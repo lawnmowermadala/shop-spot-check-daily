@@ -1,19 +1,21 @@
-
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CirclePause, CirclePlay, CircleCheck } from 'lucide-react';
+import AssigneeSelect from './AssigneeSelect';
 
 interface ChecklistItemProps {
   area: string;
   description: string;
+  assignees: { id: string; name: string }[];
 }
 
-const ChecklistItem: React.FC<ChecklistItemProps> = ({ area, description }) => {
+const ChecklistItem: React.FC<ChecklistItemProps> = ({ area, description, assignees }) => {
   const [status, setStatus] = useState<'needs-check' | 'in-progress' | 'done'>('needs-check');
   const [comment, setComment] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [assigneeId, setAssigneeId] = useState('');
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,6 +54,12 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({ area, description }) => {
         </div>
         <p className="text-sm text-gray-600 mb-4">{description}</p>
         
+        <AssigneeSelect
+          value={assigneeId}
+          onChange={setAssigneeId}
+          assignees={assignees}
+        />
+
         <Textarea
           placeholder="Add your comments here..."
           value={comment}

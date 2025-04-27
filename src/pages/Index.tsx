@@ -1,6 +1,8 @@
-
 import { useState } from 'react';
 import ChecklistItem from '@/components/ChecklistItem';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { UserPlus } from 'lucide-react';
 
 const shopAreas = [
   {
@@ -46,6 +48,19 @@ const shopAreas = [
 ];
 
 const Index = () => {
+  const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
+  const [newAssigneeName, setNewAssigneeName] = useState('');
+
+  const handleAddAssignee = () => {
+    if (newAssigneeName.trim()) {
+      setAssignees([
+        ...assignees,
+        { id: Date.now().toString(), name: newAssigneeName.trim() }
+      ]);
+      setNewAssigneeName('');
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6 text-center">Daily Shop Check</h1>
@@ -57,6 +72,26 @@ const Index = () => {
           day: 'numeric' 
         })}
       </p>
+
+      <div className="mb-6 space-y-2">
+        <h2 className="text-lg font-semibold">Staff Members</h2>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Add staff member..."
+            value={newAssigneeName}
+            onChange={(e) => setNewAssigneeName(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleAddAssignee()}
+          />
+          <Button onClick={handleAddAssignee} variant="outline">
+            <UserPlus className="h-4 w-4" />
+          </Button>
+        </div>
+        {assignees.length > 0 && (
+          <div className="text-sm text-gray-600">
+            Staff: {assignees.map(a => a.name).join(', ')}
+          </div>
+        )}
+      </div>
       
       <div className="space-y-4">
         {shopAreas.map((area, index) => (
@@ -64,6 +99,7 @@ const Index = () => {
             key={index}
             area={area.area}
             description={area.description}
+            assignees={assignees}
           />
         ))}
       </div>
