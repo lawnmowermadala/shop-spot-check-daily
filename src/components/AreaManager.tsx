@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from 'lucide-react';
@@ -12,6 +12,11 @@ interface AreaManagerProps {
 const AreaManager: React.FC<AreaManagerProps> = ({ areas, onAddArea }) => {
   const [newArea, setNewArea] = useState('');
   const [newDescription, setNewDescription] = useState('');
+
+  useEffect(() => {
+    // Store areas in localStorage for use by other components
+    localStorage.setItem('areas', JSON.stringify(areas));
+  }, [areas]);
 
   const handleAddArea = () => {
     if (newArea.trim() && newDescription.trim()) {

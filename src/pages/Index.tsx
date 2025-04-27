@@ -1,9 +1,11 @@
+
 import { useState } from 'react';
 import ChecklistItem from '@/components/ChecklistItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UserPlus } from 'lucide-react';
 import AreaManager from '@/components/AreaManager';
+import Navigation from '@/components/Navigation';
 
 interface Area {
   area: string;
@@ -61,16 +63,24 @@ const Index = () => {
 
   const handleAddAssignee = () => {
     if (newAssigneeName.trim()) {
-      setAssignees([
-        ...assignees,
-        { id: Date.now().toString(), name: newAssigneeName.trim() }
-      ]);
+      const newAssignee = { 
+        id: Date.now().toString(), 
+        name: newAssigneeName.trim() 
+      };
+      
+      setAssignees([...assignees, newAssignee]);
       setNewAssigneeName('');
+      
+      // Store staff members in localStorage for use by other components
+      const updatedAssignees = [...assignees, newAssignee];
+      localStorage.setItem('staffMembers', JSON.stringify(updatedAssignees));
     }
   };
 
   const handleAddArea = (area: string, description: string) => {
-    setAreas([...areas, { area, description }]);
+    const newAreas = [...areas, { area, description }];
+    setAreas(newAreas);
+    // The localStorage update is handled in the AreaManager component
   };
 
   const handleAssignment = (areaName: string, assigneeId: string) => {
@@ -81,7 +91,7 @@ const Index = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto p-4">
+    <div className="max-w-md mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6 text-center">Daily Shop Check</h1>
       <p className="text-gray-600 mb-6 text-center">
         {new Date().toLocaleDateString('en-US', { 
@@ -126,6 +136,8 @@ const Index = () => {
           />
         ))}
       </div>
+      
+      <Navigation />
     </div>
   );
 };

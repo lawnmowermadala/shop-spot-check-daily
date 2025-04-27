@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { CirclePause, CirclePlay, CircleCheck } from 'lucide-react';
+import { CirclePause, CirclePlay, CircleCheck, Star } from 'lucide-react';
 import AssigneeSelect from './AssigneeSelect';
 
 interface ChecklistItemProps {
@@ -24,10 +25,42 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
   const [comment, setComment] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [assigneeId, setAssigneeId] = useState('');
+  const [rating, setRating] = useState<number>(0);
+  const [showRating, setShowRating] = useState(false);
 
   const handleAssigneeChange = (id: string) => {
     setAssigneeId(id);
     onAssign(id);
+    
+    // When a task is assigned, create/update an assignment record in localStorage
+    const assignments = JSON.parse(localStorage.getItem('assignments') || '[]');
+    const selectedAssignee = assignees.find(a => a.id === id);
+    
+    if (selectedAssignee) {
+      const newAssignment = {
+        id: `${area}-${Date.now()}`,
+        area: area,
+        assignee: selectedAssignee.name,
+        assigneeId: selectedAssignee.id,
+        status: status,
+        assignedDate: new Date().toISOString().split('T')[0]
+      };
+      
+      const existingAssignmentIndex = assignments.findIndex(
+        (a: any) => a.area === area && a.status !== 'done'
+      );
+      
+      if (existingAssignmentIndex !== -1) {
+        assignments[existingAssignmentIndex] = newAssignment;
+      } else {
+        assignments.push(newAssignment);
+      }
+      
+      localStorage.setItem('assignments', JSON.stringify(assignments));
+      
+      // Save staff members to localStorage for other components to use
+      localStorage.setItem('staffMembers', JSON.stringify(assignees));
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,7 +86,50 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
     const statuses: ('needs-check' | 'in-progress' | 'done')[] = ['needs-check', 'in-progress', 'done'];
     const currentIndex = statuses.indexOf(status);
     const nextIndex = (currentIndex + 1) % statuses.length;
-    setStatus(statuses[nextIndex]);
+    const newStatus = statuses[nextIndex];
+    setStatus(newStatus);
+    
+    // If the status changes to done, prompt for a rating
+    if (newStatus === 'done' && assigneeId) {
+      setShowRating(true);
+    }
+    
+    // Update the assignment status in localStorage
+    if (assigneeId) {
+      const assignments = JSON.parse(localStorage.getItem('assignments') || '[]');
+      const assignmentIndex = assignments.findIndex(
+        (a: any) => a.area === area && a.assigneeId === assigneeId
+      );
+      
+      if (assignmentIndex !== -1) {
+        assignments[assignmentIndex].status = newStatus;
+        localStorage.setItem('assignments', JSON.stringify(assignments));
+      }
+    }
+  };
+  
+  const handleRating = (value: number) => {
+    setRating(value);
+    
+    // Save the rating to localStorage
+    if (assigneeId) {
+      const ratings = JSON.parse(localStorage.getItem('ratings') || '[]');
+      const selectedAssignee = assignees.find(a => a.id === assigneeId);
+      
+      if (selectedAssignee) {
+        const newRating = {
+          staffId: assigneeId,
+          staffName: selectedAssignee.name,
+          area: area,
+          rating: value,
+          date: new Date().toISOString().split('T')[0],
+          comment: comment
+        };
+        
+        ratings.push(newRating);
+        localStorage.setItem('ratings', JSON.stringify(ratings));
+      }
+    }
   };
 
   return (
@@ -86,6 +162,26 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
           onChange={(e) => setComment(e.target.value)}
           className="mb-4"
         />
+
+        {showRating && status === 'done' && (
+          <div className="mb-4">
+            <p className="mb-2 font-medium">Rate task completion:</p>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <Button
+                  key={value}
+                  variant="ghost"
+                  className="p-1"
+                  onClick={() => handleRating(value)}
+                >
+                  <Star 
+                    className={`h-6 w-6 ${rating >= value ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
+                  />
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           <div className="flex items-center gap-4">
