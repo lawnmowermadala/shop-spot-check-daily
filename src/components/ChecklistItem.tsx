@@ -9,13 +9,26 @@ interface ChecklistItemProps {
   area: string;
   description: string;
   assignees: { id: string; name: string }[];
+  onAssign: (assigneeId: string) => void;
+  isAssigned: boolean;
 }
 
-const ChecklistItem: React.FC<ChecklistItemProps> = ({ area, description, assignees }) => {
+const ChecklistItem: React.FC<ChecklistItemProps> = ({ 
+  area, 
+  description, 
+  assignees,
+  onAssign,
+  isAssigned
+}) => {
   const [status, setStatus] = useState<'needs-check' | 'in-progress' | 'done'>('needs-check');
   const [comment, setComment] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [assigneeId, setAssigneeId] = useState('');
+
+  const handleAssigneeChange = (id: string) => {
+    setAssigneeId(id);
+    onAssign(id);
+  };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,7 +60,14 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({ area, description, assign
     <Card className="mb-4 p-4">
       <div className={`status-${status} rounded-lg p-4 border`}>
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-lg font-semibold">{area}</h3>
+          <div>
+            <h3 className="text-lg font-semibold">{area}</h3>
+            {isAssigned && (
+              <span className="text-xs text-green-600 font-medium">
+                Assigned for today
+              </span>
+            )}
+          </div>
           <Button variant="ghost" onClick={cycleStatus}>
             {getStatusIcon()}
           </Button>
@@ -56,7 +76,7 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({ area, description, assign
         
         <AssigneeSelect
           value={assigneeId}
-          onChange={setAssigneeId}
+          onChange={handleAssigneeChange}
           assignees={assignees}
         />
 

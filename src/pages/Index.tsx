@@ -3,8 +3,14 @@ import ChecklistItem from '@/components/ChecklistItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UserPlus } from 'lucide-react';
+import AreaManager from '@/components/AreaManager';
 
-const shopAreas = [
+interface Area {
+  area: string;
+  description: string;
+}
+
+const initialShopAreas: Area[] = [
   {
     area: "Front Entrance",
     description: "Check cleanliness of entrance area, windows, and door handles"
@@ -48,8 +54,10 @@ const shopAreas = [
 ];
 
 const Index = () => {
+  const [areas, setAreas] = useState<Area[]>(initialShopAreas);
   const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
   const [newAssigneeName, setNewAssigneeName] = useState('');
+  const [assignedAreas, setAssignedAreas] = useState<Record<string, string>>({});
 
   const handleAddAssignee = () => {
     if (newAssigneeName.trim()) {
@@ -59,6 +67,17 @@ const Index = () => {
       ]);
       setNewAssigneeName('');
     }
+  };
+
+  const handleAddArea = (area: string, description: string) => {
+    setAreas([...areas, { area, description }]);
+  };
+
+  const handleAssignment = (areaName: string, assigneeId: string) => {
+    setAssignedAreas(prev => ({
+      ...prev,
+      [areaName]: assigneeId
+    }));
   };
 
   return (
@@ -92,14 +111,18 @@ const Index = () => {
           </div>
         )}
       </div>
+
+      <AreaManager areas={areas} onAddArea={handleAddArea} />
       
       <div className="space-y-4">
-        {shopAreas.map((area, index) => (
+        {areas.map((area, index) => (
           <ChecklistItem
             key={index}
             area={area.area}
             description={area.description}
             assignees={assignees}
+            onAssign={(assigneeId) => handleAssignment(area.area, assigneeId)}
+            isAssigned={!!assignedAreas[area.area]}
           />
         ))}
       </div>
