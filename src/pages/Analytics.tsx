@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -43,6 +42,9 @@ import {
 import Navigation from '@/components/Navigation';
 import { supabase } from '../lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { DateRange } from 'react-day-picker';
+import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 // Colors for charts
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -66,11 +68,15 @@ const Analytics = () => {
   const [areaNeglect, setAreaNeglect] = useState<any[]>([]);
   const [timelineData, setTimelineData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
   const { toast } = useToast();
   
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [dateRange]);
   
   const fetchData = async () => {
     try {
@@ -159,13 +165,27 @@ const Analytics = () => {
       const mergedAreas = supabaseAreas.length > 0 ? supabaseAreas : areas;
       const mergedStaff = supabaseStaff.length > 0 ? supabaseStaff : staffMembers;
       
+      // Filter data by date range
+      const from = dateRange?.from || new Date(0);
+      const to = dateRange?.to || new Date();
+      
+      const filteredAssignments = mergedAssignments.filter(assignment => {
+        const date = new Date(assignment.assignedDate || assignment.assigned_date);
+        return isWithinInterval(date, { start: from, end: to });
+      });
+      
+      const filteredRatings = mergedRatings.filter(rating => {
+        const date = new Date(rating.date);
+        return isWithinInterval(date, { start: from, end: to });
+      });
+      
       // Process area analytics
       const areaAnalytics = mergedAreas.map(area => {
         const areaName = area.area || area.name;
-        const areaAssignments = mergedAssignments.filter(
+        const areaAssignments = filteredAssignments.filter(
           a => (a.area === areaName) || (a.area_name === areaName)
         );
-        const areaRatings = mergedRatings.filter(
+        const areaRatings = filteredRatings.filter(
           r => (r.area === areaName) || (r.area_name === areaName)
         );
         
@@ -277,11 +297,11 @@ const Analytics = () => {
       // Process staff analytics
       const staffAnalytics = mergedStaff.map(staff => {
         const staffId = staff.id;
-        const staffRatings = mergedRatings.filter(r => 
+        const staffRatings = filteredRatings.filter(r => 
           r.staffId === staffId || r.staff_id === staffId
         );
         
-        const staffAssignments = mergedAssignments.filter(a => 
+        const staffAssignments = filteredAssignments.filter(a => 
           a.assigneeId === staffId || a.assignee_id === staffId
         );
         
@@ -317,26 +337,11 @@ const Analytics = () => {
                 }
               });
             } else {
-              // Handle Supabase rating format
-              if (rating.overall) {
-                totals.overall += rating.overall;
+              // Handle Supabase format
+              const key = aspectName.toLowerCase().replace(/\s+/g, '_');
+              if (rating[key]) {
+                totals.overall += rating[key];
                 counts.overall++;
-              }
-              if (rating.product_knowledge) {
-                totals.product_knowledge += rating.product_knowledge;
-                counts.product_knowledge++;
-              }
-              if (rating.job_performance) {
-                totals.job_performance += rating.job_performance;
-                counts.job_performance++;
-              }
-              if (rating.customer_service) {
-                totals.customer_service += rating.customer_service;
-                counts.customer_service++;
-              }
-              if (rating.teamwork) {
-                totals.teamwork += rating.teamwork;
-                counts.teamwork++;
               }
             }
           });
@@ -364,9 +369,9 @@ const Analytics = () => {
       });
       
       // Status distribution
-      const needsCheck = mergedAssignments.filter(a => a.status === 'needs-check').length;
-      const inProgress = mergedAssignments.filter(a => a.status === 'in-progress').length;
-      const completed = mergedAssignments.filter(a => a.status === 'done' || a.status === 'completed').length;
+      const needsCheck = filteredAssignments.filter(a => a.status === 'needs-check').length;
+      const inProgress = filteredAssignments.filter(a => a.status === 'in-progress').length;
+      const completed = filteredAssignments.filter(a => a.status === 'done' || a.status === 'completed').length;
       
       // Aspect performance across all staff
       const aspectData = [];
@@ -408,9 +413,9 @@ const Analytics = () => {
         }));
       }
       
-      // Generate timeline data (by month)
+      // Generate timeline data by month from filtered assignments
       const timelineByMonth = new Map();
-      mergedAssignments.forEach(assignment => {
+      filteredAssignments.forEach(assignment => {
         const date = new Date(assignment.assignedDate || assignment.assigned_date);
         const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
         
@@ -483,6 +488,21 @@ const Analytics = () => {
   return (
     <div className="container mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6">Analytics</h1>
+      
+      <div className="mb-6">
+        <DateRangePicker 
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          className="max-w-md"
+        />
+        {dateRange?.from && (
+          <p className="text-sm text-muted-foreground mt-2">
+            Showing data for: {format(dateRange.from, "MMMM d, yyyy")} 
+            {dateRange.to && dateRange.to !== dateRange.from && 
+              ` to ${format(dateRange.to, "MMMM d, yyyy")}`}
+          </p>
+        )}
+      </div>
       
       <div className="grid gap-6 md:grid-cols-2">
         {/* Task Status Distribution */}

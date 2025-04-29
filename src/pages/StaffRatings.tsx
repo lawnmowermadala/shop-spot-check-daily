@@ -12,12 +12,17 @@ import {
   Card, 
   CardContent, 
   CardHeader, 
-  CardTitle 
+  CardTitle,
+  CardDescription
 } from "@/components/ui/card";
-import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
+import { Star, Award, ThumbsUp, HeadphonesIcon, Users, Trophy, Medal } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '../lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { DateRange } from 'react-day-picker';
+import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 type RatingAspect = {
   name: string;
@@ -34,11 +39,26 @@ type StaffRating = {
   aspects: RatingAspect[];
 };
 
+type TopPerformer = {
+  staffId: string;
+  staffName: string;
+  count: number;
+  average: number;
+  aspects: {
+    [key: string]: number;
+  };
+};
+
 const StaffRatings = () => {
   const [ratings, setRatings] = useState<StaffRating[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<string | 'all'>('all');
   const [staffMembers, setStaffMembers] = useState<{id: string; name: string}[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
+  const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
   const { toast } = useToast();
 
   const fetchRatings = async () => {
@@ -118,9 +138,100 @@ const StaffRatings = () => {
     fetchRatings();
   }, []);
   
-  const filteredRatings = selectedStaff === 'all' 
-    ? ratings 
-    : ratings.filter(rating => rating.staffId === selectedStaff);
+  useEffect(() => {
+    calculateTopPerformers();
+  }, [ratings, dateRange]);
+  
+  const calculateTopPerformers = () => {
+    if (!dateRange?.from || !ratings.length) return;
+    
+    const to = dateRange.to || dateRange.from;
+    
+    // Filter ratings by date range
+    const filteredRatings = ratings.filter(rating => {
+      const ratingDate = new Date(rating.date);
+      return isWithinInterval(ratingDate, { 
+        start: dateRange.from as Date, 
+        end: to 
+      });
+    });
+    
+    // Group by staff
+    const staffPerformance = new Map<string, TopPerformer>();
+    
+    filteredRatings.forEach(rating => {
+      if (!staffPerformance.has(rating.staffId)) {
+        staffPerformance.set(rating.staffId, {
+          staffId: rating.staffId,
+          staffName: rating.staffName,
+          count: 0,
+          average: 0,
+          aspects: {
+            'Overall': 0,
+            'Product Knowledge': 0,
+            'Job Performance': 0,
+            'Customer Service': 0,
+            'Teamwork': 0
+          }
+        });
+      }
+      
+      const staff = staffPerformance.get(rating.staffId)!;
+      staff.count += 1;
+      
+      // Sum up all aspect ratings
+      rating.aspects.forEach(aspect => {
+        if (!staff.aspects[aspect.name]) {
+          staff.aspects[aspect.name] = 0;
+        }
+        staff.aspects[aspect.name] += aspect.rating;
+      });
+    });
+    
+    // Calculate averages and sort
+    const performers = Array.from(staffPerformance.values())
+      .map(staff => {
+        // Calculate average for each aspect
+        Object.keys(staff.aspects).forEach(aspect => {
+          staff.aspects[aspect] = staff.aspects[aspect] / staff.count;
+        });
+        
+        // Calculate overall average across all aspects
+        const sum = Object.values(staff.aspects).reduce((a, b) => a + b, 0);
+        staff.average = sum / Object.keys(staff.aspects).length;
+        
+        return staff;
+      })
+      .sort((a, b) => {
+        // Sort by count first, then by average
+        if (b.count !== a.count) {
+          return b.count - a.count;
+        }
+        return b.average - a.average;
+      });
+    
+    setTopPerformers(performers);
+  };
+
+  const filteredRatingsByDate = (ratings: StaffRating[]) => {
+    if (!dateRange?.from) return ratings;
+    
+    const to = dateRange.to || dateRange.from;
+    
+    return ratings.filter(rating => {
+      const ratingDate = new Date(rating.date);
+      return isWithinInterval(ratingDate, { 
+        start: dateRange.from as Date, 
+        end: to 
+      });
+    });
+  };
+  
+  const filteredRatings = filteredRatingsByDate(
+    selectedStaff === 'all' 
+      ? ratings 
+      : ratings.filter(rating => rating.staffId === selectedStaff)
+  );
 
   const renderStars = (rating: number) => {
     return Array(5).fill(0).map((_, i) => (
@@ -132,7 +243,7 @@ const StaffRatings = () => {
   };
 
   const calculateAverageRating = (staffId: string, aspectName?: string) => {
-    const staffRatings = ratings.filter(r => r.staffId === staffId);
+    const staffRatings = filteredRatingsByDate(ratings.filter(r => r.staffId === staffId));
     if (staffRatings.length === 0) return 0;
     
     if (aspectName) {
@@ -185,25 +296,142 @@ const StaffRatings = () => {
     <div className="container mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6">Staff Ratings</h1>
       
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="w-full md:w-1/2">
+          <DateRangePicker 
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
+        </div>
+        <div className="w-full md:w-1/2">
+          <select 
+            className="w-full p-2 border rounded-md"
+            value={selectedStaff}
+            onChange={(e) => setSelectedStaff(e.target.value)}
+          >
+            <option value="all">All Staff Members</option>
+            {staffMembers.map(staff => (
+              <option key={staff.id} value={staff.id}>{staff.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      
       <div className="grid gap-6">
+        {/* Top Performers Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              Top Performers
+            </CardTitle>
+            <CardDescription>
+              {dateRange?.from && (
+                <>
+                  For period: {format(dateRange.from, "MMMM d, yyyy")} 
+                  {dateRange.to && dateRange.to !== dateRange.from && 
+                    ` - ${format(dateRange.to, "MMMM d, yyyy")}`}
+                </>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Rank</TableHead>
+                    <TableHead>Staff</TableHead>
+                    <TableHead>Ratings Count</TableHead>
+                    <TableHead>Overall Avg</TableHead>
+                    <TableHead>Highest Aspect</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6">
+                        Loading top performers...
+                      </TableCell>
+                    </TableRow>
+                  ) : topPerformers.length > 0 ? (
+                    topPerformers.slice(0, 3).map((performer, index) => {
+                      // Find highest rated aspect
+                      const aspects = Object.entries(performer.aspects);
+                      const highestAspect = aspects.reduce((highest, current) => 
+                        current[1] > highest[1] ? current : highest, 
+                        aspects[0]
+                      );
+                      
+                      return (
+                        <TableRow key={performer.staffId}>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {index === 0 ? (
+                                <Trophy className="h-5 w-5 text-yellow-500" />
+                              ) : index === 1 ? (
+                                <Medal className="h-5 w-5 text-gray-400" />
+                              ) : index === 2 ? (
+                                <Medal className="h-5 w-5 text-amber-600" />
+                              ) : (
+                                <span>{index + 1}</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">{performer.staffName}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{performer.count}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <div className="flex">
+                                {renderStars(Math.round(performer.average))}
+                              </div>
+                              <span className="text-xs font-medium ml-1">
+                                ({performer.average.toFixed(1)})
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {getAspectIcon(highestAspect[0])}
+                              <span className="text-sm">{highestAspect[0]}: </span>
+                              <div className="flex">
+                                {renderStars(Math.round(highestAspect[1]))}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                        No ratings found for the selected period
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Ratings List Card */}
         <Card>
           <CardHeader>
             <CardTitle>Staff Performance Ratings</CardTitle>
+            <CardDescription>
+              {filteredRatings.length} ratings found
+              {dateRange?.from && (
+                <> for period {format(dateRange.from, "MMM d, yyyy")} 
+                  {dateRange.to && dateRange.to !== dateRange.from && 
+                    ` - ${format(dateRange.to, "MMM d, yyyy")}`}
+                </>
+              )}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4">
-              <select 
-                className="w-full p-2 border rounded-md"
-                value={selectedStaff}
-                onChange={(e) => setSelectedStaff(e.target.value)}
-              >
-                <option value="all">All Staff Members</option>
-                {staffMembers.map(staff => (
-                  <option key={staff.id} value={staff.id}>{staff.name}</option>
-                ))}
-              </select>
-            </div>
-
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -247,7 +475,7 @@ const StaffRatings = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                        No ratings found
+                        No ratings found for the selected period
                       </TableCell>
                     </TableRow>
                   )}
@@ -257,9 +485,13 @@ const StaffRatings = () => {
           </CardContent>
         </Card>
         
+        {/* Staff Summary */}
         <Card>
           <CardHeader>
             <CardTitle>Staff Summary</CardTitle>
+            <CardDescription>
+              Performance metrics for the selected date range
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -272,7 +504,7 @@ const StaffRatings = () => {
                     <TableHead>Job Performance</TableHead>
                     <TableHead>Customer Service</TableHead>
                     <TableHead>Teamwork</TableHead>
-                    <TableHead>Total Tasks</TableHead>
+                    <TableHead>Total Ratings</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -284,7 +516,9 @@ const StaffRatings = () => {
                     </TableRow>
                   ) : staffMembers.length > 0 ? (
                     staffMembers.map((staff) => {
-                      const staffRatings = ratings.filter(r => r.staffId === staff.id);
+                      const staffRatings = filteredRatingsByDate(
+                        ratings.filter(r => r.staffId === staff.id)
+                      );
                       
                       return (
                         <TableRow key={staff.id}>
