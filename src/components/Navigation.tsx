@@ -7,6 +7,10 @@ const Navigation = () => {
   const location = useLocation();
   
   const isActive = (path: string) => {
+    // For ratings pages, consider both /ratings and /rate-staff as active for the ratings tab
+    if (path === '/ratings' && (location.pathname === '/ratings' || location.pathname === '/rate-staff')) {
+      return true;
+    }
     return location.pathname === path;
   };
   

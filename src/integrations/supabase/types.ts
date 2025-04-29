@@ -9,7 +9,115 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      assignments: {
+        Row: {
+          area: string
+          assigned_date: string
+          assignee_id: string
+          assignee_name: string
+          id: string
+          status: string
+        }
+        Insert: {
+          area: string
+          assigned_date?: string
+          assignee_id: string
+          assignee_name: string
+          id: string
+          status: string
+        }
+        Update: {
+          area?: string
+          assigned_date?: string
+          assignee_id?: string
+          assignee_name?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ratings: {
+        Row: {
+          area: string
+          comment: string | null
+          customer_service: number
+          id: string
+          job_performance: number
+          overall: number
+          product_knowledge: number
+          rating_date: string
+          staff_id: string
+          staff_name: string
+          teamwork: number
+        }
+        Insert: {
+          area: string
+          comment?: string | null
+          customer_service: number
+          id?: string
+          job_performance: number
+          overall: number
+          product_knowledge: number
+          rating_date?: string
+          staff_id: string
+          staff_name: string
+          teamwork: number
+        }
+        Update: {
+          area?: string
+          comment?: string | null
+          customer_service?: number
+          id?: string
+          job_performance?: number
+          overall?: number
+          product_knowledge?: number
+          rating_date?: string
+          staff_id?: string
+          staff_name?: string
+          teamwork?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ratings_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_members: {
+        Row: {
+          created_at: string
+          department: string | null
+          id: string
+          name: string
+          position: string | null
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          id?: string
+          name: string
+          position?: string | null
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          id?: string
+          name?: string
+          position?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

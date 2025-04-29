@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { 
   Table, 
@@ -15,14 +14,16 @@ import {
   CardTitle,
   CardDescription
 } from "@/components/ui/card";
-import { Star, Award, ThumbsUp, HeadphonesIcon, Users, Trophy, Medal } from 'lucide-react';
+import { Star, Award, ThumbsUp, HeadphonesIcon, Users, Trophy, Medal, Plus } from 'lucide-react';
 import Navigation from '@/components/Navigation';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { format, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Button } from "@/components/ui/button";
+import { Link } from 'react-router-dom';
 
 type RatingAspect = {
   name: string;
@@ -65,13 +66,7 @@ const StaffRatings = () => {
     try {
       setLoading(true);
       
-      // First, check if we have ratings in localStorage
-      const storedRatings = localStorage.getItem('ratings');
-      if (storedRatings) {
-        setRatings(JSON.parse(storedRatings));
-      }
-      
-      // Then fetch from Supabase
+      // Fetch from Supabase
       const { data, error } = await supabase
         .from('ratings')
         .select('*');
@@ -83,6 +78,12 @@ const StaffRatings = () => {
           description: "Could not fetch ratings from the database. Showing locally stored data.",
           variant: "destructive"
         });
+        
+        // Fallback to localStorage
+        const storedRatings = localStorage.getItem('ratings');
+        if (storedRatings) {
+          setRatings(JSON.parse(storedRatings));
+        }
       } else if (data) {
         // Transform the Supabase data format to match our app's format
         const transformedRatings = data.map(rating => ({
@@ -102,22 +103,23 @@ const StaffRatings = () => {
         }));
         
         setRatings(transformedRatings);
-        // Update localStorage
+        // Update localStorage as backup
         localStorage.setItem('ratings', JSON.stringify(transformedRatings));
       }
       
       // Fetch staff members
-      const storedStaff = localStorage.getItem('staffMembers');
-      if (storedStaff) {
-        setStaffMembers(JSON.parse(storedStaff));
-      }
-      
       const { data: staffData, error: staffError } = await supabase
         .from('staff_members')
         .select('*');
         
       if (staffError) {
         console.error('Error fetching staff from Supabase:', staffError);
+        
+        // Fallback to localStorage
+        const storedStaff = localStorage.getItem('staffMembers');
+        if (storedStaff) {
+          setStaffMembers(JSON.parse(storedStaff));
+        }
       } else if (staffData) {
         const transformedStaff = staffData.map(staff => ({
           id: staff.id,
@@ -125,6 +127,7 @@ const StaffRatings = () => {
         }));
         
         setStaffMembers(transformedStaff);
+        // Update localStorage as backup
         localStorage.setItem('staffMembers', JSON.stringify(transformedStaff));
       }
     } catch (error) {
@@ -294,7 +297,15 @@ const StaffRatings = () => {
 
   return (
     <div className="container mx-auto p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6">Staff Ratings</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Staff Ratings</h1>
+        <Link to="/rate-staff">
+          <Button className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Rate Staff
+          </Button>
+        </Link>
+      </div>
       
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="w-full md:w-1/2">
