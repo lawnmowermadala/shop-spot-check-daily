@@ -32,6 +32,14 @@ import {
   CartesianGrid,
   Tooltip
 } from 'recharts';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
 import Navigation from '@/components/Navigation';
 import { supabase } from '../lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';

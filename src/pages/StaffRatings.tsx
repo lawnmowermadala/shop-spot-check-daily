@@ -14,7 +14,7 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import { Star, Award, ThumbsUp, CustomerService, Users } from 'lucide-react';
+import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '../lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
@@ -173,7 +173,7 @@ const StaffRatings = () => {
       case 'Job Performance':
         return <ThumbsUp className="h-4 w-4 text-green-500" />;
       case 'Customer Service':
-        return <CustomerService className="h-4 w-4 text-purple-500" />;
+        return <HeadphonesIcon className="h-4 w-4 text-purple-500" />;
       case 'Teamwork':
         return <Users className="h-4 w-4 text-orange-500" />;
       default:

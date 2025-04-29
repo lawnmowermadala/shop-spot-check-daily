@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { CirclePause, CirclePlay, CircleCheck, Star, Award, ThumbsUp, CustomerService, Users } from 'lucide-react';
+import { CirclePause, CirclePlay, CircleCheck, Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
 import AssigneeSelect from './AssigneeSelect';
 import { supabase } from '../lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
@@ -41,7 +41,7 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
     { name: "Overall", icon: <Star className="h-5 w-5" />, value: 0 },
     { name: "Product Knowledge", icon: <Award className="h-5 w-5" />, value: 0 },
     { name: "Job Performance", icon: <ThumbsUp className="h-5 w-5" />, value: 0 },
-    { name: "Customer Service", icon: <CustomerService className="h-5 w-5" />, value: 0 },
+    { name: "Customer Service", icon: <HeadphonesIcon className="h-5 w-5" />, value: 0 },
     { name: "Teamwork", icon: <Users className="h-5 w-5" />, value: 0 },
   ]);
 
