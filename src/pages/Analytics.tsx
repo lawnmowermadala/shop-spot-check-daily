@@ -338,10 +338,25 @@ const Analytics = () => {
               });
             } else {
               // Handle Supabase format
-              const key = aspectName.toLowerCase().replace(/\s+/g, '_');
-              if (rating[key]) {
-                totals.overall += rating[key];
+              if (rating.overall) {
+                totals.overall += rating.overall;
                 counts.overall++;
+              }
+              if (rating.product_knowledge) {
+                totals.product_knowledge += rating.product_knowledge;
+                counts.product_knowledge++;
+              }
+              if (rating.job_performance) {
+                totals.job_performance += rating.job_performance;
+                counts.job_performance++;
+              }
+              if (rating.customer_service) {
+                totals.customer_service += rating.customer_service;
+                counts.customer_service++;
+              }
+              if (rating.teamwork) {
+                totals.teamwork += rating.teamwork;
+                counts.teamwork++;
               }
             }
           });
