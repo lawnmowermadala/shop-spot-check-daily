@@ -21,6 +21,27 @@ const Index = () => {
   const [newArea, setNewArea] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [assignedAreas, setAssignedAreas] = useState<Record<string, string>>({});
+  const [staffMembers, setStaffMembers] = useState<Array<{ id: string; name: string }>>([]);
+
+  // Fetch staff members on component mount
+  useEffect(() => {
+    const fetchStaffMembers = async () => {
+      const { data, error } = await supabase
+        .from('staff_members')
+        .select('id, name');
+      
+      if (error) {
+        console.error('Error fetching staff members:', error);
+        return;
+      }
+      
+      setStaffMembers(data || []);
+      // Also store in localStorage for use in handleAssignment
+      localStorage.setItem('staffMembers', JSON.stringify(data));
+    };
+    
+    fetchStaffMembers();
+  }, []);
 
   // Fetch areas using a raw approach since the types don't include 'areas' yet
   const { data: areas = [], isLoading, error, refetch } = useQuery({
@@ -101,7 +122,7 @@ const Index = () => {
     if (!assignee) return;
     
     try {
-      // For assignments table, we need to generate an ID since it's required but not auto-generated in insert
+      // Generate a UUID for the assignment ID
       const id = crypto.randomUUID();
       
       const { error } = await supabase
@@ -178,7 +199,7 @@ const Index = () => {
               key={area.id}
               area={area.area}
               description={area.description}
-              assignees={[]} // Will be populated from localStorage
+              assignees={staffMembers} // Use the fetched staff members
               onAssign={(assigneeId) => handleAssignment(area.area, assigneeId)}
               isAssigned={!!assignedAreas[area.area]}
             />
