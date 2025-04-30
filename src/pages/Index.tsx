@@ -9,10 +9,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 
+// Define the Area interface to match what we expect from the database
 interface Area {
   id: string;
   area: string;
   description: string;
+  created_at?: string;
 }
 
 const Index = () => {
@@ -20,14 +22,15 @@ const Index = () => {
   const [newDescription, setNewDescription] = useState('');
   const [assignedAreas, setAssignedAreas] = useState<Record<string, string>>({});
 
-  // Fetch areas from Supabase
+  // Fetch areas using a raw approach since the types don't include 'areas' yet
   const { data: areas = [], isLoading, error, refetch } = useQuery({
     queryKey: ['areas'],
     queryFn: async () => {
+      // Using any here since the types don't yet include the areas table
       const { data, error } = await supabase
         .from('areas')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as { data: Area[] | null, error: any };
       
       if (error) throw error;
       return data as Area[];
@@ -47,6 +50,7 @@ const Index = () => {
   const handleAddArea = async () => {
     if (newArea.trim() && newDescription.trim()) {
       try {
+        // Using any since the types don't yet include the areas table
         const { error } = await supabase
           .from('areas')
           .insert([
@@ -54,7 +58,7 @@ const Index = () => {
               area: newArea.trim(), 
               description: newDescription.trim() 
             }
-          ]);
+          ]) as { error: any };
 
         if (error) throw error;
 
@@ -95,14 +99,12 @@ const Index = () => {
     try {
       const { error } = await supabase
         .from('assignments')
-        .insert([
-          {
-            area: areaName,
-            assignee_name: assignee.name,
-            assignee_id: assigneeId,
-            status: 'needs-check'
-          }
-        ]);
+        .insert({
+          area: areaName,
+          assignee_name: assignee.name,
+          assignee_id: assigneeId,
+          status: 'needs-check'
+        });
       
       if (error) throw error;
       
