@@ -26,14 +26,20 @@ const Index = () => {
   const { data: areas = [], isLoading, error, refetch } = useQuery({
     queryKey: ['areas'],
     queryFn: async () => {
-      // Using any here since the types don't yet include the areas table
-      const { data, error } = await supabase
-        .from('areas' as any)
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return (data || []) as Area[];
+      try {
+        // Cast to any to bypass TypeScript's type checking for the 'areas' table
+        const { data, error } = await supabase
+          .from('areas' as any)
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        // First cast to unknown, then to Area[] to safely handle the type conversion
+        return (data || []) as unknown as Area[];
+      } catch (err) {
+        console.error('Error fetching areas:', err);
+        return [] as Area[];
+      }
     }
   });
 
@@ -50,7 +56,7 @@ const Index = () => {
   const handleAddArea = async () => {
     if (newArea.trim() && newDescription.trim()) {
       try {
-        // Using any here since the types don't yet include the areas table
+        // Cast to any to bypass TypeScript's type checking for the 'areas' table
         const { error } = await supabase
           .from('areas' as any)
           .insert({
