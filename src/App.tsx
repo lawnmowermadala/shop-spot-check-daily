@@ -10,6 +10,8 @@ import StaffRatings from "./pages/StaffRatings";
 import RateStaff from "./pages/RateStaff";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
+import DepartmentsPage from "./pages/DepartmentsPage";
+import StaffPage from "./pages/StaffPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +34,8 @@ const App = () => (
           <Route path="/ratings" element={<StaffRatings />} />
           <Route path="/rate-staff" element={<RateStaff />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/departments" element={<DepartmentsPage />} />
+          <Route path="/staff" element={<StaffPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
