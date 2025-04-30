@@ -1,4 +1,4 @@
-// src/App.tsx
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,8 +10,6 @@ import StaffRatings from "./pages/StaffRatings";
 import RateStaff from "./pages/RateStaff";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
-import StaffPage from "./pages/StaffPage";
-import DepartmentsPage from "./pages/DepartmentsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,9 +32,7 @@ const App = () => (
           <Route path="/ratings" element={<StaffRatings />} />
           <Route path="/rate-staff" element={<RateStaff />} />
           <Route path="/analytics" element={<Analytics />} />
-          <Route path="/staff" element={<StaffPage />} />
-          <Route path="/departments" element={<DepartmentsPage />} />
-          {/* Keep this last */}
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
