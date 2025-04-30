@@ -2,7 +2,7 @@
 // src/pages/StaffPage.tsx
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSupabase } from "@/hooks/useSupabase";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,16 +150,16 @@ export default function StaffPage() {
                 required
               />
               <Select value={departmentId} onValueChange={setDepartmentId}>
-                <Select.Trigger>
-                  <Select.Value placeholder="Select Department" />
-                </Select.Trigger>
-                <Select.Content>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Department" />
+                </SelectTrigger>
+                <SelectContent>
                   {departments.map((dept) => (
-                    <Select.Item key={dept.id} value={dept.id.toString()}>
+                    <SelectItem key={dept.id} value={dept.id.toString()}>
                       {dept.name}
-                    </Select.Item>
+                    </SelectItem>
                   ))}
-                </Select.Content>
+                </SelectContent>
               </Select>
               <Button type="submit">Add Staff Member</Button>
             </form>
