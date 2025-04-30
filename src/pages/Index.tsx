@@ -28,12 +28,12 @@ const Index = () => {
     queryFn: async () => {
       // Using any here since the types don't yet include the areas table
       const { data, error } = await supabase
-        .from('areas')
+        .from('areas' as any)
         .select('*')
-        .order('created_at', { ascending: false }) as { data: Area[] | null, error: any };
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as Area[];
+      return (data || []) as Area[];
     }
   });
 
@@ -50,15 +50,13 @@ const Index = () => {
   const handleAddArea = async () => {
     if (newArea.trim() && newDescription.trim()) {
       try {
-        // Using any since the types don't yet include the areas table
+        // Using any here since the types don't yet include the areas table
         const { error } = await supabase
-          .from('areas')
-          .insert([
-            { 
-              area: newArea.trim(), 
-              description: newDescription.trim() 
-            }
-          ]) as { error: any };
+          .from('areas' as any)
+          .insert({
+            area: newArea.trim(), 
+            description: newDescription.trim() 
+          });
 
         if (error) throw error;
 
@@ -97,9 +95,13 @@ const Index = () => {
     if (!assignee) return;
     
     try {
+      // For assignments table, we need to generate an ID since it's required but not auto-generated in insert
+      const id = crypto.randomUUID();
+      
       const { error } = await supabase
         .from('assignments')
         .insert({
+          id,
           area: areaName,
           assignee_name: assignee.name,
           assignee_id: assigneeId,
