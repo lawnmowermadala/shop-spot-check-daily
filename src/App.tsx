@@ -34,25 +34,6 @@ const App = () => (
           <Route path="/ratings" element={<StaffRatings />} />
           <Route path="/rate-staff" element={<RateStaff />} />
           <Route path="/analytics" element={<Analytics />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-  const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/assignments" element={<Assignments />} />
-          <Route path="/ratings" element={<StaffRatings />} />
-          <Route path="/rate-staff" element={<RateStaff />} />
-          <Route path="/analytics" element={<Analytics />} />
-          {/* Add these new routes */}
           <Route path="/staff" element={<StaffPage />} />
           <Route path="/departments" element={<DepartmentsPage />} />
           {/* Keep this last */}

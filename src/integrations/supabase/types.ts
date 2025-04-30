@@ -44,6 +44,21 @@ export type Database = {
           },
         ]
       }
+      departments: {
+        Row: {
+          id: number
+          name: string
+        }
+        Insert: {
+          id?: number
+          name: string
+        }
+        Update: {
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
       ratings: {
         Row: {
           area: string
@@ -90,6 +105,38 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff: {
+        Row: {
+          created_at: string | null
+          department_id: number | null
+          email: string | null
+          id: number
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          department_id?: number | null
+          email?: string | null
+          id?: number
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          department_id?: number | null
+          email?: string | null
+          id?: number
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
         ]
