@@ -17,13 +17,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Check, Clock, CirclePlay } from 'lucide-react';
 import Navigation from '@/components/Navigation';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { toast } from '@/hooks/use-toast';
 
 type Assignment = {
   id: string;
   area: string;
-  assignee: string;
+  assignee_name: string;
+  assignee_id: string;
   status: 'needs-check' | 'in-progress' | 'done';
-  assignedDate: string;
+  assigned_date: string;
 }
 
 const statusIcons = {
@@ -33,17 +37,57 @@ const statusIcons = {
 };
 
 const Assignments = () => {
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filter, setFilter] = useState<'all' | 'needs-check' | 'in-progress' | 'done'>('all');
 
-  useEffect(() => {
-    // In a real app, this would fetch data from a backend
-    // For now, we'll mock some data
-    const storedAssignments = localStorage.getItem('assignments');
-    if (storedAssignments) {
-      setAssignments(JSON.parse(storedAssignments));
+  // Fetch assignments from Supabase
+  const { data: assignments = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['assignments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('*')
+        .order('assigned_date', { ascending: false });
+      
+      if (error) throw error;
+      return data as Assignment[];
     }
-  }, []);
+  });
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load assignments. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [error]);
+
+  // Update assignment status
+  const updateAssignmentStatus = async (id: string, status: Assignment['status']) => {
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .update({ status })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      refetch();
+      
+      toast({
+        title: "Status updated",
+        description: `Assignment status changed to ${status.replace('-', ' ')}`,
+      });
+    } catch (err) {
+      console.error('Error updating assignment status:', err);
+      toast({
+        title: "Error",
+        description: "Failed to update status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
   
   const filteredAssignments = filter === 'all' 
     ? assignments 
@@ -97,14 +141,21 @@ const Assignments = () => {
                   <TableHead>Assigned To</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned Date</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAssignments.length > 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6">
+                      Loading assignments...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredAssignments.length > 0 ? (
                   filteredAssignments.map((assignment) => (
                     <TableRow key={assignment.id}>
                       <TableCell className="font-medium">{assignment.area}</TableCell>
-                      <TableCell>{assignment.assignee}</TableCell>
+                      <TableCell>{assignment.assignee_name}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {statusIcons[assignment.status]}
@@ -113,12 +164,36 @@ const Assignments = () => {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>{assignment.assignedDate}</TableCell>
+                      <TableCell>
+                        {new Date(assignment.assigned_date).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          {assignment.status !== 'in-progress' && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => updateAssignmentStatus(assignment.id, 'in-progress')}
+                            >
+                              Start
+                            </Button>
+                          )}
+                          {assignment.status !== 'done' && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => updateAssignmentStatus(assignment.id, 'done')}
+                            >
+                              Complete
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                       No assignments found
                     </TableCell>
                   </TableRow>

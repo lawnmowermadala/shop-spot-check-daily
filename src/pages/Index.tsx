@@ -1,93 +1,128 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ChecklistItem from '@/components/ChecklistItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { UserPlus } from 'lucide-react';
-import AreaManager from '@/components/AreaManager';
+import { Plus } from 'lucide-react';
 import Navigation from '@/components/Navigation';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
 
 interface Area {
+  id: string;
   area: string;
   description: string;
 }
 
-const initialShopAreas: Area[] = [
-  {
-    area: "Front Entrance",
-    description: "Check cleanliness of entrance area, windows, and door handles"
-  },
-  {
-    area: "Cash Register Area",
-    description: "Ensure counter is clean and organized, check register functionality"
-  },
-  {
-    area: "Display Windows",
-    description: "Check for cleanliness, proper product arrangement, and lighting"
-  },
-  {
-    area: "Fitting Rooms",
-    description: "Inspect mirrors, hooks, and general cleanliness"
-  },
-  {
-    area: "Main Floor",
-    description: "Check aisles, product displays, and floor cleanliness"
-  },
-  {
-    area: "Storage Room",
-    description: "Verify organization, cleanliness, and inventory arrangement"
-  },
-  {
-    area: "Break Room",
-    description: "Check cleanliness, supplies, and equipment functionality"
-  },
-  {
-    area: "Restrooms",
-    description: "Inspect cleanliness, supplies, and functionality"
-  },
-  {
-    area: "Back Office",
-    description: "Check organization, cleanliness, and equipment"
-  },
-  {
-    area: "Outdoor Area",
-    description: "Inspect sidewalk, parking area, and exterior cleanliness"
-  }
-];
-
 const Index = () => {
-  const [areas, setAreas] = useState<Area[]>(initialShopAreas);
-  const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
-  const [newAssigneeName, setNewAssigneeName] = useState('');
+  const [newArea, setNewArea] = useState('');
+  const [newDescription, setNewDescription] = useState('');
   const [assignedAreas, setAssignedAreas] = useState<Record<string, string>>({});
 
-  const handleAddAssignee = () => {
-    if (newAssigneeName.trim()) {
-      const newAssignee = { 
-        id: Date.now().toString(), 
-        name: newAssigneeName.trim() 
-      };
+  // Fetch areas from Supabase
+  const { data: areas = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['areas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('areas')
+        .select('*')
+        .order('created_at', { ascending: false });
       
-      setAssignees([...assignees, newAssignee]);
-      setNewAssigneeName('');
-      
-      // Store staff members in localStorage for use by other components
-      const updatedAssignees = [...assignees, newAssignee];
-      localStorage.setItem('staffMembers', JSON.stringify(updatedAssignees));
+      if (error) throw error;
+      return data as Area[];
+    }
+  });
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load areas. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [error]);
+
+  const handleAddArea = async () => {
+    if (newArea.trim() && newDescription.trim()) {
+      try {
+        const { error } = await supabase
+          .from('areas')
+          .insert([
+            { 
+              area: newArea.trim(), 
+              description: newDescription.trim() 
+            }
+          ]);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "New area added successfully!",
+        });
+
+        // Clear inputs and refresh data
+        setNewArea('');
+        setNewDescription('');
+        refetch();
+      } catch (error) {
+        console.error('Error adding area:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add area. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } else {
+      toast({
+        title: "Warning",
+        description: "Please enter both area name and description.",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleAddArea = (area: string, description: string) => {
-    const newAreas = [...areas, { area, description }];
-    setAreas(newAreas);
-    // The localStorage update is handled in the AreaManager component
-  };
-
-  const handleAssignment = (areaName: string, assigneeId: string) => {
-    setAssignedAreas(prev => ({
-      ...prev,
-      [areaName]: assigneeId
-    }));
+  const handleAssignment = async (areaName: string, assigneeId: string) => {
+    // Get the assignee name from localStorage
+    const staffMembersStr = localStorage.getItem('staffMembers');
+    const staffMembers = staffMembersStr ? JSON.parse(staffMembersStr) : [];
+    const assignee = staffMembers.find((a: any) => a.id === assigneeId);
+    
+    if (!assignee) return;
+    
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .insert([
+          {
+            area: areaName,
+            assignee_name: assignee.name,
+            assignee_id: assigneeId,
+            status: 'needs-check'
+          }
+        ]);
+      
+      if (error) throw error;
+      
+      setAssignedAreas(prev => ({
+        ...prev,
+        [areaName]: assigneeId
+      }));
+      
+      toast({
+        title: "Success",
+        description: `Area assigned to ${assignee.name}`,
+      });
+    } catch (error) {
+      console.error('Error assigning area:', error);
+      toast({
+        title: "Error",
+        description: "Failed to assign area. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -102,40 +137,44 @@ const Index = () => {
         })}
       </p>
 
+      {/* Area Form - Now at the top */}
       <div className="mb-6 space-y-2">
-        <h2 className="text-lg font-semibold">Staff Members</h2>
-        <div className="flex gap-2">
+        <h2 className="text-lg font-semibold">Add New Area</h2>
+        <div className="space-y-2">
           <Input
-            placeholder="Add staff member..."
-            value={newAssigneeName}
-            onChange={(e) => setNewAssigneeName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleAddAssignee()}
+            placeholder="Area name..."
+            value={newArea}
+            onChange={(e) => setNewArea(e.target.value)}
+            className="mb-2"
           />
-          <Button onClick={handleAddAssignee} variant="outline">
-            <UserPlus className="h-4 w-4" />
+          <Input
+            placeholder="Description..."
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+          />
+          <Button onClick={handleAddArea} className="w-full">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Area
           </Button>
         </div>
-        {assignees.length > 0 && (
-          <div className="text-sm text-gray-600">
-            Staff: {assignees.map(a => a.name).join(', ')}
-          </div>
-        )}
       </div>
-
-      <AreaManager areas={areas} onAddArea={handleAddArea} />
       
-      <div className="space-y-4">
-        {areas.map((area, index) => (
-          <ChecklistItem
-            key={index}
-            area={area.area}
-            description={area.description}
-            assignees={assignees}
-            onAssign={(assigneeId) => handleAssignment(area.area, assigneeId)}
-            isAssigned={!!assignedAreas[area.area]}
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="text-center py-4">Loading areas...</div>
+      ) : (
+        <div className="space-y-4">
+          {areas.map((area) => (
+            <ChecklistItem
+              key={area.id}
+              area={area.area}
+              description={area.description}
+              assignees={[]} // Will be populated from localStorage
+              onAssign={(assigneeId) => handleAssignment(area.area, assigneeId)}
+              isAssigned={!!assignedAreas[area.area]}
+            />
+          ))}
+        </div>
+      )}
       
       <Navigation />
     </div>
