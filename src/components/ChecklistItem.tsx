@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import AssigneeSelect from './AssigneeSelect';
 
 interface ChecklistItemProps {
   area: string;
@@ -36,16 +37,31 @@ const ChecklistItem = ({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [localAssignees, setLocalAssignees] = useState<Array<{ id: string; name: string }>>([]);
   
-  // Get assignees from localStorage if not provided via props
+  // Fetch staff members directly from Supabase
   useEffect(() => {
-    if (propAssignees && propAssignees.length > 0) {
-      setLocalAssignees(propAssignees);
-    } else {
-      const storedStaff = localStorage.getItem('staffMembers');
-      if (storedStaff) {
-        setLocalAssignees(JSON.parse(storedStaff));
+    const fetchStaffMembers = async () => {
+      const { data, error } = await supabase
+        .from('staff_members')
+        .select('id, name');
+      
+      if (error) {
+        console.error('Error fetching staff members:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load staff members",
+          variant: "destructive"
+        });
+        return;
       }
-    }
+      
+      if (data && data.length > 0) {
+        setLocalAssignees(data);
+      } else if (propAssignees && propAssignees.length > 0) {
+        setLocalAssignees(propAssignees);
+      }
+    };
+    
+    fetchStaffMembers();
   }, [propAssignees]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 // Define the Area interface to match what we expect from the database
 interface Area {
   id: string;
-  name: string;  // Changed from 'area' to 'name' to match db schema
+  name: string;
   description: string;
   created_at?: string;
 }
@@ -23,7 +23,7 @@ const Index = () => {
   const [assignedAreas, setAssignedAreas] = useState<Record<string, string>>({});
   const [staffMembers, setStaffMembers] = useState<Array<{ id: string; name: string }>>([]);
 
-  // Fetch staff members on component mount
+  // Fetch staff members directly from Supabase
   useEffect(() => {
     const fetchStaffMembers = async () => {
       const { data, error } = await supabase
@@ -32,12 +32,15 @@ const Index = () => {
       
       if (error) {
         console.error('Error fetching staff members:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load staff members",
+          variant: "destructive"
+        });
         return;
       }
       
       setStaffMembers(data || []);
-      // Also store in localStorage for use in handleAssignment
-      localStorage.setItem('staffMembers', JSON.stringify(data));
     };
     
     fetchStaffMembers();
@@ -54,7 +57,7 @@ const Index = () => {
           .order('created_at', { ascending: false });
         
         if (error) throw error;
-        return (data || []) as unknown as Area[];
+        return (data || []) as Area[];
       } catch (err) {
         console.error('Error fetching areas:', err);
         return [] as Area[];
@@ -75,11 +78,10 @@ const Index = () => {
   const handleAddArea = async () => {
     if (newArea.trim() && newDescription.trim()) {
       try {
-        // Updated to use 'name' instead of 'area' to match the database schema
         const { error } = await supabase
           .from('areas')
           .insert({
-            name: newArea.trim(),  // Changed from 'area' to 'name'
+            name: newArea.trim(),
             description: newDescription.trim() 
           });
 
@@ -112,12 +114,19 @@ const Index = () => {
   };
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
-    // Get the assignee name from localStorage or state
-    const assignee = staffMembers.find((a) => a.id === assigneeId);
-    
-    if (!assignee) return;
-    
     try {
+      // Get the assignee name from staffMembers state
+      const assignee = staffMembers.find((staff) => staff.id === assigneeId);
+      
+      if (!assignee) {
+        toast({
+          title: "Error",
+          description: "Invalid staff selection",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       // Generate a UUID for the assignment ID
       const id = crypto.randomUUID();
       
@@ -133,7 +142,10 @@ const Index = () => {
           photo_url: photoUrl || null
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error details:', error);
+        throw error;
+      }
       
       setAssignedAreas(prev => ({
         ...prev,
@@ -195,13 +207,13 @@ const Index = () => {
           {areas.map((area) => (
             <ChecklistItem
               key={area.id}
-              area={area.name}  // Changed from area.area to area.name
+              area={area.name}
               description={area.description}
-              assignees={staffMembers} // Use the fetched staff members
+              assignees={staffMembers}
               onAssign={(assigneeId, instructions, photoUrl) => 
                 handleAssignment(area.name, assigneeId, instructions, photoUrl)
               }
-              isAssigned={!!assignedAreas[area.name]}  // Changed from area.area to area.name
+              isAssigned={!!assignedAreas[area.name]}
             />
           ))}
         </div>
