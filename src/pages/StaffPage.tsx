@@ -1,176 +1,254 @@
-
 import { useState, useEffect } from 'react';
-import { toast } from "@/components/ui/sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/lib/supabaseClient";
-import Navigation from "@/components/Navigation";
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { User, X, Upload } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
-interface Department {
-  id: number;
+interface StaffMember {
+  id: number;  // Changed from string to match your StaffPage
   name: string;
-}
-
-interface Staff {
-  id: number;
-  name: string;
-  department_id: number;
+  department_id?: number;
   department_name?: string;
 }
 
-export default function StaffPage() {
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [name, setName] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
-  const [loadingDepts, setLoadingDepts] = useState(true);
-  const [loadingStaff, setLoadingStaff] = useState(true);
+interface ChecklistItemProps {
+  area: string;
+  description: string;
+  onAssign: (assigneeId: string, instructions: string, photoUrl?: string) => void;
+  isAssigned: boolean;
+}
 
+const ChecklistItem = ({ 
+  area, 
+  description, 
+  onAssign, 
+  isAssigned 
+}: ChecklistItemProps) => {
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+
+  // Fetch staff members using the same pattern as StaffPage
   useEffect(() => {
-    fetchDepartments();
+    const fetchStaff = async () => {
+      setIsLoadingStaff(true);
+      try {
+        const { data, error } = await supabase
+          .from('staff')
+          .select(`
+            *,
+            departments:department_id (name)
+          `)
+          .order('name');
+
+        if (error) throw error;
+
+        const formattedStaff = data?.map(item => ({
+          id: item.id,
+          name: item.name,
+          department_id: item.department_id,
+          department_name: item.departments?.name || 'No Department'
+        })) || [];
+
+        setStaffMembers(formattedStaff);
+      } catch (error) {
+        console.error('Error fetching staff:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load staff members",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoadingStaff(false);
+      }
+    };
+
     fetchStaff();
   }, []);
 
-  async function fetchDepartments() {
-    try {
-      setLoadingDepts(true);
-      const { data, error } = await supabase
-        .from('departments')
-        .select('*')
-        .order('name');
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      if (error) {
-        throw error;
-      }
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setPhotoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
-      setDepartments(data || []);
-    } catch (error) {
-      toast.error("Error loading departments");
-      console.error("Error fetching departments:", error);
-    } finally {
-      setLoadingDepts(false);
-    }
-  }
-
-  async function fetchStaff() {
-    try {
-      setLoadingStaff(true);
-      // Join staff with departments to get department names
-      const { data, error } = await supabase
-        .from('staff')
-        .select(`
-          *,
-          departments:department_id (name)
-        `)
-        .order('name');
-
-      if (error) {
-        throw error;
-      }
-
-      // Transform the data to include the department name
-      const staffWithDeptNames = data?.map(item => ({
-        id: item.id,
-        name: item.name,
-        department_id: item.department_id,
-        department_name: item.departments?.name || 'No Department'
-      })) || [];
-
-      setStaff(staffWithDeptNames);
-    } catch (error) {
-      toast.error("Error loading staff members");
-      console.error("Error fetching staff:", error);
-    } finally {
-      setLoadingStaff(false);
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    
-    if (!name.trim()) {
-      toast.error("Please enter a staff name");
-      return;
-    }
-
-    if (!departmentId) {
-      toast.error("Please select a department");
+  const handleAssign = async () => {
+    if (!selectedAssigneeId) {
+      toast({
+        title: "Required",
+        description: "Please select a staff member",
+        variant: "destructive"
+      });
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('staff')
-        .insert([{ 
-          name: name.trim(), 
-          department_id: parseInt(departmentId) 
-        }]);
+      let photoUrl: string | undefined;
 
-      if (error) {
-        throw error;
+      if (photoFile) {
+        const fileExt = photoFile.name.split('.').pop();
+        const fileName = `${area}-${Date.now()}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from('area_photos')
+          .upload(fileName, photoFile);
+
+        if (error) throw error;
+        photoUrl = data.path;
       }
 
-      toast.success("Staff member added successfully");
-      setName('');
-      setDepartmentId('');
-      fetchStaff();
+      onAssign(selectedAssigneeId, instructions, photoUrl);
+      
+      setSelectedAssigneeId("");
+      setInstructions("");
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setShowAssignForm(false);
+
+      toast({
+        title: "Success",
+        description: "Area assigned successfully",
+        variant: "default"
+      });
     } catch (error) {
-      toast.error("Error adding staff member");
-      console.error("Error adding staff:", error);
+      console.error('Assignment error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to assign area",
+        variant: "destructive"
+      });
     }
-  }
+  };
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6">Staff Management</h1>
-      
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">Add New Staff Member</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            placeholder="Staff Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          
-          <Select value={departmentId} onValueChange={setDepartmentId} required>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select Department" />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map((dept) => (
-                <SelectItem key={dept.id} value={dept.id.toString()}>
-                  {dept.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Button type="submit">Add Staff Member</Button>
-        </form>
-      </div>
-
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Staff List</h2>
-        {loadingStaff ? (
-          <p className="text-center text-gray-500">Loading staff members...</p>
-        ) : staff.length > 0 ? (
-          <div className="space-y-2">
-            {staff.map((person) => (
-              <div key={person.id} className="p-3 border rounded bg-white shadow-sm">
-                <div className="font-medium">{person.name}</div>
-                <div className="text-sm text-gray-600">{person.department_name}</div>
-              </div>
-            ))}
+    <Card className={isAssigned ? "border-green-500 bg-green-50" : ""}>
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <h3 className="font-bold text-lg">{area}</h3>
+            <p className="text-gray-600 text-sm">{description}</p>
           </div>
-        ) : (
-          <p className="text-center text-gray-500">No staff members found</p>
+          
+          {isAssigned ? (
+            <Button variant="outline" className="bg-green-50" disabled>
+              <User className="h-4 w-4 mr-2 text-green-500" />
+              Assigned
+            </Button>
+          ) : showAssignForm ? (
+            <Button 
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAssignForm(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAssignForm(true)}
+            >
+              <User className="h-4 w-4 mr-2" />
+              Assign to...
+            </Button>
+          )}
+        </div>
+        
+        {showAssignForm && !isAssigned && (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5 text-gray-500" />
+              <Select
+                value={selectedAssigneeId}
+                onValueChange={setSelectedAssigneeId}
+                disabled={isLoadingStaff}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={isLoadingStaff ? "Loading staff..." : "Select staff member"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {staffMembers.length > 0 ? (
+                    staffMembers.map(member => (
+                      <SelectItem key={member.id} value={member.id.toString()}>
+                        {member.name} ({member.department_name})
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      {isLoadingStaff ? "Loading..." : "No staff available"}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Textarea
+              placeholder="Add instructions..."
+              className="min-h-[80px]"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+            />
+            
+            {photoPreview ? (
+              <div className="relative group">
+                <img
+                  src={photoPreview}
+                  alt="Preview"
+                  className="w-full rounded-md max-h-48 object-cover"
+                />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => {
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center py-3 px-4 border border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
+                <Upload className="h-5 w-5 mb-1 text-gray-500" />
+                <span className="text-sm">Upload Photo (Optional)</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </label>
+            )}
+            
+            <Button 
+              className="w-full" 
+              onClick={handleAssign}
+              disabled={!selectedAssigneeId || isLoadingStaff}
+            >
+              Confirm Assignment
+            </Button>
+          </div>
         )}
-      </div>
-      
-      <Navigation />
-    </div>
+      </CardContent>
+    </Card>
   );
-}
+};
+
+export default ChecklistItem;
