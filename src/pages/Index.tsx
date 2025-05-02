@@ -16,71 +16,85 @@ interface Area {
 }
 
 interface StaffMember {
-  id: string;
+  id: number;
   name: string;
+  department_id: number;
   department_name?: string;
+}
+
+interface Assignment {
+  id: string;
+  area: string;
+  assignee_id: string;
+  status: string;
 }
 
 const Index = () => {
   const [newArea, setNewArea] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [assignedAreas, setAssignedAreas] = useState<Record<string, string>>({});
+  const [assignedAreas, setAssignedAreas] = useState<Record<string, Assignment>>({});
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
-  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+  const [loadingStaff, setLoadingStaff] = useState(true);
 
-  // Enhanced staff fetching with proper error handling
+  // Fetch staff members with department info (same as StaffPage)
   const fetchStaffMembers = async () => {
-    setIsLoadingStaff(true);
+    setLoadingStaff(true);
     try {
-      console.log('[DEBUG] Fetching staff members from Supabase...');
-      
       const { data, error } = await supabase
-        .from('staff_members')
+        .from('staff')
         .select(`
           id,
           name,
+          department_id,
           departments:department_id (name)
         `)
-        .order('name', { ascending: true });
+        .order('name');
 
-      console.log('[DEBUG] Staff members response:', { data, error });
+      if (error) throw error;
 
-      if (error) {
-        console.error('[ERROR] Staff fetch error:', error);
-        throw error;
-      }
+      const formattedStaff = data?.map(item => ({
+        id: item.id,
+        name: item.name,
+        department_id: item.department_id,
+        department_name: item.departments?.name || 'No Department'
+      })) || [];
 
-      if (!data || data.length === 0) {
-        console.warn('[WARNING] No staff members found in database');
-        throw new Error('No staff members available');
-      }
-
-      const formattedStaff = data.map(member => ({
-        id: member.id,
-        name: member.name,
-        department_name: member.departments?.name || 'No Department'
-      }));
-
-      console.log('[DEBUG] Formatted staff:', formattedStaff);
       setStaffMembers(formattedStaff);
-      return formattedStaff;
-
     } catch (error) {
-      console.error('[ERROR] Failed to load staff:', error);
+      console.error('Error fetching staff:', error);
       toast({
-        title: "Staff Loading Failed",
-        description: "Couldn't load staff list. Please try again.",
+        title: "Error",
+        description: "Failed to load staff members",
         variant: "destructive"
       });
-      setStaffMembers([]);
-      return [];
     } finally {
-      setIsLoadingStaff(false);
+      setLoadingStaff(false);
+    }
+  };
+
+  // Fetch existing assignments
+  const fetchAssignments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('id, area, assignee_id, status');
+
+      if (error) throw error;
+
+      const assignmentsMap = data?.reduce((acc, assignment) => {
+        acc[assignment.area] = assignment;
+        return acc;
+      }, {} as Record<string, Assignment>);
+
+      setAssignedAreas(assignmentsMap || {});
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
     }
   };
 
   useEffect(() => {
     fetchStaffMembers();
+    fetchAssignments();
   }, []);
 
   // Fetch areas using React Query
@@ -102,21 +116,11 @@ const Index = () => {
     }
   });
 
-  useEffect(() => {
-    if (areasError) {
-      toast({
-        title: "Error",
-        description: "Failed to load areas. Please try again.",
-        variant: "destructive"
-      });
-    }
-  }, [areasError]);
-
   const handleAddArea = async () => {
     if (!newArea.trim() || !newDescription.trim()) {
       toast({
         title: "Warning",
-        description: "Please enter both area name and description.",
+        description: "Please enter both area name and description",
         variant: "destructive"
       });
       return;
@@ -127,7 +131,7 @@ const Index = () => {
         .from('areas')
         .insert({
           name: newArea.trim(),
-          description: newDescription.trim() 
+          description: newDescription.trim()
         });
 
       if (error) throw error;
@@ -152,9 +156,7 @@ const Index = () => {
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
     try {
-      console.log('[DEBUG] Assigning area:', { areaName, assigneeId, instructions, photoUrl });
-      
-      const assignee = staffMembers.find(staff => staff.id === assigneeId);
+      const assignee = staffMembers.find(staff => staff.id === parseInt(assigneeId));
       
       if (!assignee) {
         toast({
@@ -164,31 +166,46 @@ const Index = () => {
         });
         return;
       }
+
+      const assignmentData = {
+        area: areaName,
+        assignee_id: assigneeId,
+        assignee_name: assignee.name,
+        status: 'pending',
+        instructions,
+        photo_url: photoUrl || null
+      };
+
+      // Check if assignment exists
+      const existingAssignment = assignedAreas[areaName];
       
-      const { error } = await supabase
-        .from('assignments')
-        .insert({
-          area: areaName,
-          assignee_name: assignee.name,
-          assignee_id: assigneeId,
-          status: 'needs-check',
-          instructions: instructions,
-          photo_url: photoUrl || null
-        });
-      
+      let error;
+      if (existingAssignment) {
+        // Update existing assignment
+        const { error: updateError } = await supabase
+          .from('assignments')
+          .update(assignmentData)
+          .eq('id', existingAssignment.id);
+        error = updateError;
+      } else {
+        // Create new assignment
+        const { error: insertError } = await supabase
+          .from('assignments')
+          .insert(assignmentData);
+        error = insertError;
+      }
+
       if (error) throw error;
-      
-      setAssignedAreas(prev => ({
-        ...prev,
-        [areaName]: assigneeId
-      }));
-      
+
+      // Refresh assignments
+      await fetchAssignments();
+
       toast({
         title: "Success",
         description: `Area assigned to ${assignee.name}`,
       });
     } catch (error) {
-      console.error('[ERROR] Assignment failed:', error);
+      console.error('Error assigning area:', error);
       toast({
         title: "Error",
         description: "Failed to assign area. Please try again.",
@@ -209,7 +226,7 @@ const Index = () => {
         })}
       </p>
 
-      {/* Area Form */}
+      {/* Add New Area Form */}
       <div className="mb-6 space-y-2">
         <h2 className="text-lg font-semibold">Add New Area</h2>
         <div className="space-y-2">
@@ -242,18 +259,27 @@ const Index = () => {
       ) : (
         <div className="space-y-4">
           {areas.length > 0 ? (
-            areas.map((area) => (
-              <ChecklistItem
-                key={area.id}
-                area={area.name}
-                description={area.description}
-                assignees={staffMembers}
-                onAssign={(assigneeId, instructions, photoUrl) => 
-                  handleAssignment(area.name, assigneeId, instructions, photoUrl)
-                }
-                isAssigned={!!assignedAreas[area.name]}
-              />
-            ))
+            areas.map((area) => {
+              const assignment = assignedAreas[area.name];
+              const isAssigned = !!assignment;
+              const assignedStaff = isAssigned 
+                ? staffMembers.find(staff => staff.id === parseInt(assignment.assignee_id))
+                : null;
+
+              return (
+                <ChecklistItem
+                  key={area.id}
+                  area={area.name}
+                  description={area.description}
+                  assignees={staffMembers}
+                  onAssign={(assigneeId, instructions, photoUrl) => 
+                    handleAssignment(area.name, assigneeId, instructions, photoUrl)
+                  }
+                  isAssigned={isAssigned}
+                  assignedTo={assignedStaff?.name}
+                />
+              );
+            })
           ) : (
             <div className="text-center py-4 text-gray-500">
               No areas found. Add your first area above.
