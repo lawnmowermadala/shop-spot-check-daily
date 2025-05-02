@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,8 +38,6 @@ const ChecklistItem = ({
   
   // Fetch staff members directly from Supabase
   useEffect(() => {
-    console.log('PropAssignees passed to ChecklistItem:', propAssignees);
-    
     const fetchStaffMembers = async () => {
       try {
         const { data, error } = await supabase
@@ -57,15 +54,12 @@ const ChecklistItem = ({
           return;
         }
         
-        console.log('Fetched staff members in ChecklistItem:', data);
+        console.log('Fetched staff members:', data);
         
         if (data && data.length > 0) {
           setLocalAssignees(data);
         } else if (propAssignees && propAssignees.length > 0) {
           setLocalAssignees(propAssignees);
-          console.log('Using prop assignees instead:', propAssignees);
-        } else {
-          console.log('No staff members available');
         }
       } catch (err) {
         console.error('Exception fetching staff:', err);
@@ -191,7 +185,7 @@ const ChecklistItem = ({
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Assign to..." />
                 </SelectTrigger>
-                <SelectContent className="bg-white">
+                <SelectContent>
                   {localAssignees && localAssignees.length > 0 ? (
                     localAssignees.map(assignee => (
                       <SelectItem key={assignee.id} value={assignee.id}>
