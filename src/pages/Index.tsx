@@ -1,235 +1,250 @@
-
 import { useState, useEffect } from 'react';
-import ChecklistItem from '@/components/ChecklistItem';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Plus } from 'lucide-react';
-import Navigation from '@/components/Navigation';
+import { User, X, Upload } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
 
-// Define the Area interface to match what we expect from the database
-interface Area {
+interface StaffMember {
   id: string;
   name: string;
-  description: string;
-  created_at?: string;
 }
 
-const Index = () => {
-  const [newArea, setNewArea] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [assignedAreas, setAssignedAreas] = useState<Record<string, string>>({});
-  const [staffMembers, setStaffMembers] = useState<Array<{ id: string; name: string }>>([]);
+interface ChecklistItemProps {
+  area: string;
+  description: string;
+  assignees?: StaffMember[];
+  onAssign: (assigneeId: string, instructions: string, photoUrl?: string) => void;
+  isAssigned: boolean;
+}
 
-  // Fetch staff members directly from Supabase
+const ChecklistItem = ({ 
+  area, 
+  description, 
+  assignees = [], 
+  onAssign, 
+  isAssigned 
+}: ChecklistItemProps) => {
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Fetch staff members from Supabase
   useEffect(() => {
-    const fetchStaffMembers = async () => {
+    const fetchStaff = async () => {
+      setIsLoading(true);
       try {
         const { data, error } = await supabase
-          .from('staff_members')
-          .select('id, name');
-        
-        if (error) {
-          console.error('Error fetching staff members:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load staff members",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        console.log('Fetched staff members in Index:', data);
+          .from('staff') // Ensure this matches your table name
+          .select('id, name')
+          .eq('status', 1) // Only active staff
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+
         setStaffMembers(data || []);
-      } catch (err) {
-        console.error('Exception fetching staff in Index:', err);
+        
+        // Fallback to prop assignees if no staff found
+        if (!data?.length && assignees.length) {
+          setStaffMembers(assignees);
+        }
+      } catch (error) {
+        console.error('Error fetching staff:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load staff members",
+          variant: "destructive"
+        });
+        setStaffMembers(assignees);
+      } finally {
+        setIsLoading(false);
       }
     };
-    
-    fetchStaffMembers();
-  }, []);
 
-  // Fetch areas using React Query
-  const { data: areas = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['areas'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('areas')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        return (data || []) as Area[];
-      } catch (err) {
-        console.error('Error fetching areas:', err);
-        return [] as Area[];
-      }
-    }
-  });
+    fetchStaff();
+  }, [assignees]);
 
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load areas. Please try again.",
-        variant: "destructive"
-      });
-    }
-  }, [error]);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleAddArea = async () => {
-    if (newArea.trim() && newDescription.trim()) {
-      try {
-        const { error } = await supabase
-          .from('areas')
-          .insert({
-            name: newArea.trim(),
-            description: newDescription.trim() 
-          });
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "New area added successfully!",
-        });
-
-        // Clear inputs and refresh data
-        setNewArea('');
-        setNewDescription('');
-        refetch();
-      } catch (error) {
-        console.error('Error adding area:', error);
-        toast({
-          title: "Error",
-          description: "Failed to add area. Please try again.",
-          variant: "destructive"
-        });
-      }
-    } else {
-      toast({
-        title: "Warning",
-        description: "Please enter both area name and description.",
-        variant: "destructive"
-      });
-    }
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setPhotoPreview(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
-  const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
-    try {
-      console.log('Assignment data:', { areaName, assigneeId, instructions, photoUrl });
-      console.log('Staff members available:', staffMembers);
-      
-      // Get the assignee name from staffMembers state
-      const assignee = staffMembers.find((staff) => staff.id === assigneeId);
-      
-      if (!assignee) {
-        toast({
-          title: "Error",
-          description: "Invalid staff selection",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Generate a UUID for the assignment ID
-      const id = crypto.randomUUID();
-      
-      const { error } = await supabase
-        .from('assignments')
-        .insert({
-          id,
-          area: areaName,
-          assignee_name: assignee.name,
-          assignee_id: assigneeId,
-          status: 'needs-check',
-          instructions: instructions,
-          photo_url: photoUrl || null
-        });
-      
-      if (error) {
-        console.error('Error details:', error);
-        throw error;
-      }
-      
-      setAssignedAreas(prev => ({
-        ...prev,
-        [areaName]: assigneeId
-      }));
-      
+  const handleAssign = async () => {
+    if (!selectedAssigneeId) {
       toast({
-        title: "Success",
-        description: `Area assigned to ${assignee.name}`,
+        title: "Required",
+        description: "Please select a staff member",
+        variant: "destructive"
       });
+      return;
+    }
+
+    try {
+      let photoUrl: string | undefined;
+
+      // Upload photo if selected
+      if (photoFile) {
+        const fileExt = photoFile.name.split('.').pop();
+        const fileName = `${area}-${Date.now()}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from('task-photos')
+          .upload(fileName, photoFile);
+
+        if (error) throw error;
+        photoUrl = data.path;
+      }
+
+      // Call parent handler
+      onAssign(selectedAssigneeId, instructions, photoUrl);
+
+      // Reset form
+      setSelectedAssigneeId("");
+      setInstructions("");
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setShowAssignForm(false);
     } catch (error) {
-      console.error('Error assigning area:', error);
+      console.error('Assignment error:', error);
       toast({
         title: "Error",
-        description: "Failed to assign area. Please try again.",
+        description: "Failed to assign task",
         variant: "destructive"
       });
     }
   };
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6 text-center">Daily Shop Check</h1>
-      <p className="text-gray-600 mb-6 text-center">
-        {new Date().toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        })}
-      </p>
-
-      {/* Area Form - Now at the top */}
-      <div className="mb-6 space-y-2">
-        <h2 className="text-lg font-semibold">Add New Area</h2>
-        <div className="space-y-2">
-          <Input
-            placeholder="Area name..."
-            value={newArea}
-            onChange={(e) => setNewArea(e.target.value)}
-            className="mb-2"
-          />
-          <Input
-            placeholder="Description..."
-            value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-          />
-          <Button onClick={handleAddArea} className="w-full bg-slate-900">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Area
-          </Button>
+    <Card className={isAssigned ? "border-green-500 bg-green-50" : ""}>
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <h3 className="font-bold text-lg">{area}</h3>
+            <p className="text-gray-600 text-sm">{description}</p>
+          </div>
+          
+          {isAssigned ? (
+            <Button variant="outline" className="bg-green-50" disabled>
+              <User className="h-4 w-4 mr-2 text-green-500" />
+              Assigned
+            </Button>
+          ) : showAssignForm ? (
+            <Button 
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAssignForm(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAssignForm(true)}
+            >
+              <User className="h-4 w-4 mr-2" />
+              Assign
+            </Button>
+          )}
         </div>
-      </div>
-      
-      {isLoading ? (
-        <div className="text-center py-4">Loading areas...</div>
-      ) : (
-        <div className="space-y-4">
-          {areas.map((area) => (
-            <ChecklistItem
-              key={area.id}
-              area={area.name}
-              description={area.description}
-              assignees={staffMembers}
-              onAssign={(assigneeId, instructions, photoUrl) => 
-                handleAssignment(area.name, assigneeId, instructions, photoUrl)
-              }
-              isAssigned={!!assignedAreas[area.name]}
+        
+        {showAssignForm && !isAssigned && (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5 text-gray-500" />
+              <Select
+                value={selectedAssigneeId}
+                onValueChange={setSelectedAssigneeId}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={isLoading ? "Loading staff..." : "Select staff"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {staffMembers.length > 0 ? (
+                    staffMembers.map(member => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      {isLoading ? "Loading..." : "No staff available"}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Textarea
+              placeholder="Add instructions..."
+              className="min-h-[80px]"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
             />
-          ))}
-        </div>
-      )}
-      
-      <Navigation />
-    </div>
+            
+            <div className="space-y-2">
+              {photoPreview ? (
+                <div className="relative group">
+                  <img
+                    src={photoPreview}
+                    alt="Preview"
+                    className="w-full rounded-md max-h-48 object-cover"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => {
+                      setPhotoFile(null);
+                      setPhotoPreview(null);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center py-3 px-4 border border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
+                  <Upload className="h-5 w-5 mb-1 text-gray-500" />
+                  <span className="text-sm">Upload Photo (Optional)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              )}
+            </div>
+            
+            <Button 
+              className="w-full" 
+              onClick={handleAssign}
+              disabled={!selectedAssigneeId}
+            >
+              Confirm Assignment
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
-export default Index;
+export default ChecklistItem;
