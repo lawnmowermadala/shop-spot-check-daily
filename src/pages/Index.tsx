@@ -23,10 +23,14 @@ interface StaffMember {
 }
 
 interface Assignment {
-  id: string;
+  id?: string;
   area: string;
-  assignee_id: string;
+  assignee_id: number;
+  assignee_name: string;
   status: string;
+  instructions?: string;
+  photo_url?: string | null;
+  created_at?: string;
 }
 
 const Index = () => {
@@ -36,7 +40,7 @@ const Index = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
 
-  // Fetch staff members with department info (same as StaffPage)
+  // Fetch staff members with department info
   const fetchStaffMembers = async () => {
     setLoadingStaff(true);
     try {
@@ -52,12 +56,12 @@ const Index = () => {
 
       if (error) throw error;
 
-      const formattedStaff = data?.map(item => ({
+      const formattedStaff = (data || []).map(item => ({
         id: item.id,
         name: item.name,
         department_id: item.department_id,
         department_name: item.departments?.name || 'No Department'
-      })) || [];
+      }));
 
       setStaffMembers(formattedStaff);
     } catch (error) {
@@ -77,18 +81,23 @@ const Index = () => {
     try {
       const { data, error } = await supabase
         .from('assignments')
-        .select('id, area, assignee_id, status');
+        .select('*');
 
       if (error) throw error;
 
-      const assignmentsMap = data?.reduce((acc, assignment) => {
+      const assignmentsMap = (data || []).reduce((acc, assignment) => {
         acc[assignment.area] = assignment;
         return acc;
       }, {} as Record<string, Assignment>);
 
-      setAssignedAreas(assignmentsMap || {});
+      setAssignedAreas(assignmentsMap);
     } catch (error) {
       console.error('Error fetching assignments:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load assignments",
+        variant: "destructive"
+      });
     }
   };
 
@@ -108,7 +117,7 @@ const Index = () => {
           .order('created_at', { ascending: false });
         
         if (error) throw error;
-        return (data || []) as Area[];
+        return data as Area[];
       } catch (err) {
         console.error('Error fetching areas:', err);
         throw err;
@@ -156,7 +165,9 @@ const Index = () => {
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
     try {
-      const assignee = staffMembers.find(staff => staff.id === parseInt(assigneeId));
+      // Convert assigneeId to number (since staff.id is number in your schema)
+      const assigneeIdNum = parseInt(assigneeId);
+      const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
       
       if (!assignee) {
         toast({
@@ -167,48 +178,47 @@ const Index = () => {
         return;
       }
 
-      const assignmentData = {
+      const assignmentData: Assignment = {
         area: areaName,
-        assignee_id: assigneeId,
+        assignee_id: assigneeIdNum,
         assignee_name: assignee.name,
         status: 'pending',
-        instructions,
+        instructions: instructions || null,
         photo_url: photoUrl || null
       };
 
       // Check if assignment exists
       const existingAssignment = assignedAreas[areaName];
       
-      let error;
-      if (existingAssignment) {
+      let operation;
+      if (existingAssignment?.id) {
         // Update existing assignment
-        const { error: updateError } = await supabase
+        const { error } = await supabase
           .from('assignments')
           .update(assignmentData)
           .eq('id', existingAssignment.id);
-        error = updateError;
+        operation = 'updated';
       } else {
         // Create new assignment
-        const { error: insertError } = await supabase
+        const { error } = await supabase
           .from('assignments')
-          .insert(assignmentData);
-        error = insertError;
+          .insert(assignmentData)
+          .select();
+        operation = 'created';
       }
-
-      if (error) throw error;
 
       // Refresh assignments
       await fetchAssignments();
 
       toast({
         title: "Success",
-        description: `Area assigned to ${assignee.name}`,
+        description: `Area assignment ${operation} successfully!`,
       });
     } catch (error) {
       console.error('Error assigning area:', error);
       toast({
         title: "Error",
-        description: "Failed to assign area. Please try again.",
+        description: `Failed to assign area: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -263,7 +273,7 @@ const Index = () => {
               const assignment = assignedAreas[area.name];
               const isAssigned = !!assignment;
               const assignedStaff = isAssigned 
-                ? staffMembers.find(staff => staff.id === parseInt(assignment.assignee_id))
+                ? staffMembers.find(staff => staff.id === assignment.assignee_id)
                 : null;
 
               return (
