@@ -14,9 +14,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 interface StaffMember {
-  id: number;  // Changed from string to match your StaffPage
+  id: number;
   name: string;
-  department_id?: number;
   department_name?: string;
 }
 
@@ -41,36 +40,51 @@ const ChecklistItem = ({
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(true);
 
-  // Fetch staff members using the same pattern as StaffPage
+  // Enhanced staff fetching with comprehensive error handling
   useEffect(() => {
     const fetchStaff = async () => {
       setIsLoadingStaff(true);
       try {
+        console.log('[DEBUG] Starting staff fetch from Supabase...');
+        
         const { data, error } = await supabase
           .from('staff')
           .select(`
-            *,
+            id,
+            name,
             departments:department_id (name)
           `)
-          .order('name');
+          .order('name', { ascending: true });
 
-        if (error) throw error;
+        console.log('[DEBUG] Supabase response:', { data, error });
 
-        const formattedStaff = data?.map(item => ({
+        if (error) {
+          console.error('[ERROR] Supabase query failed:', error);
+          throw error;
+        }
+
+        if (!data || data.length === 0) {
+          console.warn('[WARNING] No staff data returned from Supabase');
+          throw new Error('No staff members found');
+        }
+
+        const formattedStaff = data.map(item => ({
           id: item.id,
           name: item.name,
-          department_id: item.department_id,
           department_name: item.departments?.name || 'No Department'
-        })) || [];
+        }));
 
+        console.log('[DEBUG] Formatted staff data:', formattedStaff);
         setStaffMembers(formattedStaff);
+        
       } catch (error) {
-        console.error('Error fetching staff:', error);
+        console.error('[ERROR] Staff fetch failed:', error);
         toast({
-          title: "Error",
-          description: "Failed to load staff members",
-          variant: "destructive"
+          title: "Staff Loading Failed",
+          description: "Couldn't load staff list. Please try again or check console for details.",
+          variant: "destructive",
         });
+        setStaffMembers([]);
       } finally {
         setIsLoadingStaff(false);
       }
@@ -92,8 +106,8 @@ const ChecklistItem = ({
   const handleAssign = async () => {
     if (!selectedAssigneeId) {
       toast({
-        title: "Required",
-        description: "Please select a staff member",
+        title: "Selection Required",
+        description: "Please select a staff member before assigning",
         variant: "destructive"
       });
       return;
@@ -102,20 +116,27 @@ const ChecklistItem = ({
     try {
       let photoUrl: string | undefined;
 
+      // Handle photo upload if a file was selected
       if (photoFile) {
         const fileExt = photoFile.name.split('.').pop();
-        const fileName = `${area}-${Date.now()}.${fileExt}`;
+        const fileName = `assignments/${area}-${Date.now()}.${fileExt}`;
+        
+        console.log('[DEBUG] Attempting to upload photo:', fileName);
         
         const { data, error } = await supabase.storage
           .from('area_photos')
           .upload(fileName, photoFile);
 
         if (error) throw error;
+        
         photoUrl = data.path;
+        console.log('[DEBUG] Photo uploaded successfully:', photoUrl);
       }
 
+      // Call the assignment handler
       onAssign(selectedAssigneeId, instructions, photoUrl);
       
+      // Reset the form
       setSelectedAssigneeId("");
       setInstructions("");
       setPhotoFile(null);
@@ -123,22 +144,23 @@ const ChecklistItem = ({
       setShowAssignForm(false);
 
       toast({
-        title: "Success",
-        description: "Area assigned successfully",
+        title: "Assignment Successful",
+        description: `${area} has been assigned successfully`,
         variant: "default"
       });
+
     } catch (error) {
-      console.error('Assignment error:', error);
+      console.error('[ERROR] Assignment failed:', error);
       toast({
-        title: "Error",
-        description: "Failed to assign area",
+        title: "Assignment Failed",
+        description: "Couldn't complete assignment. Please try again.",
         variant: "destructive"
       });
     }
   };
 
   return (
-    <Card className={isAssigned ? "border-green-500 bg-green-50" : ""}>
+    <Card className={isAssigned ? "border-green-500 bg-green-50" : "border-gray-200"}>
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div>
@@ -180,18 +202,36 @@ const ChecklistItem = ({
                 disabled={isLoadingStaff}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={isLoadingStaff ? "Loading staff..." : "Select staff member"} />
+                  <SelectValue 
+                    placeholder={
+                      isLoadingStaff 
+                        ? "Loading staff..." 
+                        : staffMembers.length 
+                          ? "Select staff member" 
+                          : "No staff available"
+                    } 
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {staffMembers.length > 0 ? (
                     staffMembers.map(member => (
-                      <SelectItem key={member.id} value={member.id.toString()}>
-                        {member.name} ({member.department_name})
+                      <SelectItem 
+                        key={member.id} 
+                        value={member.id.toString()}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{member.name}</span>
+                          {member.department_name && (
+                            <span className="text-xs text-gray-500">
+                              ({member.department_name})
+                            </span>
+                          )}
+                        </div>
                       </SelectItem>
                     ))
                   ) : (
                     <SelectItem value="none" disabled>
-                      {isLoadingStaff ? "Loading..." : "No staff available"}
+                      {isLoadingStaff ? "Loading..." : "No staff members found"}
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -199,7 +239,7 @@ const ChecklistItem = ({
             </div>
             
             <Textarea
-              placeholder="Add instructions..."
+              placeholder="Add specific instructions..."
               className="min-h-[80px]"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
@@ -209,8 +249,8 @@ const ChecklistItem = ({
               <div className="relative group">
                 <img
                   src={photoPreview}
-                  alt="Preview"
-                  className="w-full rounded-md max-h-48 object-cover"
+                  alt="Assignment preview"
+                  className="w-full rounded-md max-h-48 object-cover border"
                 />
                 <Button
                   variant="destructive"
@@ -238,7 +278,7 @@ const ChecklistItem = ({
             )}
             
             <Button 
-              className="w-full" 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               onClick={handleAssign}
               disabled={!selectedAssigneeId || isLoadingStaff}
             >
