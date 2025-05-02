@@ -1,4 +1,3 @@
-HERE IS WHERE IM FETCHING STAFF FROM SUPABASE 
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,6 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import AssigneeSelect from './AssigneeSelect';
 
 interface ChecklistItemProps {
   area: string;
@@ -35,41 +33,45 @@ const ChecklistItem = ({
   const [instructions, setInstructions] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [localAssignees, setLocalAssignees] = useState<Array<{ id: string; name: string }>>([]);
-  
-  // Fetch staff members directly from Supabase
+  const [staffMembers, setStaffMembers] = useState<Array<{ id: string; name: string }>>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+
+  // Fetch staff members from Supabase
   useEffect(() => {
     const fetchStaffMembers = async () => {
+      setIsLoadingStaff(true);
       try {
         const { data, error } = await supabase
-          .from('staff_members')
-          .select('id, name');
-        
-        if (error) {
-          console.error('Error fetching staff members:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load staff members",
-            variant: "destructive"
-          });
-          return;
+          .from('staff') // or 'staff_members' if that's your table name
+          .select('id, name')
+          .eq('is_active', true) // or 'status', depending on your schema
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        if (data?.length) {
+          setStaffMembers(data);
+        } else {
+          // Fallback to prop assignees if no data from Supabase
+          setStaffMembers(propAssignees || []);
+          console.warn('No staff found in database, using propAssignees');
         }
-        
-        console.log('Fetched staff members:', data);
-        
-        if (data && data.length > 0) {
-          setLocalAssignees(data);
-        } else if (propAssignees && propAssignees.length > 0) {
-          setLocalAssignees(propAssignees);
-        }
-      } catch (err) {
-        console.error('Exception fetching staff:', err);
+      } catch (error) {
+        console.error('Error fetching staff:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load staff members",
+          variant: "destructive"
+        });
+        setStaffMembers(propAssignees || []);
+      } finally {
+        setIsLoadingStaff(false);
       }
     };
-    
+
     fetchStaffMembers();
   }, [propAssignees]);
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -83,7 +85,7 @@ const ChecklistItem = ({
       reader.readAsDataURL(file);
     }
   };
-  
+
   const handleAssign = async () => {
     if (!selectedAssigneeId) {
       toast({
@@ -95,28 +97,28 @@ const ChecklistItem = ({
     }
     
     try {
-      let photoUrl = null;
-      
+      let photoUrl: string | undefined;
+
       // Upload photo if available
       if (photoFile) {
         const fileExt = photoFile.name.split('.').pop();
         const filePath = `${area}/${Date.now()}.${fileExt}`;
         
-        // Try to upload to Supabase Storage if it exists
         try {
-          const { data: uploadData, error: uploadError } = await supabase
+          const { data, error } = await supabase
             .storage
             .from('area_photos')
             .upload(filePath, photoFile);
           
-          if (uploadError) {
-            console.error('Photo upload error:', uploadError);
-          } else if (uploadData) {
-            photoUrl = filePath;
-          }
+          if (error) throw error;
+          photoUrl = data.path;
         } catch (storageError) {
-          // If storage bucket doesn't exist, just continue without the photo
-          console.log('Storage bucket may not exist:', storageError);
+          console.error('Photo upload error:', storageError);
+          toast({
+            title: "Warning",
+            description: "Photo couldn't be uploaded, continuing without it",
+            variant: "default"
+          });
         }
       }
       
@@ -129,6 +131,12 @@ const ChecklistItem = ({
       setPhotoFile(null);
       setPhotoPreview(null);
       setShowAssignForm(false);
+
+      toast({
+        title: "Success",
+        description: "Area assigned successfully",
+        variant: "default"
+      });
     } catch (error) {
       console.error('Error during assignment:', error);
       toast({
@@ -138,19 +146,19 @@ const ChecklistItem = ({
       });
     }
   };
-  
+
   return (
-    <Card className={isAssigned ? "border-green-500 bg-red-50" : ""}>
+    <Card className={isAssigned ? "border-green-500 bg-green-50" : "border-gray-200"}>
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <h3 className="font-bold text-lg text-red-600">{area}</h3>
+            <h3 className="font-bold text-lg text-gray-900">{area}</h3>
             <p className="text-gray-600 text-sm">{description}</p>
           </div>
           
           {isAssigned ? (
             <Button variant="outline" className="bg-green-50" disabled>
-              <User className="h-4 w-4 mr-2 text-green-500" />
+              <User className="h-4 w-4 mr-2 text-green-600" />
               Assigned
             </Button>
           ) : showAssignForm ? (
@@ -158,6 +166,7 @@ const ChecklistItem = ({
               variant="ghost"
               size="sm"
               onClick={() => setShowAssignForm(false)}
+              className="text-gray-500 hover:text-gray-700"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -165,8 +174,9 @@ const ChecklistItem = ({
             <Button 
               variant="outline" 
               onClick={() => setShowAssignForm(true)}
+              className="hover:bg-gray-50"
             >
-              <User className="h-4 w-4 mr-2" />
+              <User className="h-4 w-4 mr-2 text-gray-600" />
               Assign to...
             </Button>
           )}
@@ -178,47 +188,48 @@ const ChecklistItem = ({
               <User className="h-5 w-5 text-gray-500" />
               <Select 
                 value={selectedAssigneeId} 
-                onValueChange={(value) => {
-                  console.log('Selected staff member:', value);
-                  setSelectedAssigneeId(value);
-                }}
+                onValueChange={setSelectedAssigneeId}
+                disabled={isLoadingStaff}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Assign to..." />
+                  <SelectValue 
+                    placeholder={isLoadingStaff ? "Loading staff..." : "Select staff member"} 
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {console.log('Rendering staff members:', localAssignees)}
-                  {localAssignees && localAssignees.length > 0 ? (
-                    localAssignees.map(assignee => (
-                      <SelectItem key={assignee.id} value={assignee.id}>
-                        {assignee.name}
+                  {staffMembers.length > 0 ? (
+                    staffMembers.map(member => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="none" disabled>No staff members available</SelectItem>
+                    <SelectItem value="none" disabled>
+                      {isLoadingStaff ? "Loading..." : "No staff members available"}
+                    </SelectItem>
                   )}
                 </SelectContent>
               </Select>
             </div>
             
             <Textarea 
-              placeholder="Add your comments here..." 
+              placeholder="Add instructions or comments..." 
               className="min-h-[80px]"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
             />
             
             {photoPreview ? (
-              <div className="relative">
+              <div className="relative group">
                 <img 
                   src={photoPreview} 
                   alt="Preview" 
-                  className="w-full h-auto rounded-md max-h-[200px] object-cover" 
+                  className="w-full h-auto rounded-md max-h-[200px] object-cover border border-gray-200" 
                 />
                 <Button 
                   variant="destructive" 
                   size="sm"
-                  className="absolute top-2 right-2"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => {
                     setPhotoFile(null);
                     setPhotoPreview(null);
@@ -230,9 +241,9 @@ const ChecklistItem = ({
             ) : (
               <div className="flex justify-center">
                 <label className="cursor-pointer">
-                  <div className="flex items-center justify-center py-2 px-4 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Photo
+                  <div className="flex items-center justify-center py-2 px-4 border border-dashed border-gray-300 rounded-md text-sm hover:bg-gray-50 transition-colors">
+                    <Upload className="h-4 w-4 mr-2 text-gray-500" />
+                    Upload Photo (Optional)
                   </div>
                   <input 
                     type="file" 
@@ -244,8 +255,12 @@ const ChecklistItem = ({
               </div>
             )}
             
-            <Button className="w-full" onClick={handleAssign}>
-              Assign Area
+            <Button 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleAssign}
+              disabled={!selectedAssigneeId || isLoadingStaff}
+            >
+              Confirm Assignment
             </Button>
           </div>
         )}
