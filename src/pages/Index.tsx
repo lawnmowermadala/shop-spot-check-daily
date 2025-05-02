@@ -26,21 +26,26 @@ const Index = () => {
   // Fetch staff members directly from Supabase
   useEffect(() => {
     const fetchStaffMembers = async () => {
-      const { data, error } = await supabase
-        .from('staff_members')
-        .select('id, name');
-      
-      if (error) {
-        console.error('Error fetching staff members:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load staff members",
-          variant: "destructive"
-        });
-        return;
+      try {
+        const { data, error } = await supabase
+          .from('staff_members')
+          .select('id, name');
+        
+        if (error) {
+          console.error('Error fetching staff members:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load staff members",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        console.log('Fetched staff members in Index:', data);
+        setStaffMembers(data || []);
+      } catch (err) {
+        console.error('Exception fetching staff in Index:', err);
       }
-      
-      setStaffMembers(data || []);
     };
     
     fetchStaffMembers();
@@ -115,6 +120,9 @@ const Index = () => {
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
     try {
+      console.log('Assignment data:', { areaName, assigneeId, instructions, photoUrl });
+      console.log('Staff members available:', staffMembers);
+      
       // Get the assignee name from staffMembers state
       const assignee = staffMembers.find((staff) => staff.id === assigneeId);
       

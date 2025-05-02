@@ -40,24 +40,30 @@ const ChecklistItem = ({
   // Fetch staff members directly from Supabase
   useEffect(() => {
     const fetchStaffMembers = async () => {
-      const { data, error } = await supabase
-        .from('staff_members')
-        .select('id, name');
-      
-      if (error) {
-        console.error('Error fetching staff members:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load staff members",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      if (data && data.length > 0) {
-        setLocalAssignees(data);
-      } else if (propAssignees && propAssignees.length > 0) {
-        setLocalAssignees(propAssignees);
+      try {
+        const { data, error } = await supabase
+          .from('staff_members')
+          .select('id, name');
+        
+        if (error) {
+          console.error('Error fetching staff members:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load staff members",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        console.log('Fetched staff members:', data);
+        
+        if (data && data.length > 0) {
+          setLocalAssignees(data);
+        } else if (propAssignees && propAssignees.length > 0) {
+          setLocalAssignees(propAssignees);
+        }
+      } catch (err) {
+        console.error('Exception fetching staff:', err);
       }
     };
     
@@ -170,12 +176,19 @@ const ChecklistItem = ({
           <div className="mt-4 space-y-4">
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-gray-500" />
-              <Select value={selectedAssigneeId} onValueChange={setSelectedAssigneeId}>
+              <Select 
+                value={selectedAssigneeId} 
+                onValueChange={(value) => {
+                  console.log('Selected staff member:', value);
+                  setSelectedAssigneeId(value);
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Assign to..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {localAssignees.length > 0 ? (
+                  {console.log('Rendering staff members:', localAssignees)}
+                  {localAssignees && localAssignees.length > 0 ? (
                     localAssignees.map(assignee => (
                       <SelectItem key={assignee.id} value={assignee.id}>
                         {assignee.name}
