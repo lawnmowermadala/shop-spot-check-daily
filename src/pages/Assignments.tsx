@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { 
   Table, 
@@ -28,6 +27,8 @@ type Assignment = {
   assignee_id: string;
   status: 'needs-check' | 'in-progress' | 'done';
   assigned_date: string;
+  instructions?: string;
+  photo_url?: string;
 }
 
 const statusIcons = {
@@ -39,51 +40,71 @@ const statusIcons = {
 const Assignments = () => {
   const [filter, setFilter] = useState<'all' | 'needs-check' | 'in-progress' | 'done'>('all');
 
-  // Fetch assignments from Supabase
-  const { data: assignments = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['assignments'],
-    queryFn: async () => {
+  // Enhanced fetch function with error handling
+  const fetchAssignments = async () => {
+    try {
+      console.log('Fetching assignments from Supabase...');
       const { data, error } = await supabase
         .from('assignments')
         .select('*')
         .order('assigned_date', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Assignments data:', data);
       return data as Assignment[];
+    } catch (error) {
+      console.error('Failed to fetch assignments:', error);
+      throw error;
     }
+  };
+
+  const { data: assignments = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['assignments'],
+    queryFn: fetchAssignments,
+    retry: 1 // Retry once before failing
   });
 
   useEffect(() => {
     if (error) {
       toast({
-        title: "Error",
-        description: "Failed to load assignments. Please try again.",
-        variant: "destructive"
+        title: "Error Loading Assignments",
+        description: error.message || "Please check your connection and try again.",
+        variant: "destructive",
+        action: (
+          <Button variant="ghost" size="sm" onClick={() => refetch()}>
+            Retry
+          </Button>
+        )
       });
     }
-  }, [error]);
+  }, [error, refetch]);
 
-  // Update assignment status
   const updateAssignmentStatus = async (id: string, status: Assignment['status']) => {
     try {
+      console.log(`Updating assignment ${id} to status: ${status}`);
       const { error } = await supabase
         .from('assignments')
         .update({ status })
-        .eq('id', id);
+        .eq('id', id)
+        .select();
       
       if (error) throw error;
       
-      refetch();
+      await refetch();
       
       toast({
-        title: "Status updated",
-        description: `Assignment status changed to ${status.replace('-', ' ')}`,
+        title: "Status Updated",
+        description: `Assignment marked as ${status.replace('-', ' ')}`,
       });
     } catch (err) {
-      console.error('Error updating assignment status:', err);
+      console.error('Error updating status:', err);
       toast({
-        title: "Error",
-        description: "Failed to update status. Please try again.",
+        title: "Update Failed",
+        description: err.message || "Couldn't update status. Please try again.",
         variant: "destructive"
       });
     }
@@ -194,7 +215,7 @@ const Assignments = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                      No assignments found
+                      {assignments.length === 0 ? "No assignments found" : "No assignments match this filter"}
                     </TableCell>
                   </TableRow>
                 )}
