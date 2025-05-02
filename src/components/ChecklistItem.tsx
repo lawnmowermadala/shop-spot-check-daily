@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -187,7 +186,6 @@ const ChecklistItem = ({
                   <SelectValue placeholder="Assign to..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {console.log('Rendering staff members:', localAssignees)}
                   {localAssignees && localAssignees.length > 0 ? (
                     localAssignees.map(assignee => (
                       <SelectItem key={assignee.id} value={assignee.id}>
