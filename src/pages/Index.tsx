@@ -13,10 +13,15 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+interface StaffMember {
+  id: string;
+  name: string;
+}
+
 interface ChecklistItemProps {
   area: string;
   description: string;
-  assignees: Array<{ id: string; name: string }>;
+  assignees?: StaffMember[];
   onAssign: (assigneeId: string, instructions: string, photoUrl?: string) => void;
   isAssigned: boolean;
 }
@@ -24,7 +29,7 @@ interface ChecklistItemProps {
 const ChecklistItem = ({ 
   area, 
   description, 
-  assignees: propAssignees, 
+  assignees = [], 
   onAssign, 
   isAssigned 
 }: ChecklistItemProps) => {
@@ -33,99 +38,84 @@ const ChecklistItem = ({
   const [instructions, setInstructions] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [staffMembers, setStaffMembers] = useState<Array<{ id: string; name: string }>>([]);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(true);
 
-  // Fetch staff members from Supabase
+  // Enhanced staff fetching with error handling
   useEffect(() => {
-    const fetchStaffMembers = async () => {
+    const fetchStaff = async () => {
       setIsLoadingStaff(true);
       try {
+        // First try Supabase
         const { data, error } = await supabase
-          .from('staff') // or 'staff_members' if that's your table name
+          .from('staff') // or 'staff_members' if different
           .select('id, name')
-          .eq('is_active', true) // or 'status', depending on your schema
+          .eq('is_active', true) // or 'status', 1 if using numbers
           .order('name', { ascending: true });
 
         if (error) throw error;
 
-        if (data?.length) {
+        if (data && data.length > 0) {
           setStaffMembers(data);
         } else {
-          // Fallback to prop assignees if no data from Supabase
-          setStaffMembers(propAssignees || []);
-          console.warn('No staff found in database, using propAssignees');
+          // Fallback to prop assignees
+          console.warn('No staff from Supabase, using prop assignees');
+          setStaffMembers(assignees);
         }
       } catch (error) {
-        console.error('Error fetching staff:', error);
+        console.error('Staff fetch error:', error);
         toast({
-          title: "Error",
-          description: "Failed to load staff members",
-          variant: "destructive"
+          title: "Warning",
+          description: "Using fallback staff data",
+          variant: "default"
         });
-        setStaffMembers(propAssignees || []);
+        setStaffMembers(assignees);
       } finally {
         setIsLoadingStaff(false);
       }
     };
 
-    fetchStaffMembers();
-  }, [propAssignees]);
+    fetchStaff();
+  }, [assignees]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setPhotoFile(file);
-      
-      // Create preview URL
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setPhotoPreview(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const handleAssign = async () => {
     if (!selectedAssigneeId) {
       toast({
-        title: "Error",
+        title: "Required",
         description: "Please select a staff member",
         variant: "destructive"
       });
       return;
     }
-    
+
     try {
       let photoUrl: string | undefined;
 
-      // Upload photo if available
       if (photoFile) {
         const fileExt = photoFile.name.split('.').pop();
-        const filePath = `${area}/${Date.now()}.${fileExt}`;
+        const fileName = `${area}-${Date.now()}.${fileExt}`;
         
-        try {
-          const { data, error } = await supabase
-            .storage
-            .from('area_photos')
-            .upload(filePath, photoFile);
-          
-          if (error) throw error;
-          photoUrl = data.path;
-        } catch (storageError) {
-          console.error('Photo upload error:', storageError);
-          toast({
-            title: "Warning",
-            description: "Photo couldn't be uploaded, continuing without it",
-            variant: "default"
-          });
-        }
+        const { data, error } = await supabase.storage
+          .from('area_photos')
+          .upload(fileName, photoFile);
+
+        if (error) throw error;
+        photoUrl = data.path;
       }
-      
-      // Assign the area
+
       onAssign(selectedAssigneeId, instructions, photoUrl);
       
-      // Clear form
+      // Reset form
       setSelectedAssigneeId("");
       setInstructions("");
       setPhotoFile(null);
@@ -138,27 +128,27 @@ const ChecklistItem = ({
         variant: "default"
       });
     } catch (error) {
-      console.error('Error during assignment:', error);
+      console.error('Assignment error:', error);
       toast({
         title: "Error",
-        description: "Failed to assign area. Please try again.",
+        description: "Failed to assign area",
         variant: "destructive"
       });
     }
   };
 
   return (
-    <Card className={isAssigned ? "border-green-500 bg-green-50" : "border-gray-200"}>
+    <Card className={isAssigned ? "border-green-500 bg-green-50" : ""}>
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <h3 className="font-bold text-lg text-gray-900">{area}</h3>
+            <h3 className="font-bold text-lg">{area}</h3>
             <p className="text-gray-600 text-sm">{description}</p>
           </div>
           
           {isAssigned ? (
             <Button variant="outline" className="bg-green-50" disabled>
-              <User className="h-4 w-4 mr-2 text-green-600" />
+              <User className="h-4 w-4 mr-2 text-green-500" />
               Assigned
             </Button>
           ) : showAssignForm ? (
@@ -166,7 +156,6 @@ const ChecklistItem = ({
               variant="ghost"
               size="sm"
               onClick={() => setShowAssignForm(false)}
-              className="text-gray-500 hover:text-gray-700"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -174,9 +163,8 @@ const ChecklistItem = ({
             <Button 
               variant="outline" 
               onClick={() => setShowAssignForm(true)}
-              className="hover:bg-gray-50"
             >
-              <User className="h-4 w-4 mr-2 text-gray-600" />
+              <User className="h-4 w-4 mr-2" />
               Assign to...
             </Button>
           )}
@@ -186,15 +174,13 @@ const ChecklistItem = ({
           <div className="mt-4 space-y-4">
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-gray-500" />
-              <Select 
-                value={selectedAssigneeId} 
+              <Select
+                value={selectedAssigneeId}
                 onValueChange={setSelectedAssigneeId}
                 disabled={isLoadingStaff}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue 
-                    placeholder={isLoadingStaff ? "Loading staff..." : "Select staff member"} 
-                  />
+                  <SelectValue placeholder={isLoadingStaff ? "Loading staff..." : "Select staff member"} />
                 </SelectTrigger>
                 <SelectContent>
                   {staffMembers.length > 0 ? (
@@ -205,15 +191,15 @@ const ChecklistItem = ({
                     ))
                   ) : (
                     <SelectItem value="none" disabled>
-                      {isLoadingStaff ? "Loading..." : "No staff members available"}
+                      {isLoadingStaff ? "Loading..." : "No staff available - check database"}
                     </SelectItem>
                   )}
                 </SelectContent>
               </Select>
             </div>
             
-            <Textarea 
-              placeholder="Add instructions or comments..." 
+            <Textarea
+              placeholder="Add instructions..."
               className="min-h-[80px]"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
@@ -221,13 +207,13 @@ const ChecklistItem = ({
             
             {photoPreview ? (
               <div className="relative group">
-                <img 
-                  src={photoPreview} 
-                  alt="Preview" 
-                  className="w-full h-auto rounded-md max-h-[200px] object-cover border border-gray-200" 
+                <img
+                  src={photoPreview}
+                  alt="Preview"
+                  className="w-full rounded-md max-h-48 object-cover"
                 />
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   size="sm"
                   className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => {
@@ -239,24 +225,20 @@ const ChecklistItem = ({
                 </Button>
               </div>
             ) : (
-              <div className="flex justify-center">
-                <label className="cursor-pointer">
-                  <div className="flex items-center justify-center py-2 px-4 border border-dashed border-gray-300 rounded-md text-sm hover:bg-gray-50 transition-colors">
-                    <Upload className="h-4 w-4 mr-2 text-gray-500" />
-                    Upload Photo (Optional)
-                  </div>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleFileChange} 
-                  />
-                </label>
-              </div>
+              <label className="flex flex-col items-center justify-center py-3 px-4 border border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
+                <Upload className="h-5 w-5 mb-1 text-gray-500" />
+                <span className="text-sm">Upload Photo (Optional)</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </label>
             )}
             
             <Button 
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full" 
               onClick={handleAssign}
               disabled={!selectedAssigneeId || isLoadingStaff}
             >
