@@ -2,13 +2,23 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ClipboardCheck } from 'lucide-react';
+import { User, X, Upload } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface ChecklistItemProps {
   area: string;
   description: string;
   assignees: Array<{ id: string; name: string }>;
-  onAssign: (assigneeId: string) => void;
+  onAssign: (assigneeId: string, instructions: string, photoUrl?: string) => void;
   isAssigned: boolean;
 }
 
@@ -19,7 +29,11 @@ const ChecklistItem = ({
   onAssign, 
   isAssigned 
 }: ChecklistItemProps) => {
-  const [showAssignees, setShowAssignees] = useState(false);
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [localAssignees, setLocalAssignees] = useState<Array<{ id: string; name: string }>>([]);
   
   // Get assignees from localStorage if not provided via props
@@ -33,53 +47,177 @@ const ChecklistItem = ({
       }
     }
   }, [propAssignees]);
-
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setPhotoFile(file);
+      
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const handleAssign = async () => {
+    if (!selectedAssigneeId) {
+      toast({
+        title: "Error",
+        description: "Please select a staff member",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      let photoUrl = null;
+      
+      // Upload photo if available
+      if (photoFile) {
+        const fileExt = photoFile.name.split('.').pop();
+        const filePath = `${area}/${Date.now()}.${fileExt}`;
+        
+        // Try to upload to Supabase Storage if it exists
+        try {
+          const { data: uploadData, error: uploadError } = await supabase
+            .storage
+            .from('area_photos')
+            .upload(filePath, photoFile);
+          
+          if (uploadError) {
+            console.error('Photo upload error:', uploadError);
+          } else if (uploadData) {
+            photoUrl = filePath;
+          }
+        } catch (storageError) {
+          // If storage bucket doesn't exist, just continue without the photo
+          console.log('Storage bucket may not exist:', storageError);
+        }
+      }
+      
+      // Assign the area
+      onAssign(selectedAssigneeId, instructions, photoUrl);
+      
+      // Clear form
+      setSelectedAssigneeId("");
+      setInstructions("");
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setShowAssignForm(false);
+    } catch (error) {
+      console.error('Error during assignment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to assign area. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+  
   return (
-    <Card className={isAssigned ? "border-green-500" : ""}>
+    <Card className={isAssigned ? "border-green-500 bg-red-50" : ""}>
       <CardContent className="p-4">
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start mb-2">
           <div>
-            <h3 className="font-bold text-lg">{area}</h3>
-            <p className="text-gray-600">{description}</p>
+            <h3 className="font-bold text-lg text-red-600">{area}</h3>
+            <p className="text-gray-600 text-sm">{description}</p>
           </div>
           
           {isAssigned ? (
             <Button variant="outline" className="bg-green-50" disabled>
-              <Check className="h-4 w-4 mr-2 text-green-500" />
+              <User className="h-4 w-4 mr-2 text-green-500" />
               Assigned
+            </Button>
+          ) : showAssignForm ? (
+            <Button 
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAssignForm(false)}
+            >
+              <X className="h-4 w-4" />
             </Button>
           ) : (
             <Button 
               variant="outline" 
-              onClick={() => setShowAssignees(!showAssignees)}
+              onClick={() => setShowAssignForm(true)}
             >
-              <ClipboardCheck className="h-4 w-4 mr-2" />
-              Assign
+              <User className="h-4 w-4 mr-2" />
+              Assign to...
             </Button>
           )}
         </div>
         
-        {showAssignees && !isAssigned && (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {localAssignees.length > 0 ? (
-              localAssignees.map(assignee => (
+        {showAssignForm && !isAssigned && (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5 text-gray-500" />
+              <Select value={selectedAssigneeId} onValueChange={setSelectedAssigneeId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Assign to..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {localAssignees.length > 0 ? (
+                    localAssignees.map(assignee => (
+                      <SelectItem key={assignee.id} value={assignee.id}>
+                        {assignee.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>No staff members available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Textarea 
+              placeholder="Add your comments here..." 
+              className="min-h-[80px]"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+            />
+            
+            {photoPreview ? (
+              <div className="relative">
+                <img 
+                  src={photoPreview} 
+                  alt="Preview" 
+                  className="w-full h-auto rounded-md max-h-[200px] object-cover" 
+                />
                 <Button 
-                  key={assignee.id} 
-                  variant="ghost"
-                  className="justify-start"
+                  variant="destructive" 
+                  size="sm"
+                  className="absolute top-2 right-2"
                   onClick={() => {
-                    onAssign(assignee.id);
-                    setShowAssignees(false);
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
                   }}
                 >
-                  {assignee.name}
+                  <X className="h-4 w-4" />
                 </Button>
-              ))
+              </div>
             ) : (
-              <p className="text-sm text-gray-500 col-span-2">
-                No staff members available. Add staff members first.
-              </p>
+              <div className="flex justify-center">
+                <label className="cursor-pointer">
+                  <div className="flex items-center justify-center py-2 px-4 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Photo
+                  </div>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleFileChange} 
+                  />
+                </label>
+              </div>
             )}
+            
+            <Button className="w-full" onClick={handleAssign}>
+              Assign Area
+            </Button>
           </div>
         )}
       </CardContent>

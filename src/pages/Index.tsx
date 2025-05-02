@@ -43,19 +43,17 @@ const Index = () => {
     fetchStaffMembers();
   }, []);
 
-  // Fetch areas using a raw approach since the types don't include 'areas' yet
+  // Fetch areas using React Query
   const { data: areas = [], isLoading, error, refetch } = useQuery({
     queryKey: ['areas'],
     queryFn: async () => {
       try {
-        // Cast to any to bypass TypeScript's type checking for the 'areas' table
         const { data, error } = await supabase
-          .from('areas' as any)
+          .from('areas')
           .select('*')
           .order('created_at', { ascending: false });
         
         if (error) throw error;
-        // First cast to unknown, then to Area[] to safely handle the type conversion
         return (data || []) as unknown as Area[];
       } catch (err) {
         console.error('Error fetching areas:', err);
@@ -79,7 +77,7 @@ const Index = () => {
       try {
         // Updated to use 'name' instead of 'area' to match the database schema
         const { error } = await supabase
-          .from('areas' as any)
+          .from('areas')
           .insert({
             name: newArea.trim(),  // Changed from 'area' to 'name'
             description: newDescription.trim() 
@@ -113,11 +111,9 @@ const Index = () => {
     }
   };
 
-  const handleAssignment = async (areaName: string, assigneeId: string) => {
-    // Get the assignee name from localStorage
-    const staffMembersStr = localStorage.getItem('staffMembers');
-    const staffMembers = staffMembersStr ? JSON.parse(staffMembersStr) : [];
-    const assignee = staffMembers.find((a: any) => a.id === assigneeId);
+  const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
+    // Get the assignee name from localStorage or state
+    const assignee = staffMembers.find((a) => a.id === assigneeId);
     
     if (!assignee) return;
     
@@ -132,7 +128,9 @@ const Index = () => {
           area: areaName,
           assignee_name: assignee.name,
           assignee_id: assigneeId,
-          status: 'needs-check'
+          status: 'needs-check',
+          instructions: instructions,
+          photo_url: photoUrl || null
         });
       
       if (error) throw error;
@@ -183,7 +181,7 @@ const Index = () => {
             value={newDescription}
             onChange={(e) => setNewDescription(e.target.value)}
           />
-          <Button onClick={handleAddArea} className="w-full">
+          <Button onClick={handleAddArea} className="w-full bg-slate-900">
             <Plus className="h-4 w-4 mr-2" />
             Add Area
           </Button>
@@ -200,7 +198,9 @@ const Index = () => {
               area={area.name}  // Changed from area.area to area.name
               description={area.description}
               assignees={staffMembers} // Use the fetched staff members
-              onAssign={(assigneeId) => handleAssignment(area.name, assigneeId)}  // Changed from area.area to area.name
+              onAssign={(assigneeId, instructions, photoUrl) => 
+                handleAssignment(area.name, assigneeId, instructions, photoUrl)
+              }
               isAssigned={!!assignedAreas[area.name]}  // Changed from area.area to area.name
             />
           ))}
