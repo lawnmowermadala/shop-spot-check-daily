@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 // Define the Area interface to match what we expect from the database
 interface Area {
   id: string;
-  area: string;
+  name: string;  // Changed from 'area' to 'name' to match db schema
   description: string;
   created_at?: string;
 }
@@ -77,11 +77,11 @@ const Index = () => {
   const handleAddArea = async () => {
     if (newArea.trim() && newDescription.trim()) {
       try {
-        // Cast to any to bypass TypeScript's type checking for the 'areas' table
+        // Updated to use 'name' instead of 'area' to match the database schema
         const { error } = await supabase
           .from('areas' as any)
           .insert({
-            area: newArea.trim(), 
+            name: newArea.trim(),  // Changed from 'area' to 'name'
             description: newDescription.trim() 
           });
 
@@ -197,11 +197,11 @@ const Index = () => {
           {areas.map((area) => (
             <ChecklistItem
               key={area.id}
-              area={area.area}
+              area={area.name}  // Changed from area.area to area.name
               description={area.description}
               assignees={staffMembers} // Use the fetched staff members
-              onAssign={(assigneeId) => handleAssignment(area.area, assigneeId)}
-              isAssigned={!!assignedAreas[area.area]}
+              onAssign={(assigneeId) => handleAssignment(area.name, assigneeId)}  // Changed from area.area to area.name
+              isAssigned={!!assignedAreas[area.name]}  // Changed from area.area to area.name
             />
           ))}
         </div>
