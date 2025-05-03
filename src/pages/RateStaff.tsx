@@ -171,19 +171,17 @@ const RateStaff = () => {
       throw new Error("Selected staff member not found");
     }
 
-    // Ensure all column names match your table exactly
-    const submissionData = {
-      staff_id: data.staffId, // Must be UUID format
-      staff_name: selectedStaff.name,
-      overall: data.overall,
-      product_knowledge: data.productKnowledge, // Lowercase with underscore
-      job_performance: data.jobPerformance,     // Lowercase with underscore
-      customer_service: data.customerService,   // Lowercase with underscore
-      teamwork: data.teamwork,
-      area: 'General', // Required field from your table structure
-      comment: data.comment || null,
-      rating_date: new Date().toISOString()
-    };
+  const submissionData = {
+  staff_id: data.staffId,
+  staff_name: selectedStaff.name,
+  overall: data.overall,
+  product_knowledge: data.productKnowledge,
+  job_performance: data.jobPerformance,
+  customer_service: data.customerService,
+  teamwork: data.teamwork,
+  comment: data.comment || null,
+  rating_date: new Date().toISOString()
+};
 
     console.log('Final submission data:', submissionData);
 
