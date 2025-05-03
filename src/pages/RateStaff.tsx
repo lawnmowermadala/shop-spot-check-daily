@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -26,7 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -51,7 +50,7 @@ type StaffMember = {
   department_name?: string;
 };
 
-// Define the response type for staff members
+// Updated interface for StaffResponse with correct department type
 interface StaffResponse {
   id: number;
   name: string;
@@ -96,7 +95,7 @@ const RateStaff = () => {
           throw error;
         }
 
-        const mappedStaff = data?.map((item: StaffResponse) => ({
+        const mappedStaff = data?.map((item: any) => ({
           id: item.id,
           name: item.name,
           department_name: item.departments?.name || 'No Department'
