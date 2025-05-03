@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // Added missing import
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
