@@ -175,58 +175,59 @@ const Index = () => {
   };
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
-    try {
-      // Convert assigneeId to number (since staff.id is number in your schema)
-      const assigneeIdNum = parseInt(assigneeId);
-      const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
-      
-      if (!assignee) {
-        toast({
-          title: "Error",
-          description: "Invalid staff selection",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const assignmentData: Assignment = {
-        area: areaName,
-        assignee_id: assigneeIdNum,
-        assignee_name: assignee.name,
-        status: 'pending',
-        instructions: instructions || null,
-        photo_url: photoUrl || null
-      };
-
-      // Always create a new assignment
-      const { error } = await supabase
-        .from('assignments')
-        .insert(assignmentData)
-        .select();
-
-      if (error) throw error;
-
-      // Refresh assignments and count
-      await fetchAssignments();
-
-      toast({
-        title: "Success",
-        description: `Area assigned successfully to ${assignee.name}!`,
-      });
-    } catch (error) {
-      console.error('Error assigning area:', error);
+  try {
+    // Convert assigneeId to number
+    const assigneeIdNum = parseInt(assigneeId);
+    const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
+    
+    if (!assignee) {
       toast({
         title: "Error",
-        description: `Failed to assign area: ${error.message}`,
+        description: "Invalid staff selection",
         variant: "destructive"
       });
+      return;
     }
-  };
 
-  // Get assignments for a specific area
-  const getAreaAssignments = (areaName: string) => {
-    return assignedAreas.filter(assignment => assignment.area === areaName);
-  };
+    const assignmentData: Assignment = {
+      area: areaName,
+      assignee_id: assigneeIdNum,
+      assignee_name: assignee.name,
+      status: 'pending',
+      instructions: instructions || null,
+      photo_url: photoUrl || null
+    };
+
+    // Create new assignment
+    const { error } = await supabase
+      .from('assignments')
+      .insert(assignmentData)
+      .select();
+
+    if (error) throw error;
+
+    // Refresh assignments
+    await fetchAssignments();
+
+    toast({
+      title: "Success",
+      description: `Task assigned to ${assignee.name}!`,
+    });
+
+    // Automatically unlock after 2 seconds (adjust as needed)
+    setTimeout(() => {
+      // This ensures the area becomes available for new assignments
+    }, 2000);
+
+  } catch (error) {
+    console.error('Error assigning area:', error);
+    toast({
+      title: "Error",
+      description: `Assignment failed: ${error.message}`,
+      variant: "destructive"
+    });
+  }
+};
 
   return (
     <div className="max-w-md mx-auto p-4 pb-20">
