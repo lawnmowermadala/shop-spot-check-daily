@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -23,10 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Added missing import
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -51,6 +52,15 @@ type StaffMember = {
   name: string;
   department_name?: string;
 };
+
+// Define the shape of the Supabase response
+interface StaffResponse {
+  id: number;
+  name: string;
+  departments: {
+    name: string | null;
+  } | null;
+}
 
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -88,7 +98,7 @@ const RateStaff = () => {
         }
 
         if (data) {
-          const mappedStaff = data.map(item => ({
+          const mappedStaff = data.map((item: StaffResponse) => ({
             id: item.id,
             name: item.name,
             department_name: item.departments?.name || 'No Department'
