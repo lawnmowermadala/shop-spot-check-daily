@@ -36,26 +36,32 @@ export type Database = {
       assignments: {
         Row: {
           area: string
-          assigned_date: string
-          assignee_id: string
+          assignee_id: number
           assignee_name: string
+          created_at: string | null
           id: string
+          instructions: string | null
+          photo_url: string | null
           status: string
         }
         Insert: {
           area: string
-          assigned_date?: string
-          assignee_id: string
+          assignee_id: number
           assignee_name: string
-          id: string
+          created_at?: string | null
+          id?: string
+          instructions?: string | null
+          photo_url?: string | null
           status: string
         }
         Update: {
           area?: string
-          assigned_date?: string
-          assignee_id?: string
+          assignee_id?: number
           assignee_name?: string
+          created_at?: string | null
           id?: string
+          instructions?: string | null
+          photo_url?: string | null
           status?: string
         }
         Relationships: [
@@ -63,7 +69,7 @@ export type Database = {
             foreignKeyName: "assignments_assignee_id_fkey"
             columns: ["assignee_id"]
             isOneToOne: false
-            referencedRelation: "staff_members"
+            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
         ]

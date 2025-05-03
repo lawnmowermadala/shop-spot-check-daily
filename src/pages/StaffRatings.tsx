@@ -44,12 +44,18 @@ const StaffRatings = () => {
   const { data: ratings = [], isLoading, error } = useQuery({
     queryKey: ['ratings'],
     queryFn: async () => {
+      console.log('Fetching staff ratings...');
       const { data, error } = await supabase
         .from('ratings')
         .select('*')
         .order('rating_date', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching ratings:', error);
+        throw error;
+      }
+      
+      console.log('Ratings data:', data);
       return data as Rating[];
     }
   });

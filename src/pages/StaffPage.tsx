@@ -4,7 +4,7 @@ import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 
 interface Department {
@@ -35,15 +35,18 @@ export default function StaffPage() {
   async function fetchDepartments() {
     try {
       setLoadingDepts(true);
+      console.log("Fetching departments...");
       const { data, error } = await supabase
         .from('departments')
         .select('*')
         .order('name');
 
       if (error) {
+        console.error("Error fetching departments:", error);
         throw error;
       }
 
+      console.log("Departments data:", data);
       setDepartments(data || []);
     } catch (error) {
       toast.error("Error loading departments");
@@ -56,6 +59,7 @@ export default function StaffPage() {
   async function fetchStaff() {
     try {
       setLoadingStaff(true);
+      console.log("Fetching staff members...");
       // Join staff with departments to get department names
       const { data, error } = await supabase
         .from('staff')
@@ -66,9 +70,11 @@ export default function StaffPage() {
         .order('name');
 
       if (error) {
+        console.error("Error fetching staff:", error);
         throw error;
       }
 
+      console.log("Staff data:", data);
       // Transform the data to include the department name
       const staffWithDeptNames = data?.map(item => ({
         id: item.id,
@@ -100,17 +106,21 @@ export default function StaffPage() {
     }
 
     try {
-      const { error } = await supabase
+      console.log("Adding new staff member:", { name, department_id: departmentId });
+      const { error, data } = await supabase
         .from('staff')
         .insert([{ 
           name: name.trim(), 
           department_id: parseInt(departmentId) 
-        }]);
+        }])
+        .select();
 
       if (error) {
+        console.error("Error adding staff:", error);
         throw error;
       }
 
+      console.log("New staff member added:", data);
       toast.success("Staff member added successfully");
       setName('');
       setDepartmentId('');
