@@ -45,7 +45,7 @@ const ratingSchema = z.object({
 type RatingFormValues = z.infer<typeof ratingSchema>;
 
 type StaffMember = {
-  id: string; // Using string for UUID
+  id: string;
   name: string;
   department_name?: string;
 };
@@ -69,6 +69,9 @@ const RateStaff = () => {
     },
   });
 
+  // Watch the staffId field value
+  const selectedStaffId = form.watch("staffId");
+
   useEffect(() => {
     const fetchStaffMembers = async () => {
       try {
@@ -83,13 +86,11 @@ const RateStaff = () => {
           
         if (error) throw error;
 
-        const formattedStaff = data?.map(item => ({
+        setStaffMembers(data?.map(item => ({
           id: item.id,
           name: item.name,
           department_name: item.departments?.name || 'No Department'
-        })) || [];
-
-        setStaffMembers(formattedStaff);
+        })) || []);
       } catch (error) {
         console.error('Error fetching staff:', error);
         toast({
@@ -139,10 +140,7 @@ const RateStaff = () => {
                     type="button"
                     variant={value >= rating ? "default" : "ghost"}
                     className="p-1 h-8"
-                    onClick={() => {
-                      field.onChange(rating);
-                      form.trigger(name); // Manually trigger validation
-                    }}
+                    onClick={() => field.onChange(rating)}
                   >
                     <Star 
                       className={`h-5 w-5 ${
@@ -160,34 +158,31 @@ const RateStaff = () => {
     );
   };
 
-  const onSubmit = async (formData: RatingFormValues) => {
+  const onSubmit = async (data: RatingFormValues) => {
     setIsLoading(true);
     
     try {
-      // Verify staff selection
-      const selectedStaff = staffMembers.find(staff => staff.id === formData.staffId);
+      console.log("Form data before submission:", data); // Debug log
+      
+      const selectedStaff = staffMembers.find(staff => staff.id === data.staffId);
+      
       if (!selectedStaff) {
         throw new Error("Selected staff member not found");
       }
 
-      // Prepare data for Supabase
-      const ratingData = {
-        staff_id: formData.staffId, // UUID remains as string
-        staff_name: selectedStaff.name,
-        overall: formData.overall,
-        product_kn0x: formData.productKnowledge,
-        job_performa: formData.jobPerformance,
-        customer_ser: formData.customerService,
-        teamwork: formData.teamwork,
-        comment: formData.comment || null,
-        rating_date: new Date().toISOString()
-      };
-
-      console.log('Submitting rating:', ratingData); // Debug log
-
       const { error } = await supabase
         .from('ratings')
-        .insert(ratingData);
+        .insert({
+          staff_id: data.staffId,
+          staff_name: selectedStaff.name,
+          overall: data.overall,
+          product_kn0x: data.productKnowledge,
+          job_performa: data.jobPerformance,
+          customer_ser: data.customerService,
+          teamwork: data.teamwork,
+          comment: data.comment || null,
+          rating_date: new Date().toISOString()
+        });
 
       if (error) {
         console.error('Supabase error details:', error);
@@ -198,15 +193,13 @@ const RateStaff = () => {
         title: "Success",
         description: "Rating submitted successfully!",
       });
-      
-      // Reset form and navigate
       form.reset();
       navigate('/ratings');
     } catch (error) {
-      console.error('Submission error:', error);
+      console.error('Full submission error:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit rating",
+        description: error instanceof Error ? error.message : "Failed to submit rating. Please check your data and try again.",
         variant: "destructive"
       });
     } finally {
@@ -235,7 +228,10 @@ const RateStaff = () => {
                   <FormItem>
                     <FormLabel>Staff Member</FormLabel>
                     <Select 
-                      onValueChange={field.onChange} 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        console.log("Selected staff ID:", value); // Debug log
+                      }}
                       value={field.value}
                       disabled={isLoading}
                     >
@@ -255,6 +251,7 @@ const RateStaff = () => {
                 )}
               />
               
+              {/* Rest of your form components remain the same */}
               <div className="bg-gray-50 p-4 rounded-lg space-y-5">
                 <h3 className="font-semibold text-lg mb-2">Performance Ratings</h3>
                 <RatingInput 
