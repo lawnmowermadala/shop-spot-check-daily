@@ -91,10 +91,10 @@ export type Database = {
       }
       ratings: {
         Row: {
-          area: string
           comment: string | null
+          created_at: string
           customer_service: number
-          id: string
+          id: number
           job_performance: number
           overall: number
           product_knowledge: number
@@ -104,10 +104,10 @@ export type Database = {
           teamwork: number
         }
         Insert: {
-          area: string
           comment?: string | null
+          created_at?: string
           customer_service: number
-          id?: string
+          id?: never
           job_performance: number
           overall: number
           product_knowledge: number
@@ -117,10 +117,10 @@ export type Database = {
           teamwork: number
         }
         Update: {
-          area?: string
           comment?: string | null
+          created_at?: string
           customer_service?: number
-          id?: string
+          id?: never
           job_performance?: number
           overall?: number
           product_knowledge?: number
@@ -129,15 +129,7 @@ export type Database = {
           staff_name?: string
           teamwork?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "ratings_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "staff_members"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       staff: {
         Row: {
@@ -146,6 +138,7 @@ export type Database = {
           email: string | null
           id: number
           name: string
+          new_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -153,6 +146,7 @@ export type Database = {
           email?: string | null
           id?: number
           name: string
+          new_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -160,6 +154,7 @@ export type Database = {
           email?: string | null
           id?: number
           name?: string
+          new_id?: string | null
         }
         Relationships: [
           {
