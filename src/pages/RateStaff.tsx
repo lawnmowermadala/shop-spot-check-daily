@@ -170,38 +170,43 @@ const onSubmit = async (data: RatingFormValues) => {
       throw new Error("Selected staff member not found");
     }
 
+    // Ensure all column names match your table exactly
     const submissionData = {
-      staff_id: data.staffId,
+      staff_id: data.staffId, // Must be UUID format
       staff_name: selectedStaff.name,
       overall: data.overall,
-      product_Knowledge: data.productKnowledge,
-      job_Performance: data.jobPerformance,
-      customer_Service: data.customerService,
+      product_knowledge: data.productKnowledge, // Lowercase with underscore
+      job_performance: data.jobPerformance,     // Lowercase with underscore
+      customer_service: data.customerService,   // Lowercase with underscore
       teamwork: data.teamwork,
-      area: 'General', // Either add to form or set default here
+      area: 'General', // Required field from your table structure
       comment: data.comment || null,
       rating_date: new Date().toISOString()
     };
 
-    console.log('Submission data:', submissionData);
+    console.log('Final submission data:', submissionData);
 
     const { error } = await supabase
       .from('ratings')
       .insert(submissionData);
 
     if (error) {
-      console.error('Full Supabase error:', error);
+      console.error('Supabase error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
       throw error;
     }
 
-    toast({ title: "Success", description: "Rating submitted!" });
+    toast({ title: "Success", description: "Rating submitted successfully!" });
     form.reset();
     navigate('/ratings');
   } catch (error) {
-    console.error('Submission failed:', error);
+    console.error('Full error:', error);
     toast({
       title: "Error",
-      description: error instanceof Error ? error.message : "Submission failed",
+      description: error instanceof Error ? error.message : "Failed to submit rating",
       variant: "destructive"
     });
   } finally {
