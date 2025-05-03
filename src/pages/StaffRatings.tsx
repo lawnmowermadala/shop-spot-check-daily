@@ -23,10 +23,9 @@ import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
 interface Rating {
-  id: string;
+  id: string | number;
   staff_name: string;
   staff_id: string;
-  area: string;
   overall: number;
   product_knowledge: number;
   customer_service: number;
@@ -34,6 +33,8 @@ interface Rating {
   teamwork: number;
   comment?: string;
   rating_date: string;
+  created_at: string;
+  area?: string; // Made optional since it might not be present in the database
 }
 
 const StaffRatings = () => {
@@ -136,7 +137,7 @@ const StaffRatings = () => {
                   {filteredRatings.map((rating) => (
                     <TableRow key={rating.id}>
                       <TableCell className="font-medium">{rating.staff_name}</TableCell>
-                      <TableCell>{rating.area}</TableCell>
+                      <TableCell>{rating.area || "N/A"}</TableCell>
                       <TableCell>
                         <div className="flex items-center">
                           {renderStars(rating.overall)}

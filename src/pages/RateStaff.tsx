@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -50,6 +51,15 @@ type StaffMember = {
   department_name?: string;
 };
 
+// Define the response type for staff members
+interface StaffResponse {
+  id: number;
+  name: string;
+  departments?: {
+    name: string;
+  } | null;
+}
+
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -86,7 +96,7 @@ const RateStaff = () => {
           throw error;
         }
 
-        const mappedStaff = data?.map(item => ({
+        const mappedStaff = data?.map((item: StaffResponse) => ({
           id: item.id,
           name: item.name,
           department_name: item.departments?.name || 'No Department'
