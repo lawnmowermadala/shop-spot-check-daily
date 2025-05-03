@@ -52,7 +52,7 @@ const ChecklistItem = ({
     const fetchStaffMembers = async () => {
       try {
         const { data, error } = await supabase
-          .from('staff_members')
+          .from('staff')
           .select('id, name');
         
         if (error) {
@@ -68,10 +68,20 @@ const ChecklistItem = ({
         console.log('Fetched staff members in ChecklistItem:', data);
         
         if (data && data.length > 0) {
-          setLocalAssignees(data);
+          // Convert id to string for compatibility with the component
+          const staffWithStringIds = data.map(staff => ({
+            id: staff.id.toString(),
+            name: staff.name
+          }));
+          setLocalAssignees(staffWithStringIds);
         } else if (assignees && assignees.length > 0) {
-          setLocalAssignees(assignees);
-          console.log('Using prop assignees instead:', assignees);
+          // Convert assignees with number ids to string ids for the local state
+          const assigneesWithStringIds = assignees.map(assignee => ({
+            id: assignee.id.toString(),
+            name: assignee.name
+          }));
+          setLocalAssignees(assigneesWithStringIds);
+          console.log('Using prop assignees instead:', assigneesWithStringIds);
         } else {
           console.log('No staff members available');
         }

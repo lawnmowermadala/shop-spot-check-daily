@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -35,7 +34,7 @@ import Navigation from '@/components/Navigation';
 
 // Define the rating form schema
 const ratingSchema = z.object({
-  staffId: z.string().uuid({ message: "Please select a staff member" }),
+  staffId: z.string().min(1, { message: "Please select a staff member" }),
   area: z.string().min(1, { message: "Please enter an area" }),
   overall: z.number().min(1).max(5),
   productKnowledge: z.number().min(1).max(5),
@@ -48,10 +47,10 @@ const ratingSchema = z.object({
 type RatingFormValues = z.infer<typeof ratingSchema>;
 
 type StaffMember = {
-  id: string;
+  id: number;
   name: string;
   position?: string;
-  department?: string;
+  department_name?: string;
 };
 
 const RateStaff = () => {
@@ -75,13 +74,18 @@ const RateStaff = () => {
     },
   });
 
-  // Fetch staff members from Supabase
+  // Fetch staff members from Supabase "staff" table
   useEffect(() => {
     const fetchStaffMembers = async () => {
       try {
+        // Fetch from staff table with join to departments to get department names
         const { data, error } = await supabase
-          .from('staff_members')
-          .select('*');
+          .from('staff')
+          .select(`
+            id,
+            name,
+            departments:department_id (name)
+          `);
           
         if (error) {
           console.error('Error fetching staff:', error);
@@ -91,7 +95,14 @@ const RateStaff = () => {
             variant: "destructive"
           });
         } else if (data) {
-          setStaffMembers(data);
+          // Map the joined data to the expected StaffMember format
+          const mappedStaff = data.map(item => ({
+            id: item.id,
+            name: item.name,
+            department_name: item.departments?.name || 'No Department'
+          }));
+          console.log('Fetched staff members:', mappedStaff);
+          setStaffMembers(mappedStaff);
         }
       } catch (error) {
         console.error('Error in fetchStaffMembers:', error);
@@ -160,7 +171,7 @@ const RateStaff = () => {
     
     try {
       // Find the selected staff member name
-      const selectedStaff = staffMembers.find(staff => staff.id === data.staffId);
+      const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
       
       if (!selectedStaff) {
         toast({
@@ -244,8 +255,8 @@ const RateStaff = () => {
                       </FormControl>
                       <SelectContent>
                         {staffMembers.map((staff) => (
-                          <SelectItem key={staff.id} value={staff.id}>
-                            {staff.name} {staff.position && `- ${staff.position}`}
+                          <SelectItem key={staff.id} value={staff.id.toString()}>
+                            {staff.name} {staff.department_name && `- ${staff.department_name}`}
                           </SelectItem>
                         ))}
                       </SelectContent>
