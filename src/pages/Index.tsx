@@ -211,6 +211,13 @@ const Index = () => {
         title: "Error",
         description: `Assignment failed: ${error.message}`,
         variant: "destructive"
+        const handleAssignment = async (areaName, assigneeId, instructions, photoUrl) => {
+  // Assignment logic...
+  await supabase.from('assignments').insert(assignmentData);
+  await fetchAssignments(); // Refresh list
+  toast.success(); // Show success message
+  // No locking - area is immediately available for next assignment
+}
       });
     }
   };
