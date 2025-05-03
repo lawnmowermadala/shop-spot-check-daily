@@ -1,186 +1,335 @@
-
 import { useState, useEffect } from 'react';
-import { toast } from "@/components/ui/sonner";
+import { useNavigate } from 'react-router-dom';
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle,
+  CardDescription
+} from "@/components/ui/card";
+import { 
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
-import Navigation from "@/components/Navigation";
+import { Textarea } from "@/components/ui/textarea";
+import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { supabase } from '@/lib/supabaseClient';
+import Navigation from '@/components/Navigation';
 
-interface Department {
+const ratingSchema = z.object({
+  staffId: z.string().min(1, { message: "Please select a staff member" }),
+  overall: z.number().min(1).max(5),
+  productKnowledge: z.number().min(1).max(5),
+  jobPerformance: z.number().min(1).max(5),
+  customerService: z.number().min(1).max(5),
+  teamwork: z.number().min(1).max(5),
+  comment: z.string().optional(),
+});
+
+type RatingFormValues = z.infer<typeof ratingSchema>;
+
+type StaffMember = {
   id: number;
   name: string;
-}
-
-interface Staff {
-  id: number;
-  name: string;
-  department_id: number;
   department_name?: string;
-}
+};
 
-export default function StaffPage() {
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [name, setName] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
-  const [loadingDepts, setLoadingDepts] = useState(true);
-  const [loadingStaff, setLoadingStaff] = useState(true);
+const RateStaff = () => {
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const form = useForm<RatingFormValues>({
+    resolver: zodResolver(ratingSchema),
+    defaultValues: {
+      staffId: '',
+      overall: 0,
+      productKnowledge: 0,
+      jobPerformance: 0,
+      customerService: 0,
+      teamwork: 0,
+      comment: '',
+    },
+  });
 
   useEffect(() => {
-    fetchDepartments();
-    fetchStaff();
-  }, []);
+    const fetchStaffMembers = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('staff')
+          .select(`
+            id,
+            name,
+            departments:department_id (name)
+          `);
+          
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
 
-  async function fetchDepartments() {
-    try {
-      setLoadingDepts(true);
-      console.log("Fetching departments...");
-      const { data, error } = await supabase
-        .from('departments')
-        .select('*')
-        .order('name');
+        const mappedStaff = data?.map(item => ({
+          id: item.id,
+          name: item.name,
+          department_name: item.departments?.name || 'No Department'
+        })) || [];
 
-      if (error) {
-        console.error("Error fetching departments:", error);
-        throw error;
+        console.log('Fetched staff members:', mappedStaff);
+        setStaffMembers(mappedStaff);
+      } catch (error) {
+        console.error('Error fetching staff:', error);
+        toast({
+          title: "Error",
+          description: "Could not fetch staff members",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
       }
-
-      console.log("Departments data:", data);
-      setDepartments(data || []);
-    } catch (error) {
-      toast.error("Error loading departments");
-      console.error("Error fetching departments:", error);
-    } finally {
-      setLoadingDepts(false);
-    }
-  }
-
-  async function fetchStaff() {
-    try {
-      setLoadingStaff(true);
-      console.log("Fetching staff members...");
-      // Join staff with departments to get department names
-      const { data, error } = await supabase
-        .from('staff')
-        .select(`
-          *,
-          departments:department_id (name)
-        `)
-        .order('name');
-
-      if (error) {
-        console.error("Error fetching staff:", error);
-        throw error;
-      }
-
-      console.log("Staff data:", data);
-      // Transform the data to include the department name
-      const staffWithDeptNames = data?.map(item => ({
-        id: item.id,
-        name: item.name,
-        department_id: item.department_id,
-        department_name: item.departments?.name || 'No Department'
-      })) || [];
-
-      setStaff(staffWithDeptNames);
-    } catch (error) {
-      toast.error("Error loading staff members");
-      console.error("Error fetching staff:", error);
-    } finally {
-      setLoadingStaff(false);
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+    };
     
-    if (!name.trim()) {
-      toast.error("Please enter a staff name");
-      return;
-    }
+    fetchStaffMembers();
+  }, [toast]);
 
-    if (!departmentId) {
-      toast.error("Please select a department");
-      return;
-    }
+  const RatingInput = ({ 
+    label, 
+    icon, 
+    name 
+  }: { 
+    label: string; 
+    icon: JSX.Element; 
+    name: keyof RatingFormValues; 
+  }) => {
+    const value = form.watch(name) as number;
+    
+    return (
+      <FormField
+        control={form.control}
+        name={name}
+        render={({ field }) => (
+          <FormItem className="space-y-2">
+            <div className="flex justify-between items-center">
+              <FormLabel className="flex items-center gap-2">
+                {icon}
+                {label}
+              </FormLabel>
+              <span className="text-sm text-gray-500">
+                {value > 0 ? `${value}/5` : "Not rated"}
+              </span>
+            </div>
+            <FormControl>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <Button
+                    key={rating}
+                    type="button"
+                    variant={value >= rating ? "default" : "ghost"}
+                    className="p-1 h-8"
+                    onClick={() => field.onChange(rating)}
+                  >
+                    <Star 
+                      className={`h-5 w-5 ${
+                        value >= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                      }`} 
+                    />
+                  </Button>
+                ))}
+              </div>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    );
+  };
 
+  const onSubmit = async (data: RatingFormValues) => {
+    setIsLoading(true);
+    
     try {
-      console.log("Adding new staff member:", { name, department_id: departmentId });
-      const { error, data } = await supabase
-        .from('staff')
-        .insert([{ 
-          name: name.trim(), 
-          department_id: parseInt(departmentId) 
-        }])
+      console.log('Form data being submitted:', data);
+      
+      const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
+      
+      if (!selectedStaff) {
+        throw new Error(`Staff member with ID ${data.staffId} not found in local state`);
+      }
+
+      console.log('Selected staff:', selectedStaff);
+
+      const submissionData = {
+        staff_id: data.staffId,
+        staff_name: selectedStaff.name,
+        overall: data.overall,
+        product_Knowledge: data.productKnowledge,
+        job_jobPerformance: data.jobPerformance,
+        customer_Service: data.customerService,
+        teamwork: data.teamwork,
+        comment: data.comment || null,
+        rating_date: new Date().toISOString()
+      };
+
+      console.log('Data being sent to Supabase:', submissionData);
+
+      const { data: result, error } = await supabase
+        .from('ratings')
+        .insert(submissionData)
         .select();
 
       if (error) {
-        console.error("Error adding staff:", error);
+        console.error('Detailed Supabase error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
         throw error;
       }
 
-      console.log("New staff member added:", data);
-      toast.success("Staff member added successfully");
-      setName('');
-      setDepartmentId('');
-      fetchStaff();
+      console.log('Submission result:', result);
+
+      toast({
+        title: "Success",
+        description: "Rating submitted successfully!",
+      });
+      
+      form.reset();
+      navigate('/ratings');
     } catch (error) {
-      toast.error("Error adding staff member");
-      console.error("Error adding staff:", error);
+      console.error('Full error details:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to submit rating",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6">Staff Management</h1>
+    <div className="container mx-auto p-4 pb-20">
+      <h1 className="text-2xl font-bold mb-6">Rate Staff Performance</h1>
       
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">Add New Staff Member</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            placeholder="Staff Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          
-          <Select value={departmentId} onValueChange={setDepartmentId} required>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select Department" />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map((dept) => (
-                <SelectItem key={dept.id} value={dept.id.toString()}>
-                  {dept.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Button type="submit">Add Staff Member</Button>
-        </form>
-      </div>
-
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Staff List</h2>
-        {loadingStaff ? (
-          <p className="text-center text-gray-500">Loading staff members...</p>
-        ) : staff.length > 0 ? (
-          <div className="space-y-2">
-            {staff.map((person) => (
-              <div key={person.id} className="p-3 border rounded bg-white shadow-sm">
-                <div className="font-medium">{person.name}</div>
-                <div className="text-sm text-gray-600">{person.department_name}</div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Staff Performance Evaluation</CardTitle>
+          <CardDescription>
+            Rate a staff member's performance in different areas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="staffId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Staff Member</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        console.log('Selected staff ID:', value);
+                        field.onChange(value);
+                      }}
+                      value={field.value}
+                      disabled={isLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a staff member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staffMembers.map((staff) => (
+                          <SelectItem key={staff.id} value={staff.id.toString()}>
+                            {staff.name} {staff.department_name && `(${staff.department_name})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="bg-gray-50 p-4 rounded-lg space-y-5">
+                <h3 className="font-semibold text-lg mb-2">Performance Ratings</h3>
+                <RatingInput 
+                  label="Overall Rating" 
+                  icon={<Star className="h-5 w-5 text-yellow-500" />} 
+                  name="overall" 
+                />
+                <RatingInput 
+                  label="Product Knowledge" 
+                  icon={<Award className="h-5 w-5 text-blue-500" />} 
+                  name="productKnowledge" 
+                />
+                <RatingInput 
+                  label="Job Performance" 
+                  icon={<ThumbsUp className="h-5 w-5 text-green-500" />} 
+                  name="jobPerformance" 
+                />
+                <RatingInput 
+                  label="Customer Service" 
+                  icon={<HeadphonesIcon className="h-5 w-5 text-purple-500" />} 
+                  name="customerService" 
+                />
+                <RatingInput 
+                  label="Teamwork" 
+                  icon={<Users className="h-5 w-5 text-orange-500" />} 
+                  name="teamwork" 
+                />
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-center text-gray-500">No staff members found</p>
-        )}
-      </div>
+              
+              <FormField
+                control={form.control}
+                name="comment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Comments (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Add any additional comments..." 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full"
+              >
+                {isLoading ? "Submitting..." : "Submit Rating"}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
       
       <Navigation />
     </div>
   );
-}
+};
+
+export default RateStaff;
