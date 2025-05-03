@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,20 +14,29 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import AssigneeSelect from './AssigneeSelect';
 
+interface Assignee {
+  id: number;
+  name: string;
+  department_id?: number;
+  department_name?: string;
+}
+
 interface ChecklistItemProps {
   area: string;
   description: string;
-  assignees: Array<{ id: string; name: string }>;
   onAssign: (assigneeId: string, instructions: string, photoUrl?: string) => void;
-  isAssigned: boolean;
+  assignees: Assignee[];
+  isAssigned?: boolean;
+  assignedTo?: string;
 }
 
 const ChecklistItem = ({ 
   area, 
   description, 
-  assignees: propAssignees, 
   onAssign, 
-  isAssigned 
+  assignees, 
+  isAssigned, 
+  assignedTo 
 }: ChecklistItemProps) => {
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
@@ -39,7 +47,7 @@ const ChecklistItem = ({
   
   // Fetch staff members directly from Supabase
   useEffect(() => {
-    console.log('PropAssignees passed to ChecklistItem:', propAssignees);
+    console.log('PropAssignees passed to ChecklistItem:', assignees);
     
     const fetchStaffMembers = async () => {
       try {
@@ -61,9 +69,9 @@ const ChecklistItem = ({
         
         if (data && data.length > 0) {
           setLocalAssignees(data);
-        } else if (propAssignees && propAssignees.length > 0) {
-          setLocalAssignees(propAssignees);
-          console.log('Using prop assignees instead:', propAssignees);
+        } else if (assignees && assignees.length > 0) {
+          setLocalAssignees(assignees);
+          console.log('Using prop assignees instead:', assignees);
         } else {
           console.log('No staff members available');
         }
@@ -73,7 +81,7 @@ const ChecklistItem = ({
     };
     
     fetchStaffMembers();
-  }, [propAssignees]);
+  }, [assignees]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

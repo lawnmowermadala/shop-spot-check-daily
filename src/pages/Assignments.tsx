@@ -25,9 +25,9 @@ type Assignment = {
   id: string;
   area: string;
   assignee_name: string;
-  assignee_id: string;
+  assignee_id: number;
   status: 'needs-check' | 'in-progress' | 'done';
-  assigned_date: string;
+  created_at: string;
   instructions?: string;
   photo_url?: string;
 }
@@ -48,7 +48,7 @@ const Assignments = () => {
       const { data, error } = await supabase
         .from('assignments')
         .select('*')
-        .order('assigned_date', { ascending: false });
+        .order('created_at', { ascending: false });
       
       if (error) {
         console.error('Supabase error:', error);
@@ -187,7 +187,7 @@ const Assignments = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {new Date(assignment.assigned_date).toLocaleDateString()}
+                        {new Date(assignment.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
