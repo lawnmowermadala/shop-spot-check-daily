@@ -160,59 +160,71 @@ const RateStaff = () => {
       />
     );
   };
-const onSubmit = async (data: RatingFormValues) => {
-  setIsLoading(true);
-  
-  try {
-    const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
+
+  const onSubmit = async (data: RatingFormValues) => {
+    setIsLoading(true);
     
-    if (!selectedStaff) {
-      throw new Error("Selected staff member not found");
-    }
+    try {
+      console.log('Form data being submitted:', data);
+      
+      const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
+      
+      if (!selectedStaff) {
+        throw new Error(`Staff member with ID ${data.staffId} not found in local state`);
+      }
 
-    // Ensure all column names match your table exactly
-    const submissionData = {
-      staff_id: data.staffId, // Must be UUID format
-      staff_name: selectedStaff.name,
-      overall: data.overall,
-      product_knowledge: data.productKnowledge, // Lowercase with underscore
-      job_performance: data.jobPerformance,     // Lowercase with underscore
-      customer_service: data.customerService,   // Lowercase with underscore
-      teamwork: data.teamwork,
-      area: 'General', // Required field from your table structure
-      comment: data.comment || null,
-      rating_date: new Date().toISOString()
-    };
+      console.log('Selected staff:', selectedStaff);
 
-    console.log('Final submission data:', submissionData);
+      const submissionData = {
+        staff_id: data.staffId,
+        staff_name: selectedStaff.name,
+        overall: data.overall,
+        product_Knowledge: data.productKnowledge,
+        job_Performance: data.jobPerformance,
+        customer_Service: data.customerService,
+        teamwork: data.teamwork,
+        comment: data.comment || null,
+        rating_date: new Date().toISOString()
+      };
 
-    const { error } = await supabase
-      .from('ratings')
-      .insert(submissionData);
+      console.log('Data being sent to Supabase:', submissionData);
 
-    if (error) {
-      console.error('Supabase error details:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint
+      const { data: result, error } = await supabase
+        .from('ratings')
+        .insert(submissionData)
+        .select();
+
+      if (error) {
+        console.error('Detailed Supabase error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
+
+      console.log('Submission result:', result);
+
+      toast({
+        title: "Success",
+        description: "Rating submitted successfully!",
       });
-      throw error;
+      
+      form.reset();
+      navigate('/ratings');
+    } catch (error) {
+      console.error('Full error details:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to submit rating",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    toast({ title: "Success", description: "Rating submitted successfully!" });
-    form.reset();
-    navigate('/ratings');
-  } catch (error) {
-    console.error('Full error:', error);
-    toast({
-      title: "Error",
-      description: error instanceof Error ? error.message : "Failed to submit rating",
-      variant: "destructive"
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
   return (
     <div className="container mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6">Rate Staff Performance</h1>
