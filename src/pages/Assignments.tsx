@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { 
   Table, 
@@ -15,7 +14,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay } from 'lucide-react';
+import { Check, Clock, CirclePlay, X } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -26,7 +25,7 @@ type Assignment = {
   area: string;
   assignee_name: string;
   assignee_id: number;
-  status: 'needs-check' | 'in-progress' | 'done';
+  status: 'needs-check' | 'in-progress' | 'done' | 'incomplete';
   created_at: string;
   instructions?: string;
   photo_url?: string;
@@ -35,27 +34,21 @@ type Assignment = {
 const statusIcons = {
   'needs-check': <CirclePlay className="h-5 w-5 text-yellow-500" />,
   'in-progress': <Clock className="h-5 w-5 text-blue-500" />,
-  'done': <Check className="h-5 w-5 text-green-500" />
+  'done': <Check className="h-5 w-5 text-green-500" />,
+  'incomplete': <X className="h-5 w-5 text-red-500" />
 };
 
 const Assignments = () => {
-  const [filter, setFilter] = useState<'all' | 'needs-check' | 'in-progress' | 'done'>('all');
+  const [filter, setFilter] = useState<'all' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
 
-  // Enhanced fetch function with error handling
   const fetchAssignments = async () => {
     try {
-      console.log('Fetching assignments from Supabase...');
       const { data, error } = await supabase
         .from('assignments')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-
-      console.log('Assignments data:', data);
+      if (error) throw error;
       return data as Assignment[];
     } catch (error) {
       console.error('Failed to fetch assignments:', error);
@@ -66,7 +59,7 @@ const Assignments = () => {
   const { data: assignments = [], isLoading, error, refetch } = useQuery({
     queryKey: ['assignments'],
     queryFn: fetchAssignments,
-    retry: 1 // Retry once before failing
+    retry: 1
   });
 
   useEffect(() => {
@@ -86,12 +79,10 @@ const Assignments = () => {
 
   const updateAssignmentStatus = async (id: string, status: Assignment['status']) => {
     try {
-      console.log(`Updating assignment ${id} to status: ${status}`);
       const { error } = await supabase
         .from('assignments')
         .update({ status })
-        .eq('id', id)
-        .select();
+        .eq('id', id);
       
       if (error) throw error;
       
@@ -105,7 +96,32 @@ const Assignments = () => {
       console.error('Error updating status:', err);
       toast({
         title: "Update Failed",
-        description: err.message || "Couldn't update status. Please try again.",
+        description: "Couldn't update status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const clearAssignment = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      await refetch();
+      
+      toast({
+        title: "Assignment Cleared",
+        description: "The assignment has been removed and can be reassigned",
+      });
+    } catch (err) {
+      console.error('Error clearing assignment:', err);
+      toast({
+        title: "Clear Failed",
+        description: "Couldn't clear assignment. Please try again.",
         variant: "destructive"
       });
     }
@@ -147,6 +163,13 @@ const Assignments = () => {
           size="sm"
         >
           Completed
+        </Button>
+        <Button 
+          variant={filter === 'incomplete' ? 'default' : 'outline'} 
+          onClick={() => setFilter('incomplete')}
+          size="sm"
+        >
+          Incomplete
         </Button>
       </div>
 
@@ -205,8 +228,29 @@ const Assignments = () => {
                               variant="outline" 
                               size="sm"
                               onClick={() => updateAssignmentStatus(assignment.id, 'done')}
+                              className="bg-green-50 hover:bg-green-100 text-green-600"
                             >
                               Complete
+                            </Button>
+                          )}
+                          {assignment.status !== 'incomplete' && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => updateAssignmentStatus(assignment.id, 'incomplete')}
+                              className="bg-red-50 hover:bg-red-100 text-red-600"
+                            >
+                              Incomplete
+                            </Button>
+                          )}
+                          {(assignment.status === 'done' || assignment.status === 'incomplete') && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => clearAssignment(assignment.id)}
+                              className="bg-gray-50 hover:bg-gray-100 text-gray-600"
+                            >
+                              Clear
                             </Button>
                           )}
                         </div>
