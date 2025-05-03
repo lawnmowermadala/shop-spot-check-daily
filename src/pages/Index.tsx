@@ -36,7 +36,7 @@ interface Assignment {
 const Index = () => {
   const [newArea, setNewArea] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [assignedAreas, setAssignedAreas] = useState<Record<string, Assignment>>({});
+  const [assignedAreas, setAssignedAreas] = useState<Assignment[]>([]);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
   const [todaysAssignmentCount, setTodaysAssignmentCount] = useState(0);
@@ -87,7 +87,8 @@ const Index = () => {
       // Fetch all assignments
       const { data: allAssignments, error: allError } = await supabase
         .from('assignments')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (allError) throw allError;
 
@@ -101,13 +102,7 @@ const Index = () => {
       if (countError) throw countError;
 
       setTodaysAssignmentCount(count || 0);
-
-      const assignmentsMap = (allAssignments || []).reduce((acc, assignment) => {
-        acc[assignment.area] = assignment;
-        return acc;
-      }, {} as Record<string, Assignment>);
-
-      setAssignedAreas(assignmentsMap);
+      setAssignedAreas(allAssignments || []);
     } catch (error) {
       console.error('Error fetching assignments:', error);
       toast({
@@ -208,7 +203,7 @@ const Index = () => {
         photo_url: photoUrl || null
       };
 
-      // Always create a new assignment (don't update existing ones)
+      // Always create a new assignment
       const { error } = await supabase
         .from('assignments')
         .insert(assignmentData)
@@ -233,6 +228,11 @@ const Index = () => {
     } finally {
       setCurrentlyAssigning(null); // Unlock the area after assignment
     }
+  };
+
+  // Get assignments for a specific area
+  const getAreaAssignments = (areaName: string) => {
+    return assignedAreas.filter(assignment => assignment.area === areaName);
   };
 
   return (
@@ -288,11 +288,8 @@ const Index = () => {
         <div className="space-y-4">
           {areas.length > 0 ? (
             areas.map((area) => {
-              const assignment = assignedAreas[area.name];
-              const isAssigned = !!assignment;
-              const assignedStaff = isAssigned 
-                ? staffMembers.find(staff => staff.id === assignment.assignee_id)
-                : null;
+              const areaAssignments = getAreaAssignments(area.name);
+              const isAssigned = areaAssignments.length > 0;
 
               return (
                 <ChecklistItem
@@ -304,8 +301,9 @@ const Index = () => {
                     handleAssignment(area.name, assigneeId, instructions, photoUrl)
                   }
                   isAssigned={isAssigned}
-                  assignedTo={assignedStaff?.name}
+                  assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
                   isCurrentlyAssigning={currentlyAssigning === area.name}
+                  assignmentCount={areaAssignments.length}
                 />
               );
             })
