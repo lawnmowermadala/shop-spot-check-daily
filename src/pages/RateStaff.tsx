@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -35,7 +34,6 @@ import Navigation from '@/components/Navigation';
 
 const ratingSchema = z.object({
   staffId: z.string().min(1, { message: "Please select a staff member" }),
-  area: z.string().min(1, { message: "Please enter an area" }),
   overall: z.number().min(1).max(5),
   productKnowledge: z.number().min(1).max(5),
   jobPerformance: z.number().min(1).max(5),
@@ -62,7 +60,6 @@ const RateStaff = () => {
     resolver: zodResolver(ratingSchema),
     defaultValues: {
       staffId: '',
-      area: '',
       overall: 0,
       productKnowledge: 0,
       jobPerformance: 0,
@@ -71,10 +68,6 @@ const RateStaff = () => {
       comment: '',
     },
   });
-
-  // Watch staffId to debug selection
-  const selectedStaffId = form.watch("staffId");
-  console.log("Currently selected staffId:", selectedStaffId);
 
   useEffect(() => {
     const fetchStaffMembers = async () => {
@@ -168,12 +161,10 @@ const RateStaff = () => {
     setIsLoading(true);
     
     try {
-      console.log("Form submission data:", data); // Debug log
-      
       const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
       
       if (!selectedStaff) {
-        throw new Error(`Staff member with ID ${data.staffId} not found`);
+        throw new Error("Selected staff member not found");
       }
 
       const { error } = await supabase
@@ -182,13 +173,12 @@ const RateStaff = () => {
           staff_id: data.staffId,
           staff_name: selectedStaff.name,
           overall: data.overall,
-          product_kn0x: data.productKnowledge, // Matches your table column
-          job_performa: data.jobPerformance, // Matches your table column
-          customer_ser: data.customerService, // Matches your table column
+          product_kn0x: data.productKnowledge,
+          job_performa: data.jobPerformance,
+          customer_ser: data.customerService,
           teamwork: data.teamwork,
-          area: data.area,
           comment: data.comment || null,
-          rating_date: new Date().toISOString() // Added timestamp
+          rating_date: new Date().toISOString()
         });
 
       if (error) {
@@ -235,10 +225,7 @@ const RateStaff = () => {
                   <FormItem>
                     <FormLabel>Staff Member</FormLabel>
                     <Select 
-                      onValueChange={(value) => {
-                        console.log("Selected value:", value); // Debug log
-                        field.onChange(value);
-                      }}
+                      onValueChange={field.onChange} 
                       value={field.value}
                       disabled={isLoading}
                     >
@@ -247,10 +234,7 @@ const RateStaff = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {staffMembers.map((staff) => (
-                          <SelectItem 
-                            key={staff.id} 
-                            value={staff.id.toString()} // Ensure string value
-                          >
+                          <SelectItem key={staff.id} value={staff.id.toString()}>
                             {staff.name} {staff.department_name && `(${staff.department_name})`}
                           </SelectItem>
                         ))}
@@ -261,24 +245,6 @@ const RateStaff = () => {
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="area"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Area</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter area (e.g., Front End, Produce)" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Rest of your form remains the same */}
               <div className="bg-gray-50 p-4 rounded-lg space-y-5">
                 <h3 className="font-semibold text-lg mb-2">Performance Ratings</h3>
                 <RatingInput 
