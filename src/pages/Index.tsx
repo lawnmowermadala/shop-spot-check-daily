@@ -7,7 +7,6 @@ import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { format, isToday, parseISO } from 'date-fns';
 
 interface Area {
   id: string;
@@ -32,7 +31,6 @@ interface Assignment {
   instructions?: string;
   photo_url?: string | null;
   created_at?: string;
-  completed_at?: string | null;
 }
 
 const Index = () => {
@@ -41,21 +39,6 @@ const Index = () => {
   const [assignedAreas, setAssignedAreas] = useState<Record<string, Assignment>>({});
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date());
-
-  // Check date change every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      if (now.getDate() !== currentDate.getDate()) {
-        setCurrentDate(now);
-        // Automatically unlock assignments when date changes
-        unlockCompletedAssignments();
-      }
-    }, 60000); // Check every minute
-
-    return () => clearInterval(interval);
-  }, [currentDate]);
 
   // Fetch staff members with department info
   const fetchStaffMembers = async () => {
@@ -118,45 +101,9 @@ const Index = () => {
     }
   };
 
-  // Unlock completed assignments when day changes or when marked complete
-  const unlockCompletedAssignments = async () => {
-    try {
-      // Get all completed assignments
-      const { data: completedAssignments, error } = await supabase
-        .from('assignments')
-        .select('*')
-        .eq('status', 'completed');
-
-      if (error) throw error;
-
-      // Unlock assignments that were completed on previous days
-      const assignmentsToUnlock = completedAssignments.filter(assignment => {
-        if (!assignment.completed_at) return false;
-        const completedDate = parseISO(assignment.completed_at);
-        return !isToday(completedDate);
-      });
-
-      if (assignmentsToUnlock.length > 0) {
-        // Reset status to 'pending' for these assignments
-        const { error: updateError } = await supabase
-          .from('assignments')
-          .update({ status: 'pending', completed_at: null })
-          .in('id', assignmentsToUnlock.map(a => a.id));
-
-        if (updateError) throw updateError;
-
-        // Refresh assignments
-        await fetchAssignments();
-      }
-    } catch (error) {
-      console.error('Error unlocking assignments:', error);
-    }
-  };
-
   useEffect(() => {
     fetchStaffMembers();
     fetchAssignments();
-    unlockCompletedAssignments(); // Check for assignments to unlock on initial load
   }, []);
 
   // Fetch areas using React Query
@@ -218,7 +165,7 @@ const Index = () => {
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
     try {
-      // Convert assigneeId to number
+      // Convert assigneeId to number (since staff.id is number in your schema)
       const assigneeIdNum = parseInt(assigneeId);
       const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
       
@@ -237,8 +184,7 @@ const Index = () => {
         assignee_name: assignee.name,
         status: 'pending',
         instructions: instructions || null,
-        photo_url: photoUrl || null,
-        completed_at: null
+        photo_url: photoUrl || null
       };
 
       // Check if assignment exists
@@ -278,44 +224,11 @@ const Index = () => {
     }
   };
 
-  const handleCompleteAssignment = async (areaName: string) => {
-    try {
-      const assignment = assignedAreas[areaName];
-      if (!assignment?.id) return;
-
-      // Mark as completed with current timestamp
-      const { error } = await supabase
-        .from('assignments')
-        .update({ 
-          status: 'completed',
-          completed_at: new Date().toISOString() 
-        })
-        .eq('id', assignment.id);
-
-      if (error) throw error;
-
-      // Refresh assignments
-      await fetchAssignments();
-
-      toast({
-        title: "Success",
-        description: "Area marked as completed!",
-      });
-    } catch (error) {
-      console.error('Error completing assignment:', error);
-      toast({
-        title: "Error",
-        description: "Failed to mark area as completed",
-        variant: "destructive"
-      });
-    }
-  };
-
   return (
     <div className="max-w-md mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6 text-center">Daily Shop Check</h1>
       <p className="text-gray-600 mb-6 text-center">
-        {currentDate.toLocaleDateString('en-US', { 
+        {new Date().toLocaleDateString('en-US', { 
           weekday: 'long', 
           year: 'numeric', 
           month: 'long', 
@@ -359,7 +272,6 @@ const Index = () => {
             areas.map((area) => {
               const assignment = assignedAreas[area.name];
               const isAssigned = !!assignment;
-              const isCompleted = assignment?.status === 'completed';
               const assignedStaff = isAssigned 
                 ? staffMembers.find(staff => staff.id === assignment.assignee_id)
                 : null;
@@ -373,11 +285,8 @@ const Index = () => {
                   onAssign={(assigneeId, instructions, photoUrl) => 
                     handleAssignment(area.name, assigneeId, instructions, photoUrl)
                   }
-                  onComplete={() => handleCompleteAssignment(area.name)}
                   isAssigned={isAssigned}
-                  isCompleted={isCompleted}
                   assignedTo={assignedStaff?.name}
-                  canReassign={isCompleted}
                 />
               );
             })
