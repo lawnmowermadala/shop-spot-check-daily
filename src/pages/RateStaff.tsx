@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -22,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
@@ -50,6 +52,14 @@ type StaffMember = {
   name: string;
   department_name?: string;
 };
+
+interface StaffResponse {
+  id: number;
+  name: string;
+  departments: {
+    name: string | null;
+  } | null;
+}
 
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -87,7 +97,7 @@ const RateStaff = () => {
         }
 
         if (data) {
-          const mappedStaff = data.map(item => ({
+          const mappedStaff = data.map((item: StaffResponse) => ({
             id: item.id,
             name: item.name,
             department_name: item.departments?.name || 'No Department'
