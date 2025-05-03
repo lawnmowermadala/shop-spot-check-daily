@@ -161,70 +161,69 @@ const RateStaff = () => {
     );
   };
 
-  const onSubmit = async (data: RatingFormValues) => {
-    setIsLoading(true);
+ const onSubmit = async (data: RatingFormValues) => {
+  setIsLoading(true);
+  
+  try {
+    console.log('Form data being submitted:', data);
     
-    try {
-      console.log('Form data being submitted:', data);
-      
-      const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
-      
-      if (!selectedStaff) {
-        throw new Error(`Staff member with ID ${data.staffId} not found in local state`);
-      }
-
-      console.log('Selected staff:', selectedStaff);
-
-      const submissionData = {
-        staff_id: data.staffId,
-        staff_name: selectedStaff.name,
-        overall: data.overall,
-        product_Knowledge: data.productKnowledge,
-        job_Performance: data.jobPerformance,
-        customer_Service: data.customerService,
-        teamwork: data.teamwork,
-        comment: data.comment || null,
-        rating_date: new Date().toISOString()
-      };
-
-      console.log('Data being sent to Supabase:', submissionData);
-
-      const { data: result, error } = await supabase
-        .from('ratings')
-        .insert(submissionData)
-        .select();
-
-      if (error) {
-        console.error('Detailed Supabase error:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        });
-        throw error;
-      }
-
-      console.log('Submission result:', result);
-
-      toast({
-        title: "Success",
-        description: "Rating submitted successfully!",
-      });
-      
-      form.reset();
-      navigate('/ratings');
-    } catch (error) {
-      console.error('Full error details:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit rating",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+    const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
+    
+    if (!selectedStaff) {
+      throw new Error(`Staff member with ID ${data.staffId} not found in local state`);
     }
-  };
 
+    console.log('Selected staff:', selectedStaff);
+
+    const submissionData = {
+      staff_id: data.staffId,
+      staff_name: selectedStaff.name,
+      overall: data.overall,
+      product_Knowledge: data.productKnowledge,
+      job_Performance: data.jobPerformance,
+      customer_Service: data.customerService,
+      teamwork: data.teamwork,
+      comment: data.comment || null,
+      rating_date: new Date().toISOString()
+    };
+
+    console.log('Data being sent to Supabase:', submissionData);
+
+    const { data: result, error } = await supabase
+      .from('ratings')
+      .insert(submissionData)
+      .select();
+
+    if (error) {
+      console.error('Detailed Supabase error:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
+    }
+
+    console.log('Submission result:', result);
+
+    toast({
+      title: "Success",
+      description: "Rating submitted successfully!",
+    });
+    
+    form.reset();
+    navigate('/ratings');
+  } catch (error) {
+    console.error('Full error details:', error);
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to submit rating",
+      variant: "destructive"
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
     <div className="container mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6">Rate Staff Performance</h1>
