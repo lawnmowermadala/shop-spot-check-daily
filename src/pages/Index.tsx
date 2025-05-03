@@ -40,7 +40,6 @@ const Index = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
   const [todaysAssignmentCount, setTodaysAssignmentCount] = useState(0);
-  const [recentlyAssigned, setRecentlyAssigned] = useState<string[]>([]);
 
   // Fetch staff members
   const fetchStaffMembers = async () => {
@@ -190,14 +189,6 @@ const Index = () => {
         photo_url: photoUrl || null
       };
 
-      // Add to recently assigned temporarily
-      setRecentlyAssigned(prev => [...prev, areaName]);
-      
-      // Remove from recently assigned after 1 second
-      setTimeout(() => {
-        setRecentlyAssigned(prev => prev.filter(area => area !== areaName));
-      }, 1000);
-
       const { error } = await supabase
         .from('assignments')
         .insert(assignmentData)
@@ -211,6 +202,9 @@ const Index = () => {
         title: "Success",
         description: `Task assigned to ${assignee.name}!`,
       });
+
+      // No locking mechanism - area remains immediately available
+      
     } catch (error) {
       console.error('Error assigning area:', error);
       toast({
@@ -223,10 +217,6 @@ const Index = () => {
 
   const getAreaAssignments = (areaName: string) => {
     return assignedAreas.filter(assignment => assignment.area === areaName);
-  };
-
-  const isRecentlyAssigned = (areaName: string) => {
-    return recentlyAssigned.includes(areaName);
   };
 
   return (
@@ -294,7 +284,7 @@ const Index = () => {
                   isAssigned={isAssigned}
                   assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
                   assignmentCount={areaAssignments.length}
-                  isRecentlyAssigned={isRecentlyAssigned(area.name)}
+                  // No locking props passed - area stays always available
                 />
               );
             })
