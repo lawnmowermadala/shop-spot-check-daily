@@ -34,6 +34,7 @@ import Navigation from '@/components/Navigation';
 
 const ratingSchema = z.object({
   staffId: z.string().min(1, { message: "Please select a staff member" }),
+  area: z.string().min(1, { message: "Please select an area" }),
   overall: z.number().min(1).max(5),
   productKnowledge: z.number().min(1).max(5),
   jobPerformance: z.number().min(1).max(5),
@@ -45,10 +46,22 @@ const ratingSchema = z.object({
 type RatingFormValues = z.infer<typeof ratingSchema>;
 
 type StaffMember = {
-  id: number;
+  id: string; // Changed to string for UUID
   name: string;
   department_name?: string;
 };
+
+const areas = [
+  "Front End",
+  "Produce",
+  "Deli",
+  "Bakery",
+  "Meat",
+  "Dairy",
+  "Frozen",
+  "Grocery",
+  "Pharmacy"
+];
 
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -60,6 +73,7 @@ const RateStaff = () => {
     resolver: zodResolver(ratingSchema),
     defaultValues: {
       staffId: '',
+      area: '',
       overall: 0,
       productKnowledge: 0,
       jobPerformance: 0,
@@ -159,7 +173,7 @@ const RateStaff = () => {
     setIsLoading(true);
     
     try {
-      const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
+      const selectedStaff = staffMembers.find(staff => staff.id === data.staffId);
       
       if (!selectedStaff) {
         throw new Error("Selected staff member not found");
@@ -168,15 +182,16 @@ const RateStaff = () => {
       const { error } = await supabase
         .from('ratings')
         .insert({
-          staff_id: parseInt(data.staffId), // Ensure this matches your table's data type
+          staff_id: data.staffId, // Now matches UUID type
           staff_name: selectedStaff.name,
           overall: data.overall,
-          product_knowledge: data.productKnowledge,
-          job_performance: data.jobPerformance,
-          customer_service: data.customerService,
+          product_kn0x: data.productKnowledge, // Matches table column name
+          job_performa: data.jobPerformance, // Matches table column name
+          customer_ser: data.customerService, // Matches table column name
           teamwork: data.teamwork,
+          area: data.area, // Added area field
           comment: data.comment || null,
-          created_at: new Date().toISOString() // Add timestamp if your table expects it
+          rating_date: new Date().toISOString() // Matches table column name
         });
 
       if (error) {
@@ -232,8 +247,35 @@ const RateStaff = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {staffMembers.map((staff) => (
-                          <SelectItem key={staff.id} value={staff.id.toString()}>
+                          <SelectItem key={staff.id} value={staff.id}>
                             {staff.name} {staff.department_name && `(${staff.department_name})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="area"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Area/Department</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value}
+                      disabled={isLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an area" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {areas.map((area) => (
+                          <SelectItem key={area} value={area}>
+                            {area}
                           </SelectItem>
                         ))}
                       </SelectContent>
