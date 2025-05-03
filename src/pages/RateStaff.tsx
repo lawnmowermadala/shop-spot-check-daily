@@ -81,7 +81,10 @@ const RateStaff = () => {
             departments:department_id (name)
           `);
           
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
 
         const mappedStaff = data?.map(item => ({
           id: item.id,
@@ -89,6 +92,7 @@ const RateStaff = () => {
           department_name: item.departments?.name || 'No Department'
         })) || [];
 
+        console.log('Fetched staff members:', mappedStaff);
         setStaffMembers(mappedStaff);
       } catch (error) {
         console.error('Error fetching staff:', error);
@@ -161,39 +165,56 @@ const RateStaff = () => {
     setIsLoading(true);
     
     try {
+      console.log('Form data being submitted:', data);
+      
       const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
       
       if (!selectedStaff) {
-        throw new Error("Selected staff member not found");
+        throw new Error(`Staff member with ID ${data.staffId} not found in local state`);
       }
 
-      const { error } = await supabase
+      console.log('Selected staff:', selectedStaff);
+
+      const submissionData = {
+        staff_id: data.staffId,
+        staff_name: selectedStaff.name,
+        overall: data.overall,
+        product_kn0x: data.productKnowledge,
+        job_performa: data.jobPerformance,
+        customer_ser: data.customerService,
+        teamwork: data.teamwork,
+        comment: data.comment || null,
+        rating_date: new Date().toISOString()
+      };
+
+      console.log('Data being sent to Supabase:', submissionData);
+
+      const { data: result, error } = await supabase
         .from('ratings')
-        .insert({
-          staff_id: data.staffId,
-          staff_name: selectedStaff.name,
-          overall: data.overall,
-          product_kn0x: data.productKnowledge,
-          job_performa: data.jobPerformance,
-          customer_ser: data.customerService,
-          teamwork: data.teamwork,
-          comment: data.comment || null,
-          rating_date: new Date().toISOString()
-        });
+        .insert(submissionData)
+        .select();
 
       if (error) {
-        console.error('Supabase error:', error);
+        console.error('Detailed Supabase error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
         throw error;
       }
+
+      console.log('Submission result:', result);
 
       toast({
         title: "Success",
         description: "Rating submitted successfully!",
       });
+      
       form.reset();
       navigate('/ratings');
     } catch (error) {
-      console.error('Submission error:', error);
+      console.error('Full error details:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to submit rating",
@@ -225,7 +246,10 @@ const RateStaff = () => {
                   <FormItem>
                     <FormLabel>Staff Member</FormLabel>
                     <Select 
-                      onValueChange={field.onChange} 
+                      onValueChange={(value) => {
+                        console.log('Selected staff ID:', value);
+                        field.onChange(value);
+                      }}
                       value={field.value}
                       disabled={isLoading}
                     >
