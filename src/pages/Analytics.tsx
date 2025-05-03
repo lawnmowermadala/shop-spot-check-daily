@@ -9,213 +9,231 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { format, isAfter, isBefore, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Printer, Trophy, AlertTriangle } from 'lucide-react';
+import { Printer } from 'lucide-react';
 
+// Custom colors for charts
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 const Analytics = () => {
+  // Date range state for filtering
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(new Date().setDate(new Date().getDate() - 30)),
+    from: new Date(new Date().setDate(new Date().getDate() - 30)), // Default to last 30 days
     to: new Date()
   });
 
-  // Fetch ratings data
-  const { data: ratings = [], isLoading: ratingsLoading, error: ratingsError } = useQuery({
+  // Fetch ratings data from Supabase
+  const { data: ratings = [], isLoading: ratingsLoading, error: ratingsError, refetch: refetchRatings } = useQuery({
     queryKey: ['ratings-analytics', dateRange],
     queryFn: async () => {
-      const { data, error } = await supabase.from('ratings').select('*');
+      const { data, error } = await supabase
+        .from('ratings')
+        .select('*');
+      
       if (error) throw error;
       return data || [];
     }
   });
 
-  // Fetch assignments data
-  const { data: assignments = [], isLoading: assignmentsLoading, error: assignmentsError } = useQuery({
+  // Fetch assignments data from Supabase
+  const { data: assignments = [], isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useQuery({
     queryKey: ['assignments-analytics', dateRange],
     queryFn: async () => {
-      const { data, error } = await supabase.from('assignments').select('*');
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('*');
+      
       if (error) throw error;
       return data || [];
     }
   });
+
+  // Refetch data when date range changes
+  useEffect(() => {
+    refetchRatings();
+    refetchAssignments();
+  }, [dateRange, refetchRatings, refetchAssignments]);
 
   useEffect(() => {
     if (ratingsError || assignmentsError) {
       toast({
         title: "Error",
-        description: "Failed to load analytics data",
+        description: "Failed to load analytics data. Please try again.",
         variant: "destructive"
       });
     }
   }, [ratingsError, assignmentsError]);
 
-  // Filter data by date range
-  const filterByDate = (items: any[], dateField: string) => {
-    if (!dateRange?.from && !dateRange?.to) return items;
+  // Filter data based on date range
+  const filteredRatings = ratings.filter(rating => {
+    if (!dateRange?.from && !dateRange?.to) return true;
     
-    return items.filter(item => {
-      const itemDate = parseISO(item[dateField]);
-      if (!itemDate) return false;
-      
-      if (dateRange?.from && dateRange?.to) {
-        return isAfter(itemDate, startOfDay(dateRange.from)) && 
-               isBefore(itemDate, endOfDay(dateRange.to));
-      }
-      
-      if (dateRange?.from) return isAfter(itemDate, startOfDay(dateRange.from));
-      if (dateRange?.to) return isBefore(itemDate, endOfDay(dateRange.to));
-      
-      return true;
-    });
-  };
+    const ratingDate = parseISO(rating.rating_date);
+    
+    if (dateRange?.from && dateRange?.to) {
+      return isAfter(ratingDate, startOfDay(dateRange.from)) && 
+             isBefore(ratingDate, endOfDay(dateRange.to));
+    }
+    
+    if (dateRange?.from) {
+      return isAfter(ratingDate, startOfDay(dateRange.from));
+    }
+    
+    if (dateRange?.to) {
+      return isBefore(ratingDate, endOfDay(dateRange.to));
+    }
+    
+    return true;
+  });
 
-  const filteredRatings = filterByDate(ratings, 'rating_date');
-  const filteredAssignments = filterByDate(assignments, 'created_at');
+  const filteredAssignments = assignments.filter(assignment => {
+    if (!dateRange?.from && !dateRange?.to) return true;
+    
+    const assignmentDate = parseISO(assignment.created_at || '');
+    if (!assignmentDate) return false;
+    
+    if (dateRange?.from && dateRange?.to) {
+      return isAfter(assignmentDate, startOfDay(dateRange.from)) && 
+             isBefore(assignmentDate, endOfDay(dateRange.to));
+    }
+    
+    if (dateRange?.from) {
+      return isAfter(assignmentDate, startOfDay(dateRange.from));
+    }
+    
+    if (dateRange?.to) {
+      return isBefore(assignmentDate, endOfDay(dateRange.to));
+    }
+    
+    return true;
+  });
 
-  // Process staff ratings (sorted best to worst)
-  const staffPerformance = Object.entries(
+  // Process ratings data for charts and lists
+  const staffRatingData = Object.entries(
     filteredRatings.reduce((acc: Record<string, any>, rating) => {
       if (!acc[rating.staff_name]) {
         acc[rating.staff_name] = {
           name: rating.staff_name,
           overall: 0,
+          product_knowledge: 0,
+          customer_service: 0,
+          job_performance: 0,
+          teamwork: 0,
           count: 0
         };
       }
+      
       acc[rating.staff_name].overall += rating.overall;
+      acc[rating.staff_name].product_knowledge += rating.product_knowledge;
+      acc[rating.staff_name].customer_service += rating.customer_service;
+      acc[rating.staff_name].job_performance += rating.job_performance;
+      acc[rating.staff_name].teamwork += rating.teamwork;
       acc[rating.staff_name].count += 1;
+      
       return acc;
     }, {})
-  ).map(([_, data]) => ({
-    name: data.name,
-    averageRating: +(data.overall / data.count).toFixed(1),
-    totalRatings: data.count
-  }))
-  .sort((a, b) => b.averageRating - a.averageRating);
+  ).map(([_, data]) => {
+    const count = data.count;
+    return {
+      name: data.name,
+      overall: +(data.overall / count).toFixed(1),
+      product_knowledge: +(data.product_knowledge / count).toFixed(1),
+      customer_service: +(data.customer_service / count).toFixed(1),
+      job_performance: +(data.job_performance / count).toFixed(1),
+      teamwork: +(data.teamwork / count).toFixed(1),
+      totalRatings: count
+    };
+  })
+  .sort((a, b) => b.overall - a.overall); // Sort from best to worst
 
-  // Process area completion data
-  const areaCompletion = Object.entries(
-    filteredAssignments.reduce((acc: Record<string, number>, assignment) => {
-      const area = assignment.area;
-      acc[area] = (acc[area] || 0) + 1;
-      return acc;
-    }, {})
+  // Area completion data - shows areas with completed assignments
+  const completedAreaData = Object.entries(
+    filteredAssignments
+      .filter(assignment => assignment.status === 'completed')
+      .reduce((acc: Record<string, number>, assignment) => {
+        const area = assignment.area;
+        acc[area] = (acc[area] || 0) + 1;
+        return acc;
+      }, {})
   ).map(([area, count]) => ({
-    area,
-    count
+    name: area,
+    completed: count
   }))
-  .sort((a, b) => b.count - a.count);
+  .sort((a, b) => b.completed - a.completed); // Sort by most completed
 
-  // Get top 3 performing areas
-  const topAreas = areaCompletion.slice(0, 3);
-  // Get bottom 3 performing areas (neglected)
-  const neglectedAreas = areaCompletion.slice(-3).reverse();
+  // Task status data
+  const statusCounts = filteredAssignments.reduce((acc: Record<string, number>, assignment) => {
+    const status = assignment.status;
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+
+  const taskStatusData = Object.entries(statusCounts).map(([status, count]) => ({
+    name: status.replace('-', ' '),
+    value: count
+  }));
+
+  // Staff workload data
+  const staffWorkloadData = Object.entries(
+    filteredAssignments.reduce((acc: Record<string, number>, assignment) => {
+      acc[assignment.assignee_name] = (acc[assignment.assignee_name] || 0) + 1;
+      return acc;
+    }, {})
+  ).map(([name, count]) => ({
+    name,
+    tasks: count
+  }));
 
   const isLoading = ratingsLoading || assignmentsLoading;
 
+  // Print functionality
   const handlePrint = () => {
+    const printContent = document.getElementById('printable-content');
     const printWindow = window.open('', '_blank');
     
-    if (printWindow) {
+    if (printWindow && printContent) {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Employee Performance Report</title>
+            <title>Staff Performance Report</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
-              h1, h2 { color: #333; }
-              .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-              .date-range { font-style: italic; color: #666; }
-              table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+              h1 { color: #333; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
               th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
               th { background-color: #f2f2f2; }
-              .top-performer { background-color: #e6f7e6; }
-              .top-area { background-color: #e6f3ff; }
-              .neglected-area { background-color: #ffebeb; }
+              tr:nth-child(even) { background-color: #f9f9f9; }
+              .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+              .date-range { font-style: italic; color: #666; }
             </style>
           </head>
           <body>
             <div class="header">
-              <h1>Employee Performance Report</h1>
+              <h1>Staff Performance Report</h1>
               <div class="date-range">
                 ${dateRange?.from && dateRange?.to ? 
-                  `Period: ${format(dateRange.from, 'PP')} to ${format(dateRange.to, 'PP')}` : 
+                  `Report period: ${format(dateRange.from, 'PP')} to ${format(dateRange.to, 'PP')}` : 
                   'All time data'}
               </div>
             </div>
-
-            <h2>Employee of the Month Candidates</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Employee</th>
-                  <th>Average Rating</th>
-                  <th>Total Ratings</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${staffPerformance.slice(0, 5).map((staff, index) => `
-                  <tr class="${index === 0 ? 'top-performer' : ''}">
-                    <td>${index + 1}</td>
-                    <td>${staff.name}</td>
-                    <td>${staff.averageRating}</td>
-                    <td>${staff.totalRatings}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-
-            <h2>Top Performing Areas</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Area</th>
-                  <th>Completed Tasks</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${topAreas.map((area, index) => `
-                  <tr class="top-area">
-                    <td>${area.area}</td>
-                    <td>${area.count}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-
-            <h2>Neglected Areas Needing Attention</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Area</th>
-                  <th>Completed Tasks</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${neglectedAreas.map(area => `
-                  <tr class="neglected-area">
-                    <td>${area.area}</td>
-                    <td>${area.count}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+            ${printContent.innerHTML}
           </body>
         </html>
       `);
       printWindow.document.close();
-      setTimeout(() => printWindow.print(), 200);
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 200);
     }
   };
 
   return (
     <div className="container mx-auto p-4 pb-20">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Employee Performance Analytics</h1>
+        <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
         <Button onClick={handlePrint} className="gap-2">
           <Printer className="h-4 w-4" />
-          Generate Report
+          Print Report
         </Button>
       </div>
 
@@ -240,84 +258,155 @@ const Analytics = () => {
       </Card>
 
       {isLoading ? (
-        <div className="text-center py-10">Loading performance data...</div>
+        <div className="text-center py-10">Loading analytics data...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Top Performers */}
-          <Card>
-            <CardHeader className="bg-green-50">
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="text-yellow-500" />
-                Employee of the Month Candidates
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-3">Rank</th>
-                      <th className="text-left p-3">Employee</th>
-                      <th className="text-left p-3">Avg Rating</th>
-                      <th className="text-left p-3">Ratings</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {staffPerformance.slice(0, 5).map((staff, index) => (
-                      <tr key={staff.name} className="border-b hover:bg-gray-50">
-                        <td className="p-3">{index + 1}</td>
-                        <td className="p-3 font-medium">{staff.name}</td>
-                        <td className="p-3">{staff.averageRating}</td>
-                        <td className="p-3">{staff.totalRatings}</td>
+        <>
+          {/* Printable content */}
+          <div id="printable-content" className="printable-content">
+            {/* Staff Performance List */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Staff Performance Ranking (Best to Worst)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-3">Rank</th>
+                        <th className="text-left p-3">Staff Member</th>
+                        <th className="text-left p-3">Overall Rating</th>
+                        <th className="text-left p-3">Product Knowledge</th>
+                        <th className="text-left p-3">Customer Service</th>
+                        <th className="text-left p-3">Job Performance</th>
+                        <th className="text-left p-3">Teamwork</th>
+                        <th className="text-left p-3">Total Ratings</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                    </thead>
+                    <tbody>
+                      {staffRatingData.map((staff, index) => (
+                        <tr key={staff.name} className="border-b hover:bg-gray-50">
+                          <td className="p-3">{index + 1}</td>
+                          <td className="p-3 font-medium">{staff.name}</td>
+                          <td className="p-3">{staff.overall}</td>
+                          <td className="p-3">{staff.product_knowledge}</td>
+                          <td className="p-3">{staff.customer_service}</td>
+                          <td className="p-3">{staff.job_performance}</td>
+                          <td className="p-3">{staff.teamwork}</td>
+                          <td className="p-3">{staff.totalRatings}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Top Areas */}
-          <Card>
-            <CardHeader className="bg-blue-50">
-              <CardTitle>Top Performing Areas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topAreas}>
-                    <XAxis dataKey="area" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#0088FE" name="Completed Tasks" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Charts (hidden when printing) */}
+            <div className="no-print">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Staff Performance Ratings (Best to Worst)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={staffRatingData}
+                          margin={{ top: 20, right: 30, left: 0, bottom: 40 }}
+                        >
+                          <XAxis dataKey="name" angle={-45} textAnchor="end" height={70} />
+                          <YAxis domain={[0, 5]} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="overall" name="Overall" fill="#0088FE" />
+                          <Bar dataKey="product_knowledge" name="Product Knowledge" fill="#00C49F" />
+                          <Bar dataKey="customer_service" name="Customer Service" fill="#FFBB28" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          {/* Neglected Areas */}
-          <Card>
-            <CardHeader className="bg-red-50">
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="text-orange-500" />
-                Neglected Areas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={neglectedAreas}>
-                    <XAxis dataKey="area" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#FF8042" name="Completed Tasks" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Completed Tasks by Area</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={completedAreaData}
+                          margin={{ top: 20, right: 30, left: 0, bottom: 40 }}
+                        >
+                          <XAxis dataKey="name" angle={-45} textAnchor="end" height={70} />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="completed" name="Completed Tasks" fill="#8884d8" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Task Status Distribution</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px] w-full flex justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={taskStatusData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                            nameKey="name"
+                            label={({ name, value }) => `${name}: ${value}`}
+                          >
+                            {taskStatusData.map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Staff Workload</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={staffWorkloadData}
+                          margin={{ top: 20, right: 30, left: 0, bottom: 40 }}
+                        >
+                          <XAxis dataKey="name" angle={-45} textAnchor="end" height={70} />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="tasks" name="Assigned Tasks" fill="#8884d8" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </div>
+        </>
       )}
 
       <Navigation />

@@ -7,7 +7,6 @@ import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { format, isToday, parseISO } from 'date-fns';
 
 interface Area {
   id: string;
@@ -28,11 +27,10 @@ interface Assignment {
   area: string;
   assignee_id: number;
   assignee_name: string;
-  status: 'pending' | 'completed' | 'incomplete';
+  status: string;
   instructions?: string;
   photo_url?: string | null;
   created_at?: string;
-  completed_at?: string | null;
 }
 
 const Index = () => {
@@ -41,7 +39,6 @@ const Index = () => {
   const [assignedAreas, setAssignedAreas] = useState<Record<string, Assignment>>({});
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date());
 
   // Fetch staff members with department info
   const fetchStaffMembers = async () => {
@@ -168,7 +165,7 @@ const Index = () => {
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
     try {
-      // Convert assigneeId to number
+      // Convert assigneeId to number (since staff.id is number in your schema)
       const assigneeIdNum = parseInt(assigneeId);
       const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
       
@@ -227,79 +224,11 @@ const Index = () => {
     }
   };
 
-  const handleCompleteAssignment = async (areaName: string) => {
-    try {
-      const assignment = assignedAreas[areaName];
-      if (!assignment?.id) return;
-
-      // Mark as completed with current timestamp
-      const { error } = await supabase
-        .from('assignments')
-        .update({ 
-          status: 'completed',
-          completed_at: new Date().toISOString() 
-        })
-        .eq('id', assignment.id);
-
-      if (error) throw error;
-
-      // Clear the assignment from local state immediately
-      const updatedAssignments = { ...assignedAreas };
-      delete updatedAssignments[areaName];
-      setAssignedAreas(updatedAssignments);
-
-      toast({
-        title: "Success",
-        description: "Area marked as completed and cleared for reassignment!",
-      });
-    } catch (error) {
-      console.error('Error completing assignment:', error);
-      toast({
-        title: "Error",
-        description: "Failed to mark area as completed",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleIncompleteAssignment = async (areaName: string) => {
-    try {
-      const assignment = assignedAreas[areaName];
-      if (!assignment?.id) return;
-
-      // Mark as incomplete
-      const { error } = await supabase
-        .from('assignments')
-        .update({ 
-          status: 'incomplete',
-          completed_at: null 
-        })
-        .eq('id', assignment.id);
-
-      if (error) throw error;
-
-      // Refresh assignments
-      await fetchAssignments();
-
-      toast({
-        title: "Success",
-        description: "Area marked as incomplete!",
-      });
-    } catch (error) {
-      console.error('Error marking as incomplete:', error);
-      toast({
-        title: "Error",
-        description: "Failed to mark area as incomplete",
-        variant: "destructive"
-      });
-    }
-  };
-
   return (
     <div className="max-w-md mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6 text-center">Daily Shop Check</h1>
       <p className="text-gray-600 mb-6 text-center">
-        {currentDate.toLocaleDateString('en-US', { 
+        {new Date().toLocaleDateString('en-US', { 
           weekday: 'long', 
           year: 'numeric', 
           month: 'long', 
@@ -343,8 +272,6 @@ const Index = () => {
             areas.map((area) => {
               const assignment = assignedAreas[area.name];
               const isAssigned = !!assignment;
-              const isCompleted = assignment?.status === 'completed';
-              const isIncomplete = assignment?.status === 'incomplete';
               const assignedStaff = isAssigned 
                 ? staffMembers.find(staff => staff.id === assignment.assignee_id)
                 : null;
@@ -358,11 +285,7 @@ const Index = () => {
                   onAssign={(assigneeId, instructions, photoUrl) => 
                     handleAssignment(area.name, assigneeId, instructions, photoUrl)
                   }
-                  onComplete={() => handleCompleteAssignment(area.name)}
-                  onIncomplete={() => handleIncompleteAssignment(area.name)}
                   isAssigned={isAssigned}
-                  isCompleted={isCompleted}
-                  isIncomplete={isIncomplete}
                   assignedTo={assignedStaff?.name}
                 />
               );
