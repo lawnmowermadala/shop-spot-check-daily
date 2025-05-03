@@ -40,7 +40,6 @@ const Index = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
   const [todaysAssignmentCount, setTodaysAssignmentCount] = useState(0);
-  const [currentlyAssigning, setCurrentlyAssigning] = useState<string | null>(null);
 
   // Fetch staff members with department info
   const fetchStaffMembers = async () => {
@@ -162,7 +161,6 @@ const Index = () => {
         description: "New area added successfully!",
       });
 
-      // Clear the form fields
       setNewArea('');
       setNewDescription('');
       refetch();
@@ -178,8 +176,6 @@ const Index = () => {
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
     try {
-      setCurrentlyAssigning(areaName); // Lock the area while assigning
-      
       // Convert assigneeId to number (since staff.id is number in your schema)
       const assigneeIdNum = parseInt(assigneeId);
       const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
@@ -190,7 +186,6 @@ const Index = () => {
           description: "Invalid staff selection",
           variant: "destructive"
         });
-        setCurrentlyAssigning(null); // Unlock if error
         return;
       }
 
@@ -225,8 +220,6 @@ const Index = () => {
         description: `Failed to assign area: ${error.message}`,
         variant: "destructive"
       });
-    } finally {
-      setCurrentlyAssigning(null); // Unlock the area after assignment
     }
   };
 
@@ -289,7 +282,6 @@ const Index = () => {
           {areas.length > 0 ? (
             areas.map((area) => {
               const areaAssignments = getAreaAssignments(area.name);
-              const isAssigned = areaAssignments.length > 0;
 
               return (
                 <ChecklistItem
@@ -300,9 +292,8 @@ const Index = () => {
                   onAssign={(assigneeId, instructions, photoUrl) => 
                     handleAssignment(area.name, assigneeId, instructions, photoUrl)
                   }
-                  isAssigned={isAssigned}
+                  isAssigned={areaAssignments.length > 0}
                   assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
-                  isCurrentlyAssigning={currentlyAssigning === area.name}
                   assignmentCount={areaAssignments.length}
                 />
               );
