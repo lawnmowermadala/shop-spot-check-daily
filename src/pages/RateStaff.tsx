@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Added missing import
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -73,6 +72,7 @@ const RateStaff = () => {
   useEffect(() => {
     const fetchStaffMembers = async () => {
       try {
+        setIsLoading(true);
         const { data, error } = await supabase
           .from('staff')
           .select(`
@@ -81,26 +81,22 @@ const RateStaff = () => {
             departments:department_id (name)
           `);
           
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
-        if (data) {
-          const mappedStaff = data.map(item => ({
-            id: item.id,
-            name: item.name,
-            department_name: item.departments?.name || 'No Department'
-          }));
-          
-          setStaffMembers(mappedStaff);
-        }
+        setStaffMembers(data?.map(item => ({
+          id: item.id,
+          name: item.name,
+          department_name: item.departments?.name || 'No Department'
+        })) || []);
       } catch (error) {
+        console.error('Error fetching staff:', error);
         toast({
           title: "Error",
           description: "Could not fetch staff members",
           variant: "destructive"
         });
-        console.error('Error fetching staff:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -169,23 +165,22 @@ const RateStaff = () => {
         throw new Error("Selected staff member not found");
       }
 
-      const { data: result, error } = await supabase
+      const { error } = await supabase
         .from('ratings')
         .insert({
-          staff_id: data.staffId,
+          staff_id: parseInt(data.staffId), // Ensure this matches your table's data type
           staff_name: selectedStaff.name,
           overall: data.overall,
           product_knowledge: data.productKnowledge,
           job_performance: data.jobPerformance,
           customer_service: data.customerService,
           teamwork: data.teamwork,
-          comment: data.comment || null
-        })
-        .select();
-
-      console.log('Submission result:', { result, error });
+          comment: data.comment || null,
+          created_at: new Date().toISOString() // Add timestamp if your table expects it
+        });
 
       if (error) {
+        console.error('Supabase error details:', error);
         throw error;
       }
 
@@ -196,10 +191,10 @@ const RateStaff = () => {
       form.reset();
       navigate('/ratings');
     } catch (error) {
-      console.error('Submission error:', error);
+      console.error('Full submission error:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit rating",
+        description: error instanceof Error ? error.message : "Failed to submit rating. Please check your data and try again.",
         variant: "destructive"
       });
     } finally {
@@ -227,7 +222,11 @@ const RateStaff = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Staff Member</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value}
+                      disabled={isLoading}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a staff member" />
                       </SelectTrigger>
@@ -283,6 +282,7 @@ const RateStaff = () => {
                       <Textarea 
                         placeholder="Add any additional comments..." 
                         {...field} 
+                        disabled={isLoading}
                       />
                     </FormControl>
                     <FormMessage />
