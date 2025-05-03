@@ -40,19 +40,15 @@ const Index = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
   const [todaysAssignmentCount, setTodaysAssignmentCount] = useState(0);
+  const [recentlyAssigned, setRecentlyAssigned] = useState<string[]>([]);
 
-  // Fetch staff members with department info
+  // Fetch staff members
   const fetchStaffMembers = async () => {
     setLoadingStaff(true);
     try {
       const { data, error } = await supabase
         .from('staff')
-        .select(`
-          id,
-          name,
-          department_id,
-          departments:department_id (name)
-        `)
+        .select('id, name, department_id, departments:department_id (name)')
         .order('name');
 
       if (error) throw error;
@@ -77,13 +73,11 @@ const Index = () => {
     }
   };
 
-  // Fetch existing assignments and count today's assignments
+  // Fetch assignments
   const fetchAssignments = async () => {
     try {
-      // Get today's date in YYYY-MM-DD format
       const today = new Date().toISOString().split('T')[0];
       
-      // Fetch all assignments
       const { data: allAssignments, error: allError } = await supabase
         .from('assignments')
         .select('*')
@@ -91,7 +85,6 @@ const Index = () => {
 
       if (allError) throw allError;
 
-      // Count today's assignments
       const { count, error: countError } = await supabase
         .from('assignments')
         .select('*', { count: 'exact', head: true })
@@ -117,7 +110,7 @@ const Index = () => {
     fetchAssignments();
   }, []);
 
-  // Fetch areas using React Query
+  // Areas query
   const { data: areas = [], isLoading: isLoadingAreas, error: areasError, refetch } = useQuery({
     queryKey: ['areas'],
     queryFn: async () => {
@@ -175,59 +168,66 @@ const Index = () => {
   };
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
-  try {
-    // Convert assigneeId to number
-    const assigneeIdNum = parseInt(assigneeId);
-    const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
-    
-    if (!assignee) {
+    try {
+      const assigneeIdNum = parseInt(assigneeId);
+      const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
+      
+      if (!assignee) {
+        toast({
+          title: "Error",
+          description: "Invalid staff selection",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const assignmentData: Assignment = {
+        area: areaName,
+        assignee_id: assigneeIdNum,
+        assignee_name: assignee.name,
+        status: 'pending',
+        instructions: instructions || null,
+        photo_url: photoUrl || null
+      };
+
+      // Add to recently assigned temporarily
+      setRecentlyAssigned(prev => [...prev, areaName]);
+      
+      // Remove from recently assigned after 1 second
+      setTimeout(() => {
+        setRecentlyAssigned(prev => prev.filter(area => area !== areaName));
+      }, 1000);
+
+      const { error } = await supabase
+        .from('assignments')
+        .insert(assignmentData)
+        .select();
+
+      if (error) throw error;
+
+      await fetchAssignments();
+
+      toast({
+        title: "Success",
+        description: `Task assigned to ${assignee.name}!`,
+      });
+    } catch (error) {
+      console.error('Error assigning area:', error);
       toast({
         title: "Error",
-        description: "Invalid staff selection",
+        description: `Assignment failed: ${error.message}`,
         variant: "destructive"
       });
-      return;
     }
+  };
 
-    const assignmentData: Assignment = {
-      area: areaName,
-      assignee_id: assigneeIdNum,
-      assignee_name: assignee.name,
-      status: 'pending',
-      instructions: instructions || null,
-      photo_url: photoUrl || null
-    };
+  const getAreaAssignments = (areaName: string) => {
+    return assignedAreas.filter(assignment => assignment.area === areaName);
+  };
 
-    // Create new assignment
-    const { error } = await supabase
-      .from('assignments')
-      .insert(assignmentData)
-      .select();
-
-    if (error) throw error;
-
-    // Refresh assignments
-    await fetchAssignments();
-
-    toast({
-      title: "Success",
-      description: `Task assigned to ${assignee.name}!`,
-    });
-
-    // Automatically unlock after 2 seconds (adjust as needed)
-    setTimeout(() => {
-      // This ensures the area becomes available for new assignments
-    }, 2000);
-
-  } catch (error) {
-    console.error('Error assigning area:', error);
-    toast({
-      title: "Error",
-      description: `Assignment failed: ${error.message}`,
-      variant: "destructive"
-    });
-  }
-};
+  const isRecentlyAssigned = (areaName: string) => {
+    return recentlyAssigned.includes(areaName);
+  };
 
   return (
     <div className="max-w-md mx-auto p-4 pb-20">
@@ -241,14 +241,12 @@ const Index = () => {
         })}
       </p>
 
-      {/* Today's assignment count */}
       <div className="mb-4 text-center">
         <p className="text-sm text-gray-500">
           Today's assignments: <span className="font-semibold">{todaysAssignmentCount}</span>
         </p>
       </div>
 
-      {/* Add New Area Form */}
       <div className="mb-6 space-y-2">
         <h2 className="text-lg font-semibold">Add New Area</h2>
         <div className="space-y-2">
@@ -273,7 +271,6 @@ const Index = () => {
         </div>
       </div>
       
-      {/* Areas List */}
       {isLoadingAreas ? (
         <div className="text-center py-4">Loading areas...</div>
       ) : areasError ? (
@@ -283,6 +280,7 @@ const Index = () => {
           {areas.length > 0 ? (
             areas.map((area) => {
               const areaAssignments = getAreaAssignments(area.name);
+              const isAssigned = areaAssignments.length > 0;
 
               return (
                 <ChecklistItem
@@ -293,9 +291,10 @@ const Index = () => {
                   onAssign={(assigneeId, instructions, photoUrl) => 
                     handleAssignment(area.name, assigneeId, instructions, photoUrl)
                   }
-                  isAssigned={areaAssignments.length > 0}
+                  isAssigned={isAssigned}
                   assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
                   assignmentCount={areaAssignments.length}
+                  isRecentlyAssigned={isRecentlyAssigned(area.name)}
                 />
               );
             })
