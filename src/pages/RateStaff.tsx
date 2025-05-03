@@ -53,6 +53,15 @@ type StaffMember = {
   department_name?: string;
 };
 
+// Interface for the database response type to satisfy TypeScript
+interface StaffResponse {
+  id: number;
+  name: string;
+  departments?: {
+    name: string | null;
+  } | null;
+}
+
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,12 +104,16 @@ const RateStaff = () => {
             variant: "destructive"
           });
         } else if (data) {
+          // Properly type the data response and mapping
+          const typedData = data as StaffResponse[];
+          
           // Map the joined data to the expected StaffMember format
-          const mappedStaff = data.map(item => ({
+          const mappedStaff = typedData.map(item => ({
             id: item.id,
             name: item.name,
             department_name: item.departments?.name || 'No Department'
           }));
+          
           console.log('Fetched staff members:', mappedStaff);
           setStaffMembers(mappedStaff);
         }
