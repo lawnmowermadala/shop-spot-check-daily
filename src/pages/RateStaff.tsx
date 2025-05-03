@@ -160,20 +160,15 @@ const RateStaff = () => {
       />
     );
   };
-
- const onSubmit = async (data: RatingFormValues) => {
+const onSubmit = async (data: RatingFormValues) => {
   setIsLoading(true);
   
   try {
-    console.log('Form data being submitted:', data);
-    
     const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
     
     if (!selectedStaff) {
-      throw new Error(`Staff member with ID ${data.staffId} not found in local state`);
+      throw new Error("Selected staff member not found");
     }
-
-    console.log('Selected staff:', selectedStaff);
 
     const submissionData = {
       staff_id: data.staffId,
@@ -183,41 +178,30 @@ const RateStaff = () => {
       job_Performance: data.jobPerformance,
       customer_Service: data.customerService,
       teamwork: data.teamwork,
+      area: 'General', // Either add to form or set default here
       comment: data.comment || null,
       rating_date: new Date().toISOString()
     };
 
-    console.log('Data being sent to Supabase:', submissionData);
+    console.log('Submission data:', submissionData);
 
-    const { data: result, error } = await supabase
+    const { error } = await supabase
       .from('ratings')
-      .insert(submissionData)
-      .select();
+      .insert(submissionData);
 
     if (error) {
-      console.error('Detailed Supabase error:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('Full Supabase error:', error);
       throw error;
     }
 
-    console.log('Submission result:', result);
-
-    toast({
-      title: "Success",
-      description: "Rating submitted successfully!",
-    });
-    
+    toast({ title: "Success", description: "Rating submitted!" });
     form.reset();
     navigate('/ratings');
   } catch (error) {
-    console.error('Full error details:', error);
+    console.error('Submission failed:', error);
     toast({
       title: "Error",
-      description: error instanceof Error ? error.message : "Failed to submit rating",
+      description: error instanceof Error ? error.message : "Submission failed",
       variant: "destructive"
     });
   } finally {
