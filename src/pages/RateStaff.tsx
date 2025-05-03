@@ -32,7 +32,6 @@ import * as z from 'zod';
 import { supabase } from '@/lib/supabaseClient';
 import Navigation from '@/components/Navigation';
 
-// Define the rating form schema
 const ratingSchema = z.object({
   staffId: z.string().min(1, { message: "Please select a staff member" }),
   area: z.string().min(1, { message: "Please enter an area" }),
@@ -49,18 +48,8 @@ type RatingFormValues = z.infer<typeof ratingSchema>;
 type StaffMember = {
   id: number;
   name: string;
-  position?: string;
   department_name?: string;
 };
-
-// Interface for the database response type to satisfy TypeScript
-interface StaffResponse {
-  id: number;
-  name: string;
-  departments?: {
-    name: string | null;
-  } | null;
-}
 
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -68,7 +57,6 @@ const RateStaff = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Initialize form
   const form = useForm<RatingFormValues>({
     resolver: zodResolver(ratingSchema),
     defaultValues: {
@@ -83,11 +71,9 @@ const RateStaff = () => {
     },
   });
 
-  // Fetch staff members from Supabase "staff" table
   useEffect(() => {
     const fetchStaffMembers = async () => {
       try {
-        // Fetch from staff table with join to departments to get department names
         const { data, error } = await supabase
           .from('staff')
           .select(`
@@ -97,35 +83,31 @@ const RateStaff = () => {
           `);
           
         if (error) {
-          console.error('Error fetching staff:', error);
-          toast({
-            title: "Error",
-            description: "Could not fetch staff members. Please try again.",
-            variant: "destructive"
-          });
-        } else if (data) {
-          // Properly type the data response and mapping
-          const typedData = data as StaffResponse[];
-          
-          // Map the joined data to the expected StaffMember format
-          const mappedStaff = typedData.map(item => ({
+          throw error;
+        }
+
+        if (data) {
+          const mappedStaff = data.map(item => ({
             id: item.id,
             name: item.name,
             department_name: item.departments?.name || 'No Department'
           }));
           
-          console.log('Fetched staff members:', mappedStaff);
           setStaffMembers(mappedStaff);
         }
       } catch (error) {
-        console.error('Error in fetchStaffMembers:', error);
+        toast({
+          title: "Error",
+          description: "Could not fetch staff members",
+          variant: "destructive"
+        });
+        console.error('Error fetching staff:', error);
       }
     };
     
     fetchStaffMembers();
   }, [toast]);
 
-  // Function to render star rating input
   const RatingInput = ({ 
     label, 
     icon, 
@@ -133,9 +115,9 @@ const RateStaff = () => {
   }: { 
     label: string; 
     icon: JSX.Element; 
-    name: "overall" | "productKnowledge" | "jobPerformance" | "customerService" | "teamwork"; 
+    name: keyof RatingFormValues; 
   }) => {
-    const value = form.watch(name);
+    const value = form.watch(name) as number;
     
     return (
       <FormField
@@ -164,7 +146,7 @@ const RateStaff = () => {
                   >
                     <Star 
                       className={`h-5 w-5 ${
-                        field.value >= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                        value >= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
                       }`} 
                     />
                   </Button>
@@ -178,25 +160,16 @@ const RateStaff = () => {
     );
   };
 
-  // Submit handler
   const onSubmit = async (data: RatingFormValues) => {
     setIsLoading(true);
     
     try {
-      // Find the selected staff member name
       const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
       
       if (!selectedStaff) {
-        toast({
-          title: "Error",
-          description: "Selected staff member not found.",
-          variant: "destructive"
-        });
-        setIsLoading(false);
-        return;
+        throw new Error("Selected staff member not found");
       }
 
-      // Insert rating into Supabase
       const { error } = await supabase.from('ratings').insert({
         staff_id: data.staffId,
         staff_name: selectedStaff.name,
@@ -209,26 +182,17 @@ const RateStaff = () => {
         comment: data.comment || null
       });
 
-      if (error) {
-        console.error('Error submitting rating:', error);
-        toast({
-          title: "Error",
-          description: "Failed to submit rating. Please try again.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "Rating submitted successfully!",
-        });
-        // Redirect to ratings page
-        navigate('/ratings');
-      }
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Rating submitted successfully!",
+      });
+      navigate('/ratings');
     } catch (error) {
-      console.error('Error in onSubmit:', error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to submit rating",
         variant: "destructive"
       });
     } finally {
@@ -250,26 +214,20 @@ const RateStaff = () => {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Staff Member Selection */}
               <FormField
                 control={form.control}
                 name="staffId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Staff Member</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a staff member" />
-                        </SelectTrigger>
-                      </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a staff member" />
+                      </SelectTrigger>
                       <SelectContent>
                         {staffMembers.map((staff) => (
                           <SelectItem key={staff.id} value={staff.id.toString()}>
-                            {staff.name} {staff.department_name && `- ${staff.department_name}`}
+                            {staff.name} {staff.department_name && `(${staff.department_name})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -279,7 +237,6 @@ const RateStaff = () => {
                 )}
               />
               
-              {/* Area Input */}
               <FormField
                 control={form.control}
                 name="area"
@@ -287,31 +244,16 @@ const RateStaff = () => {
                   <FormItem>
                     <FormLabel>Area/Department</FormLabel>
                     <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an area" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Front End">Front End</SelectItem>
-                          <SelectItem value="Customer Service">Customer Service</SelectItem>
-                          <SelectItem value="Produce">Produce</SelectItem>
-                          <SelectItem value="Bakery">Bakery</SelectItem>
-                          <SelectItem value="Deli">Deli</SelectItem>
-                          <SelectItem value="Electronics">Electronics</SelectItem>
-                          <SelectItem value="Grocery">Grocery</SelectItem>
-                          <SelectItem value="Pharmacy">Pharmacy</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Input 
+                        placeholder="Enter area/department" 
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               
-              {/* Rating Inputs */}
               <div className="bg-gray-50 p-4 rounded-lg space-y-5">
                 <h3 className="font-semibold text-lg mb-2">Performance Ratings</h3>
                 <RatingInput 
@@ -341,7 +283,6 @@ const RateStaff = () => {
                 />
               </div>
               
-              {/* Comment */}
               <FormField
                 control={form.control}
                 name="comment"
@@ -350,7 +291,7 @@ const RateStaff = () => {
                     <FormLabel>Comments (Optional)</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Add any additional comments about the staff member's performance..." 
+                        placeholder="Add any additional comments..." 
                         {...field} 
                       />
                     </FormControl>
@@ -359,7 +300,6 @@ const RateStaff = () => {
                 )}
               />
               
-              {/* Submit Button */}
               <Button 
                 type="submit" 
                 disabled={isLoading}
