@@ -179,9 +179,9 @@ const RateStaff = () => {
         staff_id: data.staffId,
         staff_name: selectedStaff.name,
         overall: data.overall,
-        product_kn0x: data.productKnowledge,
-        job_performa: data.jobPerformance,
-        customer_ser: data.customerService,
+        product_Knowledge: data.productKnowledge,
+        job_Performance: data.jobPerformance,
+        customer_Service: data.customerService,
         teamwork: data.teamwork,
         comment: data.comment || null,
         rating_date: new Date().toISOString()
