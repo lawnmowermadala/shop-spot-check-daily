@@ -39,6 +39,7 @@ const Index = () => {
   const [assignedAreas, setAssignedAreas] = useState<Record<string, Assignment>>({});
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
+  const [todaysAssignmentCount, setTodaysAssignmentCount] = useState(0);
 
   // Fetch staff members with department info
   const fetchStaffMembers = async () => {
@@ -76,16 +77,31 @@ const Index = () => {
     }
   };
 
-  // Fetch existing assignments
+  // Fetch existing assignments and count today's assignments
   const fetchAssignments = async () => {
     try {
-      const { data, error } = await supabase
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Fetch all assignments
+      const { data: allAssignments, error: allError } = await supabase
         .from('assignments')
         .select('*');
 
-      if (error) throw error;
+      if (allError) throw allError;
 
-      const assignmentsMap = (data || []).reduce((acc, assignment) => {
+      // Count today's assignments
+      const { count, error: countError } = await supabase
+        .from('assignments')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', `${today}T00:00:00`)
+        .lte('created_at', `${today}T23:59:59`);
+
+      if (countError) throw countError;
+
+      setTodaysAssignmentCount(count || 0);
+
+      const assignmentsMap = (allAssignments || []).reduce((acc, assignment) => {
         acc[assignment.area] = assignment;
         return acc;
       }, {} as Record<string, Assignment>);
@@ -150,6 +166,7 @@ const Index = () => {
         description: "New area added successfully!",
       });
 
+      // Clear the form fields
       setNewArea('');
       setNewDescription('');
       refetch();
@@ -207,7 +224,7 @@ const Index = () => {
         operation = 'created';
       }
 
-      // Refresh assignments
+      // Refresh assignments and count
       await fetchAssignments();
 
       toast({
@@ -235,6 +252,13 @@ const Index = () => {
           day: 'numeric' 
         })}
       </p>
+
+      {/* Today's assignment count */}
+      <div className="mb-4 text-center">
+        <p className="text-sm text-gray-500">
+          Today's assignments: <span className="font-semibold">{todaysAssignmentCount}</span>
+        </p>
+      </div>
 
       {/* Add New Area Form */}
       <div className="mb-6 space-y-2">
