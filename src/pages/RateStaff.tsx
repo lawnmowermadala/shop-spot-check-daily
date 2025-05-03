@@ -45,7 +45,7 @@ const ratingSchema = z.object({
 type RatingFormValues = z.infer<typeof ratingSchema>;
 
 type StaffMember = {
-  id: string;
+  id: string; // Using string for UUID
   name: string;
   department_name?: string;
 };
@@ -83,11 +83,13 @@ const RateStaff = () => {
           
         if (error) throw error;
 
-        setStaffMembers(data?.map(item => ({
+        const formattedStaff = data?.map(item => ({
           id: item.id,
           name: item.name,
           department_name: item.departments?.name || 'No Department'
-        })) || []);
+        })) || [];
+
+        setStaffMembers(formattedStaff);
       } catch (error) {
         console.error('Error fetching staff:', error);
         toast({
@@ -135,9 +137,12 @@ const RateStaff = () => {
                   <Button
                     key={rating}
                     type="button"
-                    variant="ghost"
+                    variant={value >= rating ? "default" : "ghost"}
                     className="p-1 h-8"
-                    onClick={() => field.onChange(rating)}
+                    onClick={() => {
+                      field.onChange(rating);
+                      form.trigger(name); // Manually trigger validation
+                    }}
                   >
                     <Star 
                       className={`h-5 w-5 ${
@@ -155,29 +160,34 @@ const RateStaff = () => {
     );
   };
 
-  const onSubmit = async (data: RatingFormValues) => {
+  const onSubmit = async (formData: RatingFormValues) => {
     setIsLoading(true);
     
     try {
-      const selectedStaff = staffMembers.find(staff => staff.id === data.staffId);
-      
+      // Verify staff selection
+      const selectedStaff = staffMembers.find(staff => staff.id === formData.staffId);
       if (!selectedStaff) {
         throw new Error("Selected staff member not found");
       }
 
+      // Prepare data for Supabase
+      const ratingData = {
+        staff_id: formData.staffId, // UUID remains as string
+        staff_name: selectedStaff.name,
+        overall: formData.overall,
+        product_kn0x: formData.productKnowledge,
+        job_performa: formData.jobPerformance,
+        customer_ser: formData.customerService,
+        teamwork: formData.teamwork,
+        comment: formData.comment || null,
+        rating_date: new Date().toISOString()
+      };
+
+      console.log('Submitting rating:', ratingData); // Debug log
+
       const { error } = await supabase
         .from('ratings')
-        .insert({
-          staff_id: data.staffId,
-          staff_name: selectedStaff.name,
-          overall: data.overall,
-          product_kn0x: data.productKnowledge,
-          job_performa: data.jobPerformance,
-          customer_ser: data.customerService,
-          teamwork: data.teamwork,
-          comment: data.comment || null,
-          rating_date: new Date().toISOString()
-        });
+        .insert(ratingData);
 
       if (error) {
         console.error('Supabase error details:', error);
@@ -188,13 +198,15 @@ const RateStaff = () => {
         title: "Success",
         description: "Rating submitted successfully!",
       });
+      
+      // Reset form and navigate
       form.reset();
       navigate('/ratings');
     } catch (error) {
-      console.error('Full submission error:', error);
+      console.error('Submission error:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit rating. Please check your data and try again.",
+        description: error instanceof Error ? error.message : "Failed to submit rating",
         variant: "destructive"
       });
     } finally {
