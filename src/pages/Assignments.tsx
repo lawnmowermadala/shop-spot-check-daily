@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { 
   Table, 
@@ -14,7 +15,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X } from 'lucide-react';
+import { Check, Clock, CirclePlay } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -25,7 +26,7 @@ type Assignment = {
   area: string;
   assignee_name: string;
   assignee_id: number;
-  status: 'needs-check' | 'in-progress' | 'done' | 'incomplete';
+  status: 'needs-check' | 'in-progress' | 'done';
   created_at: string;
   instructions?: string;
   photo_url?: string;
@@ -34,13 +35,13 @@ type Assignment = {
 const statusIcons = {
   'needs-check': <CirclePlay className="h-5 w-5 text-yellow-500" />,
   'in-progress': <Clock className="h-5 w-5 text-blue-500" />,
-  'done': <Check className="h-5 w-5 text-green-500" />,
-  'incomplete': <X className="h-5 w-5 text-red-500" />
+  'done': <Check className="h-5 w-5 text-green-500" />
 };
 
 const Assignments = () => {
-  const [filter, setFilter] = useState<'all' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
+  const [filter, setFilter] = useState<'all' | 'needs-check' | 'in-progress' | 'done'>('all');
 
+  // Enhanced fetch function with error handling
   const fetchAssignments = async () => {
     try {
       console.log('Fetching assignments from Supabase...');
@@ -65,7 +66,7 @@ const Assignments = () => {
   const { data: assignments = [], isLoading, error, refetch } = useQuery({
     queryKey: ['assignments'],
     queryFn: fetchAssignments,
-    retry: 1
+    retry: 1 // Retry once before failing
   });
 
   useEffect(() => {
@@ -147,13 +148,6 @@ const Assignments = () => {
         >
           Completed
         </Button>
-        <Button 
-          variant={filter === 'incomplete' ? 'default' : 'outline'} 
-          onClick={() => setFilter('incomplete')}
-          size="sm"
-        >
-          Incomplete
-        </Button>
       </div>
 
       <Card>
@@ -211,19 +205,8 @@ const Assignments = () => {
                               variant="outline" 
                               size="sm"
                               onClick={() => updateAssignmentStatus(assignment.id, 'done')}
-                              className="bg-green-50 hover:bg-green-100 text-green-600"
                             >
                               Complete
-                            </Button>
-                          )}
-                          {assignment.status !== 'incomplete' && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => updateAssignmentStatus(assignment.id, 'incomplete')}
-                              className="bg-red-50 hover:bg-red-100 text-red-600"
-                            >
-                              Incomplete
                             </Button>
                           )}
                         </div>
