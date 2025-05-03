@@ -34,6 +34,7 @@ import Navigation from '@/components/Navigation';
 
 const ratingSchema = z.object({
   staffId: z.string().min(1, { message: "Please select a staff member" }),
+  area: z.string().min(1, { message: "Please enter an area" }),
   overall: z.number().min(1).max(5),
   productKnowledge: z.number().min(1).max(5),
   jobPerformance: z.number().min(1).max(5),
@@ -60,6 +61,7 @@ const RateStaff = () => {
     resolver: zodResolver(ratingSchema),
     defaultValues: {
       staffId: '',
+      area: '',
       overall: 0,
       productKnowledge: 0,
       jobPerformance: 0,
@@ -168,25 +170,35 @@ const RateStaff = () => {
         throw new Error("Selected staff member not found");
       }
 
-      const { error } = await supabase.from('ratings').insert({
-        staff_id: data.staffId,
-        staff_name: selectedStaff.name,
-        overall: data.overall,
-        product_knowledge: data.productKnowledge,
-        job_performance: data.jobPerformance,
-        customer_service: data.customerService,
-        teamwork: data.teamwork,
-        comment: data.comment || null
-      });
+      const { data: result, error } = await supabase
+        .from('ratings')
+        .insert({
+          staff_id: data.staffId,
+          staff_name: selectedStaff.name,
+          overall: data.overall,
+          product_knowledge: data.productKnowledge,
+          job_performance: data.jobPerformance,
+          customer_service: data.customerService,
+          teamwork: data.teamwork,
+          area: data.area,
+          comment: data.comment || null
+        })
+        .select();
 
-      if (error) throw error;
+      console.log('Submission result:', { result, error });
+
+      if (error) {
+        throw error;
+      }
 
       toast({
         title: "Success",
         description: "Rating submitted successfully!",
       });
+      form.reset();
       navigate('/ratings');
     } catch (error) {
+      console.error('Submission error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to submit rating",
@@ -229,6 +241,23 @@ const RateStaff = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="area"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Area</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter area (e.g., Front End, Produce)" 
+                        {...field} 
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
