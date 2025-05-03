@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useForm } from 'react-hook-form';
@@ -45,11 +47,20 @@ const ratingSchema = z.object({
 
 type RatingFormValues = z.infer<typeof ratingSchema>;
 
-type StaffMember = {
+interface StaffMember {
   id: number;
   name: string;
   department_name?: string;
-};
+}
+
+// Define the structure of the Supabase response
+interface StaffResponse {
+  id: number;
+  name: string;
+  departments: {
+    name: string;
+  } | null;
+}
 
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
