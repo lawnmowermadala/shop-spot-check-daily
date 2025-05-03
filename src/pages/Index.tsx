@@ -40,6 +40,7 @@ const Index = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
   const [todaysAssignmentCount, setTodaysAssignmentCount] = useState(0);
+  const [currentlyAssigning, setCurrentlyAssigning] = useState<string | null>(null);
 
   // Fetch staff members with department info
   const fetchStaffMembers = async () => {
@@ -182,6 +183,8 @@ const Index = () => {
 
   const handleAssignment = async (areaName: string, assigneeId: string, instructions: string, photoUrl?: string) => {
     try {
+      setCurrentlyAssigning(areaName); // Lock the area while assigning
+      
       // Convert assigneeId to number (since staff.id is number in your schema)
       const assigneeIdNum = parseInt(assigneeId);
       const assignee = staffMembers.find(staff => staff.id === assigneeIdNum);
@@ -192,6 +195,7 @@ const Index = () => {
           description: "Invalid staff selection",
           variant: "destructive"
         });
+        setCurrentlyAssigning(null); // Unlock if error
         return;
       }
 
@@ -204,32 +208,20 @@ const Index = () => {
         photo_url: photoUrl || null
       };
 
-      // Check if assignment exists
-      const existingAssignment = assignedAreas[areaName];
-      
-      let operation;
-      if (existingAssignment?.id) {
-        // Update existing assignment
-        const { error } = await supabase
-          .from('assignments')
-          .update(assignmentData)
-          .eq('id', existingAssignment.id);
-        operation = 'updated';
-      } else {
-        // Create new assignment
-        const { error } = await supabase
-          .from('assignments')
-          .insert(assignmentData)
-          .select();
-        operation = 'created';
-      }
+      // Always create a new assignment (don't update existing ones)
+      const { error } = await supabase
+        .from('assignments')
+        .insert(assignmentData)
+        .select();
+
+      if (error) throw error;
 
       // Refresh assignments and count
       await fetchAssignments();
 
       toast({
         title: "Success",
-        description: `Area assignment ${operation} successfully!`,
+        description: `Area assigned successfully to ${assignee.name}!`,
       });
     } catch (error) {
       console.error('Error assigning area:', error);
@@ -238,6 +230,8 @@ const Index = () => {
         description: `Failed to assign area: ${error.message}`,
         variant: "destructive"
       });
+    } finally {
+      setCurrentlyAssigning(null); // Unlock the area after assignment
     }
   };
 
@@ -311,6 +305,7 @@ const Index = () => {
                   }
                   isAssigned={isAssigned}
                   assignedTo={assignedStaff?.name}
+                  isCurrentlyAssigning={currentlyAssigning === area.name}
                 />
               );
             })
