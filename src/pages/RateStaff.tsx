@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -24,10 +23,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; // Added missing import
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -36,7 +35,6 @@ import Navigation from '@/components/Navigation';
 
 const ratingSchema = z.object({
   staffId: z.string().min(1, { message: "Please select a staff member" }),
-  area: z.string().min(1, { message: "Please enter an area" }),
   overall: z.number().min(1).max(5),
   productKnowledge: z.number().min(1).max(5),
   jobPerformance: z.number().min(1).max(5),
@@ -53,15 +51,6 @@ type StaffMember = {
   department_name?: string;
 };
 
-// Define the shape of the Supabase response
-interface StaffResponse {
-  id: number;
-  name: string;
-  departments: {
-    name: string | null;
-  } | null;
-}
-
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,7 +61,6 @@ const RateStaff = () => {
     resolver: zodResolver(ratingSchema),
     defaultValues: {
       staffId: '',
-      area: '',
       overall: 0,
       productKnowledge: 0,
       jobPerformance: 0,
@@ -98,7 +86,7 @@ const RateStaff = () => {
         }
 
         if (data) {
-          const mappedStaff = data.map((item: StaffResponse) => ({
+          const mappedStaff = data.map(item => ({
             id: item.id,
             name: item.name,
             department_name: item.departments?.name || 'No Department'
@@ -191,7 +179,6 @@ const RateStaff = () => {
           job_performance: data.jobPerformance,
           customer_service: data.customerService,
           teamwork: data.teamwork,
-          area: data.area,
           comment: data.comment || null
         })
         .select();
@@ -252,23 +239,6 @@ const RateStaff = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="area"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Area</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter area (e.g., Front End, Produce)" 
-                        {...field} 
-                      />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
