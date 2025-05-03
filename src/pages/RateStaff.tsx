@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -25,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useForm } from 'react-hook-form';
@@ -36,7 +34,6 @@ import Navigation from '@/components/Navigation';
 
 const ratingSchema = z.object({
   staffId: z.string().min(1, { message: "Please select a staff member" }),
-  area: z.string().min(1, { message: "Please enter an area" }),
   overall: z.number().min(1).max(5),
   productKnowledge: z.number().min(1).max(5),
   jobPerformance: z.number().min(1).max(5),
@@ -47,20 +44,11 @@ const ratingSchema = z.object({
 
 type RatingFormValues = z.infer<typeof ratingSchema>;
 
-interface StaffMember {
+type StaffMember = {
   id: number;
   name: string;
   department_name?: string;
-}
-
-// Define the structure of the Supabase response
-interface StaffResponse {
-  id: number;
-  name: string;
-  departments: {
-    name: string;
-  } | null;
-}
+};
 
 const RateStaff = () => {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -72,7 +60,6 @@ const RateStaff = () => {
     resolver: zodResolver(ratingSchema),
     defaultValues: {
       staffId: '',
-      area: '',
       overall: 0,
       productKnowledge: 0,
       jobPerformance: 0,
@@ -189,7 +176,6 @@ const RateStaff = () => {
         job_performance: data.jobPerformance,
         customer_service: data.customerService,
         teamwork: data.teamwork,
-        area: data.area,
         comment: data.comment || null
       });
 
@@ -243,23 +229,6 @@ const RateStaff = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="area"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Area/Department</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter area/department" 
-                        {...field} 
-                      />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
