@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // Added missing import
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -34,6 +35,7 @@ import Navigation from '@/components/Navigation';
 
 const ratingSchema = z.object({
   staffId: z.string().min(1, { message: "Please select a staff member" }),
+  area: z.string().min(1, { message: "Please enter an area" }),
   overall: z.number().min(1).max(5),
   productKnowledge: z.number().min(1).max(5),
   jobPerformance: z.number().min(1).max(5),
@@ -45,7 +47,7 @@ const ratingSchema = z.object({
 type RatingFormValues = z.infer<typeof ratingSchema>;
 
 type StaffMember = {
-  id: string;
+  id: number;
   name: string;
   department_name?: string;
 };
@@ -60,6 +62,7 @@ const RateStaff = () => {
     resolver: zodResolver(ratingSchema),
     defaultValues: {
       staffId: '',
+      area: '',
       overall: 0,
       productKnowledge: 0,
       jobPerformance: 0,
@@ -69,13 +72,9 @@ const RateStaff = () => {
     },
   });
 
-  // Watch the staffId field value
-  const selectedStaffId = form.watch("staffId");
-
   useEffect(() => {
     const fetchStaffMembers = async () => {
       try {
-        setIsLoading(true);
         const { data, error } = await supabase
           .from('staff')
           .select(`
@@ -84,22 +83,26 @@ const RateStaff = () => {
             departments:department_id (name)
           `);
           
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
-        setStaffMembers(data?.map(item => ({
-          id: item.id,
-          name: item.name,
-          department_name: item.departments?.name || 'No Department'
-        })) || []);
+        if (data) {
+          const mappedStaff = data.map(item => ({
+            id: item.id,
+            name: item.name,
+            department_name: item.departments?.name || 'No Department'
+          }));
+          
+          setStaffMembers(mappedStaff);
+        }
       } catch (error) {
-        console.error('Error fetching staff:', error);
         toast({
           title: "Error",
           description: "Could not fetch staff members",
           variant: "destructive"
         });
-      } finally {
-        setIsLoading(false);
+        console.error('Error fetching staff:', error);
       }
     };
     
@@ -138,7 +141,7 @@ const RateStaff = () => {
                   <Button
                     key={rating}
                     type="button"
-                    variant={value >= rating ? "default" : "ghost"}
+                    variant="ghost"
                     className="p-1 h-8"
                     onClick={() => field.onChange(rating)}
                   >
@@ -162,30 +165,30 @@ const RateStaff = () => {
     setIsLoading(true);
     
     try {
-      console.log("Form data before submission:", data); // Debug log
-      
-      const selectedStaff = staffMembers.find(staff => staff.id === data.staffId);
+      const selectedStaff = staffMembers.find(staff => staff.id.toString() === data.staffId);
       
       if (!selectedStaff) {
         throw new Error("Selected staff member not found");
       }
 
-      const { error } = await supabase
+      const { data: result, error } = await supabase
         .from('ratings')
         .insert({
           staff_id: data.staffId,
           staff_name: selectedStaff.name,
           overall: data.overall,
-          product_kn0x: data.productKnowledge,
-          job_performa: data.jobPerformance,
-          customer_ser: data.customerService,
+          product_knowledge: data.productKnowledge,
+          job_performance: data.jobPerformance,
+          customer_service: data.customerService,
           teamwork: data.teamwork,
-          comment: data.comment || null,
-          rating_date: new Date().toISOString()
-        });
+          area: data.area,
+          comment: data.comment || null
+        })
+        .select();
+
+      console.log('Submission result:', { result, error });
 
       if (error) {
-        console.error('Supabase error details:', error);
         throw error;
       }
 
@@ -196,10 +199,10 @@ const RateStaff = () => {
       form.reset();
       navigate('/ratings');
     } catch (error) {
-      console.error('Full submission error:', error);
+      console.error('Submission error:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit rating. Please check your data and try again.",
+        description: error instanceof Error ? error.message : "Failed to submit rating",
         variant: "destructive"
       });
     } finally {
@@ -227,20 +230,13 @@ const RateStaff = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Staff Member</FormLabel>
-                    <Select 
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        console.log("Selected staff ID:", value); // Debug log
-                      }}
-                      value={field.value}
-                      disabled={isLoading}
-                    >
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a staff member" />
                       </SelectTrigger>
                       <SelectContent>
                         {staffMembers.map((staff) => (
-                          <SelectItem key={staff.id} value={staff.id}>
+                          <SelectItem key={staff.id} value={staff.id.toString()}>
                             {staff.name} {staff.department_name && `(${staff.department_name})`}
                           </SelectItem>
                         ))}
@@ -251,7 +247,23 @@ const RateStaff = () => {
                 )}
               />
               
-              {/* Rest of your form components remain the same */}
+              <FormField
+                control={form.control}
+                name="area"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Area</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter area (e.g., Front End, Produce)" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <div className="bg-gray-50 p-4 rounded-lg space-y-5">
                 <h3 className="font-semibold text-lg mb-2">Performance Ratings</h3>
                 <RatingInput 
@@ -291,7 +303,6 @@ const RateStaff = () => {
                       <Textarea 
                         placeholder="Add any additional comments..." 
                         {...field} 
-                        disabled={isLoading}
                       />
                     </FormControl>
                     <FormMessage />
