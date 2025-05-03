@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -47,9 +48,17 @@ export default function AssignmentPage() {
           setAssignment(data);
           setStatus(data.status);
           
-          // Unlock form if assignment is incomplete
-          if (data.status === 'incomplete') {
-            setIsFormUnlocked(true);
+          // Clear form data and lock form if assignment is complete
+          if (data.status === 'complete') {
+            setFormData({
+              reassign_to: '',
+              new_deadline: '',
+              comments: ''
+            });
+            setIsFormUnlocked(false);
+          } else {
+            // Only unlock form if assignment is incomplete
+            setIsFormUnlocked(false); // Start locked, user must explicitly unlock
           }
         } else {
           throw new Error('Assignment not found');
@@ -99,12 +108,29 @@ export default function AssignmentPage() {
       if (data) {
         setAssignment(data);
       }
+      
+      // Clear form data after successful submission
+      setFormData({
+        reassign_to: '',
+        new_deadline: '',
+        comments: ''
+      });
     } catch (error) {
       console.error('Error reassigning:', error);
       setSubmitMessage('Failed to reassign. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Function to reset form when "Cancel" is clicked
+  const handleCancelForm = () => {
+    setFormData({
+      reassign_to: '',
+      new_deadline: '',
+      comments: ''
+    });
+    setIsFormUnlocked(false);
   };
 
   if (status === 'loading') {
@@ -262,14 +288,14 @@ export default function AssignmentPage() {
                   <div className="flex items-center justify-end space-x-4">
                     <button
                       type="button"
-                      onClick={() => setIsFormUnlocked(false)}
+                      onClick={handleCancelForm}
                       className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || assignment.status === 'complete'}
                       className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? 'Submitting...' : 'Submit Reassignment'}
