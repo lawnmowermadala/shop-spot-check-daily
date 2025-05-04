@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,8 @@ interface ChecklistItemProps {
   assignees: Assignee[];
   isAssigned?: boolean;
   assignedTo?: string;
+  assignmentCount?: number;
+  isRecentlyAssigned?: boolean;
 }
 
 const ChecklistItem = ({ 
@@ -36,7 +39,9 @@ const ChecklistItem = ({
   onAssign, 
   assignees, 
   isAssigned, 
-  assignedTo 
+  assignedTo,
+  assignmentCount = 0,
+  isRecentlyAssigned 
 }: ChecklistItemProps) => {
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
@@ -161,22 +166,29 @@ const ChecklistItem = ({
       });
     }
   };
+
+  const assignmentBadge = assignmentCount > 0 ? (
+    <span className="bg-green-100 text-green-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded">
+      {assignmentCount} {assignmentCount === 1 ? 'assignment' : 'assignments'}
+    </span>
+  ) : null;
   
   return (
-    <Card className={isAssigned ? "border-green-500 bg-red-50" : ""}>
+    <Card className={isRecentlyAssigned ? "border-green-500 bg-red-50" : ""}>
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div>
             <h3 className="font-bold text-lg text-red-600">{area}</h3>
             <p className="text-gray-600 text-sm">{description}</p>
+            {assignmentBadge}
+            {assignedTo && (
+              <p className="text-sm text-gray-500 mt-1">
+                Assigned to: {assignedTo}
+              </p>
+            )}
           </div>
           
-          {isAssigned ? (
-            <Button variant="outline" className="bg-green-50" disabled>
-              <User className="h-4 w-4 mr-2 text-green-500" />
-              Assigned
-            </Button>
-          ) : showAssignForm ? (
+          {showAssignForm ? (
             <Button 
               variant="ghost"
               size="sm"
@@ -195,7 +207,7 @@ const ChecklistItem = ({
           )}
         </div>
         
-        {showAssignForm && !isAssigned && (
+        {showAssignForm && (
           <div className="mt-4 space-y-4">
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-gray-500" />

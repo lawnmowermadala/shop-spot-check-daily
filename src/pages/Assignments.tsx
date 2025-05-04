@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { 
   Table, 
@@ -14,7 +15,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -25,13 +26,14 @@ type Assignment = {
   area: string;
   assignee_name: string;
   assignee_id: number;
-  status: 'needs-check' | 'in-progress' | 'done' | 'incomplete';
+  status: 'pending' | 'needs-check' | 'in-progress' | 'done' | 'incomplete';
   created_at: string;
   instructions?: string;
   photo_url?: string;
 }
 
 const statusIcons = {
+  'pending': <AlertTriangle className="h-5 w-5 text-orange-500" />,
   'needs-check': <CirclePlay className="h-5 w-5 text-yellow-500" />,
   'in-progress': <Clock className="h-5 w-5 text-blue-500" />,
   'done': <Check className="h-5 w-5 text-green-500" />,
@@ -39,7 +41,7 @@ const statusIcons = {
 };
 
 const Assignments = () => {
-  const [filter, setFilter] = useState<'all' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
 
   const fetchAssignments = async () => {
     try {
@@ -104,6 +106,24 @@ const Assignments = () => {
 
   const clearAssignment = async (id: string) => {
     try {
+      // First check if the assignment can be cleared (only pending status)
+      const { data, error: fetchError } = await supabase
+        .from('assignments')
+        .select('status')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      if (data.status !== 'pending') {
+        toast({
+          title: "Cannot Clear Assignment",
+          description: "Only pending assignments can be cleared. Assignments that have been started, completed or marked as incomplete cannot be deleted.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const { error } = await supabase
         .from('assignments')
         .delete()
@@ -115,7 +135,7 @@ const Assignments = () => {
       
       toast({
         title: "Assignment Cleared",
-        description: "The assignment has been removed and can be reassigned",
+        description: "The pending assignment has been removed",
       });
     } catch (err) {
       console.error('Error clearing assignment:', err);
@@ -142,6 +162,13 @@ const Assignments = () => {
           size="sm"
         >
           All
+        </Button>
+        <Button 
+          variant={filter === 'pending' ? 'default' : 'outline'} 
+          onClick={() => setFilter('pending')}
+          size="sm"
+        >
+          Pending
         </Button>
         <Button 
           variant={filter === 'needs-check' ? 'default' : 'outline'} 
@@ -243,7 +270,7 @@ const Assignments = () => {
                               Incomplete
                             </Button>
                           )}
-                          {(assignment.status === 'done' || assignment.status === 'incomplete') && (
+                          {assignment.status === 'pending' && (
                             <Button 
                               variant="outline" 
                               size="sm"

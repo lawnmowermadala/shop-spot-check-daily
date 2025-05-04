@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import ChecklistItem from '@/components/ChecklistItem';
 import { Button } from '@/components/ui/button';
@@ -280,7 +281,6 @@ const Index = () => {
           {areas.length > 0 ? (
             areas.map((area) => {
               const areaAssignments = getAreaAssignments(area.name);
-              const isAssigned = areaAssignments.length > 0;
 
               return (
                 <ChecklistItem
@@ -291,7 +291,7 @@ const Index = () => {
                   onAssign={(assigneeId, instructions, photoUrl) => 
                     handleAssignment(area.name, assigneeId, instructions, photoUrl)
                   }
-                  isAssigned={isAssigned}
+                  isAssigned={false} // Always allow new assignments
                   assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
                   assignmentCount={areaAssignments.length}
                   isRecentlyAssigned={isRecentlyAssigned(area.name)}
