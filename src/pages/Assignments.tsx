@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -15,11 +15,14 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X, AlertTriangle } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { DateRange } from "react-day-picker";
+import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 
 type Assignment = {
   id: string;
@@ -42,6 +45,8 @@ const statusIcons = {
 
 const Assignments = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const fetchAssignments = async () => {
     try {
@@ -146,58 +151,188 @@ const Assignments = () => {
       });
     }
   };
+
+  const isWithinDateRange = (assignment: Assignment): boolean => {
+    if (!dateRange || !dateRange.from) return true;
+    
+    const assignmentDate = new Date(assignment.created_at);
+    const start = dateRange.from ? startOfDay(dateRange.from) : null;
+    const end = dateRange.to ? endOfDay(dateRange.to) : (start ? endOfDay(start) : null);
+    
+    if (!start) return true;
+    
+    if (end) {
+      return isWithinInterval(assignmentDate, { start, end });
+    }
+    
+    // If only start date is selected, match only that day
+    const startDay = startOfDay(start);
+    const endDay = endOfDay(start);
+    return isWithinInterval(assignmentDate, { start: startDay, end: endDay });
+  };
   
-  const filteredAssignments = filter === 'all' 
-    ? assignments 
-    : assignments.filter(assignment => assignment.status === filter);
+  // Apply all filters (status and date)
+  const filteredAssignments = assignments
+    .filter(assignment => filter === 'all' || assignment.status === filter)
+    .filter(isWithinDateRange);
+
+  const handlePrint = () => {
+    const content = printRef.current;
+    
+    if (!content) return;
+    
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    
+    if (!printWindow) {
+      toast({
+        title: "Print Error",
+        description: "Unable to open print window. Please check your browser settings.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Create date range text for header
+    let dateRangeText = 'All Dates';
+    if (dateRange?.from) {
+      dateRangeText = dateRange.to 
+        ? `${format(dateRange.from, 'MMM dd, yyyy')} to ${format(dateRange.to, 'MMM dd, yyyy')}` 
+        : format(dateRange.from, 'MMM dd, yyyy');
+    }
+    
+    // Create status filter text
+    const statusText = filter === 'all' ? 'All Statuses' : `Status: ${filter.replace('-', ' ')}`;
+    
+    // Create HTML content for printing
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Assignments Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; }
+            h3 { color: #666; margin-bottom: 20px; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .print-header { display: flex; justify-content: space-between; align-items: center; }
+            .print-info { margin: 8px 0; }
+            @media print {
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-header">
+            <h1>Assignments Report</h1>
+            <div>
+              <button class="no-print" onclick="window.print()">Print</button>
+              <button class="no-print" onclick="window.close()">Close</button>
+            </div>
+          </div>
+          <div class="print-info">Date Range: ${dateRangeText}</div>
+          <div class="print-info">Filter: ${statusText}</div>
+          <div class="print-info">Total: ${filteredAssignments.length} assignments</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Assigned To</th>
+                <th>Status</th>
+                <th>Assigned Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredAssignments.map(assignment => `
+                <tr>
+                  <td>${assignment.area}</td>
+                  <td>${assignment.assignee_name}</td>
+                  <td>${assignment.status.replace('-', ' ')}</td>
+                  <td>${new Date(assignment.created_at).toLocaleDateString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    
+    // Give time for content to load before printing
+    setTimeout(() => {
+      printWindow.focus();
+    }, 500);
+  };
 
   return (
     <div className="container mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6">Job Assignments</h1>
       
-      <div className="flex flex-wrap gap-2 mb-6">
-        <Button 
-          variant={filter === 'all' ? 'default' : 'outline'} 
-          onClick={() => setFilter('all')}
-          size="sm"
-        >
-          All
-        </Button>
-        <Button 
-          variant={filter === 'pending' ? 'default' : 'outline'} 
-          onClick={() => setFilter('pending')}
-          size="sm"
-        >
-          Pending
-        </Button>
-        <Button 
-          variant={filter === 'needs-check' ? 'default' : 'outline'} 
-          onClick={() => setFilter('needs-check')}
-          size="sm"
-        >
-          Needs Check
-        </Button>
-        <Button 
-          variant={filter === 'in-progress' ? 'default' : 'outline'} 
-          onClick={() => setFilter('in-progress')}
-          size="sm"
-        >
-          In Progress
-        </Button>
-        <Button 
-          variant={filter === 'done' ? 'default' : 'outline'} 
-          onClick={() => setFilter('done')}
-          size="sm"
-        >
-          Completed
-        </Button>
-        <Button 
-          variant={filter === 'incomplete' ? 'default' : 'outline'} 
-          onClick={() => setFilter('incomplete')}
-          size="sm"
-        >
-          Incomplete
-        </Button>
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant={filter === 'all' ? 'default' : 'outline'} 
+            onClick={() => setFilter('all')}
+            size="sm"
+          >
+            All
+          </Button>
+          <Button 
+            variant={filter === 'pending' ? 'default' : 'outline'} 
+            onClick={() => setFilter('pending')}
+            size="sm"
+          >
+            Pending
+          </Button>
+          <Button 
+            variant={filter === 'needs-check' ? 'default' : 'outline'} 
+            onClick={() => setFilter('needs-check')}
+            size="sm"
+          >
+            Needs Check
+          </Button>
+          <Button 
+            variant={filter === 'in-progress' ? 'default' : 'outline'} 
+            onClick={() => setFilter('in-progress')}
+            size="sm"
+          >
+            In Progress
+          </Button>
+          <Button 
+            variant={filter === 'done' ? 'default' : 'outline'} 
+            onClick={() => setFilter('done')}
+            size="sm"
+          >
+            Completed
+          </Button>
+          <Button 
+            variant={filter === 'incomplete' ? 'default' : 'outline'} 
+            onClick={() => setFilter('incomplete')}
+            size="sm"
+          >
+            Incomplete
+          </Button>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="w-full md:w-auto">
+            <DateRangePicker 
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+              className="max-w-sm"
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={handlePrint}
+            className="ml-auto"
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Print List
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -205,7 +340,7 @@ const Assignments = () => {
           <CardTitle>Current Assignments</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div ref={printRef} className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
