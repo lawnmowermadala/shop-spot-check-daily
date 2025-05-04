@@ -86,6 +86,17 @@ const Index = () => {
 
       if (allError) throw allError;
 
+      // Filter assignments that are no older than one day
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+      oneDayAgo.setHours(0, 0, 0, 0); // Start of the previous day
+      
+      const recentAssignments = allAssignments?.filter(assignment => {
+        if (!assignment.created_at) return true; // Include if no date (shouldn't happen)
+        const assignmentDate = new Date(assignment.created_at);
+        return assignmentDate >= oneDayAgo;
+      }) || [];
+
       const { count, error: countError } = await supabase
         .from('assignments')
         .select('*', { count: 'exact', head: true })
@@ -95,7 +106,7 @@ const Index = () => {
       if (countError) throw countError;
 
       setTodaysAssignmentCount(count || 0);
-      setAssignedAreas(allAssignments || []);
+      setAssignedAreas(recentAssignments); // Only show recent assignments on home page
     } catch (error) {
       console.error('Error fetching assignments:', error);
       toast({
