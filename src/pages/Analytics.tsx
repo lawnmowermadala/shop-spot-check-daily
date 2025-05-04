@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navigation from "@/components/Navigation";
@@ -13,6 +14,43 @@ import { Printer, Trophy, AlertTriangle } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
+// Define types for our data structures
+interface Rating {
+  id: number;
+  staff_id: string;
+  staff_name: string;
+  overall: number;
+  product_knowledge: number;
+  customer_service: number;
+  job_performance: number;
+  teamwork: number;
+  comment?: string;
+  rating_date: string;
+  created_at: string;
+}
+
+interface Assignment {
+  id: string;
+  area: string;
+  assignee_id: number;
+  assignee_name: string;
+  status: string;
+  instructions?: string;
+  photo_url?: string | null;
+  created_at?: string | null;
+}
+
+interface StaffPerformance {
+  name: string;
+  averageRating: number;
+  totalRatings: number;
+}
+
+interface AreaCompletionData {
+  area: string;
+  count: number;
+}
+
 const Analytics = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
@@ -25,7 +63,7 @@ const Analytics = () => {
     queryFn: async () => {
       const { data, error } = await supabase.from('ratings').select('*');
       if (error) throw error;
-      return data || [];
+      return data as Rating[] || [];
     }
   });
 
@@ -35,7 +73,7 @@ const Analytics = () => {
     queryFn: async () => {
       const { data, error } = await supabase.from('assignments').select('*');
       if (error) throw error;
-      return data || [];
+      return data as Assignment[] || [];
     }
   });
 
@@ -50,7 +88,7 @@ const Analytics = () => {
   }, [ratingsError, assignmentsError]);
 
   // Filter data by date range
-  const filterByDate = (items: any[], dateField: string) => {
+  const filterByDate = <T extends { [key: string]: any }>(items: T[], dateField: string): T[] => {
     if (!dateRange?.from && !dateRange?.to) return items;
     
     return items.filter(item => {
@@ -73,8 +111,8 @@ const Analytics = () => {
   const filteredAssignments = filterByDate(assignments, 'created_at');
 
   // Process staff ratings (sorted best to worst)
-  const staffPerformance = Object.entries(
-    filteredRatings.reduce((acc: Record<string, any>, rating) => {
+  const staffPerformance: StaffPerformance[] = Object.entries(
+    filteredRatings.reduce((acc: Record<string, { name: string; overall: number; count: number }>, rating) => {
       if (!acc[rating.staff_name]) {
         acc[rating.staff_name] = {
           name: rating.staff_name,
@@ -88,13 +126,13 @@ const Analytics = () => {
     }, {})
   ).map(([_, data]) => ({
     name: data.name,
-    averageRating: +(data.overall / data.count).toFixed(1),
+    averageRating: Number((data.overall / data.count).toFixed(1)),
     totalRatings: data.count
   }))
   .sort((a, b) => b.averageRating - a.averageRating);
 
   // Process area completion data
-  const areaCompletion = Object.entries(
+  const areaCompletion: AreaCompletionData[] = Object.entries(
     filteredAssignments.reduce((acc: Record<string, number>, assignment) => {
       const area = assignment.area;
       acc[area] = (acc[area] || 0) + 1;
