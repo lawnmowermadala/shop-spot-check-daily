@@ -1,7 +1,7 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Home, Clipboard, Star, BarChart, Building, Users } from 'lucide-react';
+import { Home, Clipboard, Star, BarChart, Building, Users, BookOpen } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
@@ -69,6 +69,15 @@ const Navigation = () => {
           >
             <BarChart className="h-5 w-5" />
             <span className="text-xs">Analytics</span>
+          </Button>
+        </Link>
+        <Link to="/manual">
+          <Button 
+            variant={isActive('/manual') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center gap-1 h-auto py-2"
+          >
+            <BookOpen className="h-5 w-5" />
+            <span className="text-xs">Manual</span>
           </Button>
         </Link>
       </div>

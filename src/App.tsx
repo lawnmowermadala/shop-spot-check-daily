@@ -12,6 +12,7 @@ import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 import DepartmentsPage from "./pages/DepartmentsPage";
 import StaffPage from "./pages/StaffPage";
+import UserManual from "./pages/UserManual";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/departments" element={<DepartmentsPage />} />
           <Route path="/staff" element={<StaffPage />} />
+          <Route path="/manual" element={<UserManual />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
