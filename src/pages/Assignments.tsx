@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { 
   Table, 
@@ -15,7 +14,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -46,6 +45,7 @@ const statusIcons = {
 const Assignments = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const fetchAssignments = async () => {
@@ -176,6 +176,10 @@ const Assignments = () => {
     .filter(assignment => filter === 'all' || assignment.status === filter)
     .filter(isWithinDateRange);
 
+  const toggleExpandAssignment = (id: string) => {
+    setExpandedAssignment(expandedAssignment === id ? null : id);
+  };
+
   const handlePrint = () => {
     const content = printRef.current;
     
@@ -218,6 +222,7 @@ const Assignments = () => {
             th { background-color: #f2f2f2; }
             .print-header { display: flex; justify-content: space-between; align-items: center; }
             .print-info { margin: 8px 0; }
+            .instructions { padding: 8px; background-color: #f9f9f9; border-top: 1px dotted #ddd; }
             @media print {
               .no-print { display: none; }
             }
@@ -241,6 +246,7 @@ const Assignments = () => {
                 <th>Assigned To</th>
                 <th>Status</th>
                 <th>Assigned Date</th>
+                <th>Instructions</th>
               </tr>
             </thead>
             <tbody>
@@ -250,6 +256,7 @@ const Assignments = () => {
                   <td>${assignment.assignee_name}</td>
                   <td>${assignment.status.replace('-', ' ')}</td>
                   <td>${new Date(assignment.created_at).toLocaleDateString()}</td>
+                  <td>${assignment.instructions || 'No instructions provided'}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -348,80 +355,107 @@ const Assignments = () => {
                   <TableHead>Assigned To</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned Date</TableHead>
+                  <TableHead>Instructions</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-6">
+                    <TableCell colSpan={6} className="text-center py-6">
                       Loading assignments...
                     </TableCell>
                   </TableRow>
                 ) : filteredAssignments.length > 0 ? (
                   filteredAssignments.map((assignment) => (
-                    <TableRow key={assignment.id}>
-                      <TableCell className="font-medium">{assignment.area}</TableCell>
-                      <TableCell>{assignment.assignee_name}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {statusIcons[assignment.status]}
-                          <span className="capitalize">
-                            {assignment.status.replace('-', ' ')}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(assignment.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {assignment.status !== 'in-progress' && (
+                    <>
+                      <TableRow key={assignment.id}>
+                        <TableCell className="font-medium">{assignment.area}</TableCell>
+                        <TableCell>{assignment.assignee_name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {statusIcons[assignment.status]}
+                            <span className="capitalize">
+                              {assignment.status.replace('-', ' ')}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(assignment.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          {assignment.instructions ? (
                             <Button 
-                              variant="outline" 
+                              variant="ghost" 
                               size="sm"
-                              onClick={() => updateAssignmentStatus(assignment.id, 'in-progress')}
+                              onClick={() => toggleExpandAssignment(assignment.id)}
+                              className="flex items-center gap-1 text-sm"
                             >
-                              Start
+                              <FileText className="h-4 w-4" />
+                              {expandedAssignment === assignment.id ? "Hide" : "View"} Instructions
                             </Button>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No instructions</span>
                           )}
-                          {assignment.status !== 'done' && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => updateAssignmentStatus(assignment.id, 'done')}
-                              className="bg-green-50 hover:bg-green-100 text-green-600"
-                            >
-                              Complete
-                            </Button>
-                          )}
-                          {assignment.status !== 'incomplete' && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => updateAssignmentStatus(assignment.id, 'incomplete')}
-                              className="bg-red-50 hover:bg-red-100 text-red-600"
-                            >
-                              Incomplete
-                            </Button>
-                          )}
-                          {assignment.status === 'pending' && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => clearAssignment(assignment.id)}
-                              className="bg-gray-50 hover:bg-gray-100 text-gray-600"
-                            >
-                              Clear
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {assignment.status !== 'in-progress' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => updateAssignmentStatus(assignment.id, 'in-progress')}
+                              >
+                                Start
+                              </Button>
+                            )}
+                            {assignment.status !== 'done' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => updateAssignmentStatus(assignment.id, 'done')}
+                                className="bg-green-50 hover:bg-green-100 text-green-600"
+                              >
+                                Complete
+                              </Button>
+                            )}
+                            {assignment.status !== 'incomplete' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => updateAssignmentStatus(assignment.id, 'incomplete')}
+                                className="bg-red-50 hover:bg-red-100 text-red-600"
+                              >
+                                Incomplete
+                              </Button>
+                            )}
+                            {assignment.status === 'pending' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => clearAssignment(assignment.id)}
+                                className="bg-gray-50 hover:bg-gray-100 text-gray-600"
+                              >
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {expandedAssignment === assignment.id && assignment.instructions && (
+                        <TableRow className="bg-gray-50">
+                          <TableCell colSpan={6} className="py-2">
+                            <div className="p-3 text-sm border-l-2 border-gray-300">
+                              {assignment.instructions}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
                       {assignments.length === 0 ? "No assignments found" : "No assignments match this filter"}
                     </TableCell>
                   </TableRow>
