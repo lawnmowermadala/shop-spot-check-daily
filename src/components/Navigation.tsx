@@ -83,6 +83,9 @@ const Navigation = () => {
           </Button>
         </Link>
       </div>
+      <div className="w-full text-center text-[9px] text-gray-500 py-1 border-t">
+        Conceived and developed by Elton Niati | eaglevision.dev30@gmail.com
+      </div>
     </nav>
   );
 };
