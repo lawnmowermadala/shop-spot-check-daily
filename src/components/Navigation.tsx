@@ -2,9 +2,11 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Home, Clipboard, Star, BarChart, Building, Users, BookOpen } from 'lucide-react';
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Navigation = () => {
   const location = useLocation();
+  const isMobile = useIsMobile();
   
   const isActive = (path: string) => {
     // For ratings pages, consider both /ratings and /rate-staff as active for the ratings tab
@@ -15,69 +17,69 @@ const Navigation = () => {
   };
   
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t p-2 z-10">
-      <div className="flex justify-around">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t p-1 z-10">
+      <div className="flex justify-around items-center">
         <Link to="/">
           <Button 
             variant={isActive('/') ? 'default' : 'ghost'} 
-            className="flex flex-col items-center gap-1 h-auto py-2"
+            className="flex flex-col items-center h-auto py-1 px-1"
           >
-            <Home className="h-5 w-5" />
-            <span className="text-xs">Home</span>
+            <Home className="h-4 w-4" />
+            <span className="text-[10px]">{!isMobile && "Home"}</span>
           </Button>
         </Link>
         <Link to="/assignments">
           <Button 
             variant={isActive('/assignments') ? 'default' : 'ghost'} 
-            className="flex flex-col items-center gap-1 h-auto py-2"
+            className="flex flex-col items-center h-auto py-1 px-1"
           >
-            <Clipboard className="h-5 w-5" />
-            <span className="text-xs">Assignments</span>
+            <Clipboard className="h-4 w-4" />
+            <span className="text-[10px]">{!isMobile ? "Assignments" : "Tasks"}</span>
           </Button>
         </Link>
         <Link to="/ratings">
           <Button 
             variant={isActive('/ratings') ? 'default' : 'ghost'} 
-            className="flex flex-col items-center gap-1 h-auto py-2"
+            className="flex flex-col items-center h-auto py-1 px-1"
           >
-            <Star className="h-5 w-5" />
-            <span className="text-xs">Ratings</span>
+            <Star className="h-4 w-4" />
+            <span className="text-[10px]">Ratings</span>
           </Button>
         </Link>
         <Link to="/departments">
           <Button 
             variant={isActive('/departments') ? 'default' : 'ghost'} 
-            className="flex flex-col items-center gap-1 h-auto py-2"
+            className="flex flex-col items-center h-auto py-1 px-1"
           >
-            <Building className="h-5 w-5" />
-            <span className="text-xs">Departments</span>
+            <Building className="h-4 w-4" />
+            <span className="text-[10px]">Depts</span>
           </Button>
         </Link>
         <Link to="/staff">
           <Button 
             variant={isActive('/staff') ? 'default' : 'ghost'} 
-            className="flex flex-col items-center gap-1 h-auto py-2"
+            className="flex flex-col items-center h-auto py-1 px-1"
           >
-            <Users className="h-5 w-5" />
-            <span className="text-xs">Staff</span>
+            <Users className="h-4 w-4" />
+            <span className="text-[10px]">Staff</span>
           </Button>
         </Link>
         <Link to="/analytics">
           <Button 
             variant={isActive('/analytics') ? 'default' : 'ghost'} 
-            className="flex flex-col items-center gap-1 h-auto py-2"
+            className="flex flex-col items-center h-auto py-1 px-1"
           >
-            <BarChart className="h-5 w-5" />
-            <span className="text-xs">Analytics</span>
+            <BarChart className="h-4 w-4" />
+            <span className="text-[10px]">Stats</span>
           </Button>
         </Link>
         <Link to="/manual">
           <Button 
             variant={isActive('/manual') ? 'default' : 'ghost'} 
-            className="flex flex-col items-center gap-1 h-auto py-2"
+            className="flex flex-col items-center h-auto py-1 px-1"
           >
-            <BookOpen className="h-5 w-5" />
-            <span className="text-xs">Manual</span>
+            <BookOpen className="h-4 w-4" />
+            <span className="text-[10px]">Help</span>
           </Button>
         </Link>
       </div>
