@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { 
   Table, 
@@ -14,7 +15,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -22,6 +23,7 @@ import { toast } from '@/hooks/use-toast';
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 type Assignment = {
   id: string;
@@ -47,6 +49,7 @@ const Assignments = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
 
   const fetchAssignments = async () => {
     try {
@@ -83,6 +86,36 @@ const Assignments = () => {
       });
     }
   }, [error, refetch]);
+
+  useEffect(() => {
+    // Fetch photo URLs for assignments that have them
+    const fetchPhotos = async () => {
+      const urls: Record<string, string> = {};
+      
+      for (const assignment of assignments) {
+        if (assignment.photo_url) {
+          try {
+            const { data, error } = await supabase
+              .storage
+              .from('area_photos')
+              .createSignedUrl(assignment.photo_url, 3600); // URL valid for 1 hour
+            
+            if (data && !error) {
+              urls[assignment.id] = data.signedUrl;
+            }
+          } catch (err) {
+            console.error('Error fetching photo URL:', err);
+          }
+        }
+      }
+      
+      setPhotoUrls(urls);
+    };
+    
+    if (assignments.length > 0) {
+      fetchPhotos();
+    }
+  }, [assignments]);
 
   const updateAssignmentStatus = async (id: string, status: Assignment['status']) => {
     try {
@@ -223,6 +256,8 @@ const Assignments = () => {
             .print-header { display: flex; justify-content: space-between; align-items: center; }
             .print-info { margin: 8px 0; }
             .instructions { padding: 8px; background-color: #f9f9f9; border-top: 1px dotted #ddd; }
+            .photo-container { max-width: 300px; margin-top: 8px; }
+            .photo-container img { width: 100%; height: auto; border: 1px solid #ddd; }
             @media print {
               .no-print { display: none; }
             }
@@ -246,7 +281,7 @@ const Assignments = () => {
                 <th>Assigned To</th>
                 <th>Status</th>
                 <th>Assigned Date</th>
-                <th>Instructions</th>
+                <th>Details</th>
               </tr>
             </thead>
             <tbody>
@@ -256,7 +291,20 @@ const Assignments = () => {
                   <td>${assignment.assignee_name}</td>
                   <td>${assignment.status.replace('-', ' ')}</td>
                   <td>${new Date(assignment.created_at).toLocaleDateString()}</td>
-                  <td>${assignment.instructions || 'No instructions provided'}</td>
+                  <td>
+                    ${assignment.instructions ? 
+                      `<div class="instructions">
+                        <strong>Instructions:</strong><br>
+                        ${assignment.instructions}
+                      </div>` : 
+                      'No instructions provided'}
+
+                    ${assignment.photo_url && photoUrls[assignment.id] ? 
+                      `<div class="photo-container">
+                        <img src="${photoUrls[assignment.id]}" alt="Assignment photo" />
+                      </div>` : 
+                      ''}
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -356,13 +404,14 @@ const Assignments = () => {
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned Date</TableHead>
                   <TableHead>Instructions</TableHead>
+                  <TableHead>Photo</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6">
+                    <TableCell colSpan={7} className="text-center py-6">
                       Loading assignments...
                     </TableCell>
                   </TableRow>
@@ -396,6 +445,25 @@ const Assignments = () => {
                             </Button>
                           ) : (
                             <span className="text-gray-400 text-sm">No instructions</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {assignment.photo_url ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (photoUrls[assignment.id]) {
+                                  window.open(photoUrls[assignment.id], '_blank');
+                                }
+                              }}
+                              className="flex items-center gap-1 text-sm"
+                            >
+                              <ImageIcon className="h-4 w-4" />
+                              View Photo
+                            </Button>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No photo</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -444,10 +512,21 @@ const Assignments = () => {
                       </TableRow>
                       {expandedAssignment === assignment.id && assignment.instructions && (
                         <TableRow className="bg-gray-50">
-                          <TableCell colSpan={6} className="py-2">
+                          <TableCell colSpan={7} className="py-2">
                             <div className="p-3 text-sm border-l-2 border-gray-300">
                               {assignment.instructions}
                             </div>
+                            {assignment.photo_url && photoUrls[assignment.id] && (
+                              <div className="mt-3 max-w-md">
+                                <AspectRatio ratio={4/3} className="bg-muted">
+                                  <img
+                                    src={photoUrls[assignment.id]}
+                                    alt="Assignment photo"
+                                    className="rounded-md object-cover w-full h-full"
+                                  />
+                                </AspectRatio>
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       )}
@@ -455,7 +534,7 @@ const Assignments = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
                       {assignments.length === 0 ? "No assignments found" : "No assignments match this filter"}
                     </TableCell>
                   </TableRow>
