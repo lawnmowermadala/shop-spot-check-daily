@@ -11,11 +11,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+// Types
 interface ProductionItem {
   id: string;
+  product_id: string;
   product_name: string;
   category: string;
   quantity: number;
+  staff_id: string;
   staff_name: string;
   production_date: string;
   created_at: string;
@@ -29,16 +32,14 @@ interface Product {
 
 const ProductionPage = () => {
   const queryClient = useQueryClient();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [productionInput, setProductionInput] = useState({
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [productionData, setProductionData] = useState({
     product_id: '',
-    product_name: '',
-    category: '',
-    quantity: 0,
+    quantity: '',
     staff_name: 'Elton' // Default staff for demo
   });
 
-  // Fetch products for dropdown
+  // 1. Fetch Products
   const { data: products = [] } = useQuery({
     queryKey: ['production_products'],
     queryFn: async () => {
@@ -52,13 +53,13 @@ const ProductionPage = () => {
     }
   });
 
-  // Fetch today's production
-  const { data: todaysProduction = [] } = useQuery({
-    queryKey: ['todays_production', selectedDate],
+  // 2. Fetch Daily Production
+  const { data: dailyProduction = [] } = useQuery({
+    queryKey: ['daily_production', date],
     queryFn: async () => {
-      if (!selectedDate) return [];
+      if (!date) return [];
       
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const dateStr = format(date, 'yyyy-MM-dd');
       const { data, error } = await supabase
         .from('production_logs')
         .select('*')
@@ -70,34 +71,33 @@ const ProductionPage = () => {
     }
   });
 
-  // Add production mutation
+  // 3. Add Production Mutation
   const addProduction = useMutation({
     mutationFn: async () => {
-      if (!selectedDate || !productionInput.product_id || productionInput.quantity <= 0) {
+      if (!date || !productionData.product_id || !productionData.quantity) {
         throw new Error('Please fill all fields');
       }
+
+      const selectedProduct = products.find(p => p.id === productionData.product_id);
+      if (!selectedProduct) throw new Error('Product not found');
 
       const { error } = await supabase
         .from('production_logs')
         .insert({
-          product_name: productionInput.product_name,
-          category: productionInput.category,
-          quantity: productionInput.quantity,
-          staff_name: productionInput.staff_name,
-          production_date: format(selectedDate, 'yyyy-MM-dd')
+          product_id: productionData.product_id,
+          product_name: selectedProduct.name,
+          category: selectedProduct.category,
+          quantity: Number(productionData.quantity),
+          staff_name: productionData.staff_name,
+          staff_id: 'staff_123', // In real app, use auth user ID
+          production_date: format(date, 'yyyy-MM-dd')
         });
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['todays_production']);
-      setProductionInput(prev => ({
-        ...prev,
-        quantity: 0,
-        product_id: '',
-        product_name: '',
-        category: ''
-      }));
+      queryClient.invalidateQueries(['daily_production']);
+      setProductionData(prev => ({ ...prev, quantity: '', product_id: '' }));
       toast({
         title: "Success",
         description: "Production logged successfully!",
@@ -112,22 +112,11 @@ const ProductionPage = () => {
     }
   });
 
-  const handleProductSelect = (productId: string) => {
-    const selected = products.find(p => p.id === productId);
-    if (selected) {
-      setProductionInput({
-        ...productionInput,
-        product_id: productId,
-        product_name: selected.name,
-        category: selected.category
-      });
-    }
-  };
-
   return (
     <div className="p-4 space-y-6">
       <h1 className="text-2xl font-bold">Daily Production Tracking</h1>
       
+      {/* Production Logging Card */}
       <Card>
         <CardHeader>
           <CardTitle>Log Production</CardTitle>
@@ -139,14 +128,14 @@ const ProductionPage = () => {
               <PopoverTrigger asChild>
                 <Button variant="outline" className="justify-start text-left font-normal">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                  {date ? format(date, "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
                 <Calendar
                   mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
+                  selected={date}
+                  onSelect={setDate}
                   initialFocus
                 />
               </PopoverContent>
@@ -155,8 +144,8 @@ const ProductionPage = () => {
             {/* Product Selection */}
             <select
               className="p-2 border rounded"
-              value={productionInput.product_id}
-              onChange={(e) => handleProductSelect(e.target.value)}
+              value={productionData.product_id}
+              onChange={(e) => setProductionData({...productionData, product_id: e.target.value})}
             >
               <option value="">Select Product</option>
               {products.map(product => (
@@ -170,22 +159,15 @@ const ProductionPage = () => {
             <Input
               type="number"
               placeholder="Quantity"
-              min="0"
-              value={productionInput.quantity}
-              onChange={(e) => setProductionInput({
-                ...productionInput,
-                quantity: Number(e.target.value)
-              })}
+              value={productionData.quantity}
+              onChange={(e) => setProductionData({...productionData, quantity: e.target.value})}
             />
 
-            {/* Staff (hardcoded for demo) */}
+            {/* Staff Input */}
             <Input
               placeholder="Staff Name"
-              value={productionInput.staff_name}
-              onChange={(e) => setProductionInput({
-                ...productionInput,
-                staff_name: e.target.value
-              })}
+              value={productionData.staff_name}
+              onChange={(e) => setProductionData({...productionData, staff_name: e.target.value})}
             />
           </div>
 
@@ -198,14 +180,15 @@ const ProductionPage = () => {
         </CardContent>
       </Card>
 
+      {/* Daily Production Summary */}
       <Card>
         <CardHeader>
           <CardTitle>
-            Today's Production - {selectedDate && format(selectedDate, 'MMMM d, yyyy')}
+            Production for {date && format(date, 'MMMM d, yyyy')}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {todaysProduction.length > 0 ? (
+          {dailyProduction.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -216,7 +199,7 @@ const ProductionPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {todaysProduction.map(item => (
+                {dailyProduction.map(item => (
                   <TableRow key={item.id}>
                     <TableCell>{item.product_name}</TableCell>
                     <TableCell>{item.category}</TableCell>
@@ -227,33 +210,43 @@ const ProductionPage = () => {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-gray-500">No production logged for this date yet</p>
+            <p className="text-gray-500">No production logged for this date</p>
           )}
         </CardContent>
       </Card>
 
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <h2 className="font-semibold text-blue-800">Production Summary</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-          <div className="bg-white p-3 rounded shadow">
-            <h3 className="text-sm text-gray-500">Total Items Produced</h3>
+      {/* Production Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Total Produced</CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-2xl font-bold">
-              {todaysProduction.reduce((sum, item) => sum + item.quantity, 0)}
+              {dailyProduction.reduce((sum, item) => sum + item.quantity, 0)}
             </p>
-          </div>
-          <div className="bg-white p-3 rounded shadow">
-            <h3 className="text-sm text-gray-500">Unique Products</h3>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Unique Products</CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-2xl font-bold">
-              {new Set(todaysProduction.map(item => item.product_name)).size}
+              {new Set(dailyProduction.map(item => item.product_name)).size}
             </p>
-          </div>
-          <div className="bg-white p-3 rounded shadow">
-            <h3 className="text-sm text-gray-500">Staff Members</h3>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Staff Count</CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-2xl font-bold">
-              {new Set(todaysProduction.map(item => item.staff_name)).size}
+              {new Set(dailyProduction.map(item => item.staff_name)).size}
             </p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
