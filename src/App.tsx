@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Index from './pages/Index';
@@ -9,8 +8,7 @@ import PromotionsPage from './pages/PromotionsPage';
 import ExpiredStockPage from './pages/ExpiredStockPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import HelpPage from './pages/HelpPage';
-import UsersPage from './pages/UsersPage';
-import UserManual from './pages/UserManual';
+import UsersPage from "./pages/UsersPage";
 
 function App() {
   return (
@@ -23,8 +21,7 @@ function App() {
         <Route path="/promotions" element={<PromotionsPage />} />
         <Route path="/expired" element={<ExpiredStockPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/manual" element={<UserManual />} />
-        <Route path="/help" element={<HelpPage />} />
+        <Route path="/manual" element={<HelpPage />} />
         <Route path="/users" element={<UsersPage />} />
       </Routes>
     </Router>
