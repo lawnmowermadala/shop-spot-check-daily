@@ -94,7 +94,8 @@ const Index = () => {
       const recentAssignments = allAssignments?.filter(assignment => {
         if (!assignment.created_at) return true; // Include if no date (shouldn't happen)
         const assignmentDate = new Date(assignment.created_at);
-        return assignmentDate >= oneDayAgo;
+        // Only include assignments that are recent AND not marked as 'done'
+        return assignmentDate >= oneDayAgo && assignment.status !== 'done';
       }) || [];
 
       const { count, error: countError } = await supabase
