@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -117,6 +118,9 @@ const SidebarMenu = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter password"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleLogin();
+                      }}
                     />
                   </div>
                   <Button 
