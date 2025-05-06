@@ -8,6 +8,7 @@ import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
+import { Badge } from "@/components/ui/badge";
 
 interface Area {
   id: string;
@@ -32,6 +33,7 @@ interface Assignment {
   instructions?: string;
   photo_url?: string | null;
   created_at?: string;
+  isPreviousDay?: boolean; // New flag to track previous day assignments
 }
 
 const Index = () => {
@@ -91,12 +93,22 @@ const Index = () => {
       oneDayAgo.setDate(oneDayAgo.getDate() - 1);
       oneDayAgo.setHours(0, 0, 0, 0); // Start of the previous day
       
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0); // Start of today
+      
       const recentAssignments = allAssignments?.filter(assignment => {
         if (!assignment.created_at) return true; // Include if no date (shouldn't happen)
         const assignmentDate = new Date(assignment.created_at);
         // Only include assignments that are recent AND not marked as 'done'
         return assignmentDate >= oneDayAgo && assignment.status !== 'done';
       }) || [];
+      
+      // Add flag for previous day assignments
+      const processedAssignments = recentAssignments.map(assignment => {
+        const assignmentDate = new Date(assignment.created_at || '');
+        const isPreviousDay = assignmentDate < todayStart && assignmentDate >= oneDayAgo;
+        return { ...assignment, isPreviousDay };
+      });
 
       const { count, error: countError } = await supabase
         .from('assignments')
@@ -107,7 +119,7 @@ const Index = () => {
       if (countError) throw countError;
 
       setTodaysAssignmentCount(count || 0);
-      setAssignedAreas(recentAssignments); // Only show recent assignments on home page
+      setAssignedAreas(processedAssignments); // Show recent assignments with previous day flag
     } catch (error) {
       console.error('Error fetching assignments:', error);
       toast({
@@ -254,10 +266,18 @@ const Index = () => {
         })}
       </p>
 
-      <div className="mb-4 text-center">
-        <p className="text-sm text-gray-500">
+      <div className="mb-6 bg-blue-50 p-3 rounded-lg">
+        <p className="text-sm text-center">
           Today's assignments: <span className="font-semibold">{todaysAssignmentCount}</span>
         </p>
+        
+        {assignedAreas.some(a => a.isPreviousDay) && (
+          <div className="mt-2 p-2 bg-yellow-100 rounded-md">
+            <p className="text-xs text-center text-amber-800 font-medium">
+              There are incomplete assignments from yesterday highlighted below
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mb-6 space-y-2">
@@ -293,21 +313,32 @@ const Index = () => {
           {areas.length > 0 ? (
             areas.map((area) => {
               const areaAssignments = getAreaAssignments(area.name);
+              const hasPreviousDayAssignment = areaAssignments.some(a => a.isPreviousDay);
 
               return (
-                <ChecklistItem
-                  key={area.id}
-                  area={area.name}
-                  description={area.description}
-                  assignees={staffMembers}
-                  onAssign={(assigneeId, instructions, photoUrl) => 
-                    handleAssignment(area.name, assigneeId, instructions, photoUrl)
-                  }
-                  isAssigned={false} // Always allow new assignments
-                  assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
-                  assignmentCount={areaAssignments.length}
-                  isRecentlyAssigned={isRecentlyAssigned(area.name)}
-                />
+                <div 
+                  key={area.id} 
+                  className={`${hasPreviousDayAssignment ? 'border-l-4 border-amber-500 pl-2 bg-amber-50' : ''} 
+                              transition-all duration-200`}
+                >
+                  {hasPreviousDayAssignment && (
+                    <Badge variant="outline" className="mb-2 text-amber-700 bg-amber-100 border-amber-200">
+                      Pending from yesterday
+                    </Badge>
+                  )}
+                  <ChecklistItem
+                    area={area.name}
+                    description={area.description}
+                    assignees={staffMembers}
+                    onAssign={(assigneeId, instructions, photoUrl) => 
+                      handleAssignment(area.name, assigneeId, instructions, photoUrl)
+                    }
+                    isAssigned={false} // Always allow new assignments
+                    assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
+                    assignmentCount={areaAssignments.length}
+                    isRecentlyAssigned={isRecentlyAssigned(area.name)}
+                  />
+                </div>
               );
             })
           ) : (
