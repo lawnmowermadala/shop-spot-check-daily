@@ -1,23 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, QrCode, Key, Smartphone, Camera, CameraOff } from 'lucide-react';
+import { Eye, EyeOff, QrCode, Key, Smartphone } from 'lucide-react';
+import QRScanner from '@/components/QRScanner';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/components/ui/sonner';
 import { useIsMobile } from "@/hooks/use-mobile";
-
-// Define your routes
-const ROUTES = {
-  ADMIN: '/admin',
-  PRODUCTION: '/production',
-  TASKS: '/tasks',
-  HOME: '/',
-  LOGIN: '/login'
-};
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -25,13 +18,9 @@ const LoginPage = () => {
   const { login, loginWithQR, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [qrInput, setQrInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [defaultTab, setDefaultTab] = useState<string>('password');
-  const [cameraActive, setCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const isMobile = useIsMobile();
   
   // Set default tab based on device type
@@ -41,75 +30,28 @@ const LoginPage = () => {
     }
   }, [isMobile]);
 
-  // Redirect based on role after login
+  // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      const from = location.state?.from?.pathname || getDefaultRoute(user.role);
-      
-      // Validate the route before navigating
-      const validRoutes = Object.values(ROUTES);
-      const safeRoute = validRoutes.includes(from) ? from : ROUTES.HOME;
-      
-      navigate(safeRoute, { replace: true });
+      navigateBasedOnRole(user.role);
     }
-  }, [user, navigate, location.state]);
+  }, [user]);
 
-  const getDefaultRoute = (role: string) => {
+  const navigateBasedOnRole = (role: string) => {
     switch (role) {
       case 'admin':
-        return ROUTES.ADMIN;
+        navigate('/user-management');
+        break;
       case 'supervisor':
-        return ROUTES.PRODUCTION;
-      case 'staff':
-        return ROUTES.TASKS;
+        navigate('/products');
+        break;
+      case 'kitchen-staff':
+        navigate('/production');
+        break;
       default:
-        return ROUTES.HOME;
+        navigate('/');
     }
   };
-
-  // Start camera for QR scanning
-  const startCamera = async () => {
-    try {
-      setCameraError(null);
-      
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API not supported in this browser');
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setCameraActive(true);
-      }
-    } catch (err) {
-      setCameraActive(false);
-      setCameraError('Camera access denied. Please check permissions.');
-      console.error('Camera error:', err);
-    }
-  };
-
-  // Stop camera
-  const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      setCameraActive(false);
-    }
-  };
-
-  // Clean up camera on unmount
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,25 +64,19 @@ const LoginPage = () => {
     try {
       await login(username, password);
     } catch (error) {
-      toast.error('Login failed. Please check your credentials.');
+      // Error is handled in the login function
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleManualQRInput = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!qrInput) {
-      toast.error('Please enter a QR code');
-      return;
-    }
-
+  const handleQRLogin = async (qrCode: string) => {
     setIsLoading(true);
     try {
-      await loginWithQR(qrInput);
-      toast.success('Login successful!');
+      await loginWithQR(qrCode);
+      toast.success("QR code login successful!");
     } catch (error) {
-      toast.error('Invalid QR code. Please try again.');
+      // Error is handled in the loginWithQR function
     } finally {
       setIsLoading(false);
     }
@@ -160,17 +96,7 @@ const LoginPage = () => {
           )}
         </div>
 
-        <Tabs 
-          defaultValue={defaultTab} 
-          className="w-full"
-          onValueChange={(tab) => {
-            if (tab === 'qrcode' && isMobile) {
-              startCamera();
-            } else {
-              stopCamera();
-            }
-          }}
-        >
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="password">
               <Key className="mr-2 h-4 w-4" />
@@ -241,80 +167,7 @@ const LoginPage = () => {
           </TabsContent>
           
           <TabsContent value="qrcode">
-            <Card>
-              <CardHeader>
-                <CardTitle>QR Code Login</CardTitle>
-                <CardDescription>
-                  {isMobile ? 'Scan your QR code or enter manually' : 'Enter your QR code'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isMobile && (
-                  <>
-                    <div className="relative aspect-square w-full mb-4 rounded-lg overflow-hidden bg-black">
-                      {cameraActive ? (
-                        <video 
-                          ref={videoRef} 
-                          autoPlay 
-                          playsInline
-                          muted
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
-                          {cameraError ? 'Camera unavailable' : 'Camera inactive'}
-                        </div>
-                      )}
-                      <div className="absolute inset-0 border-4 border-primary rounded-lg pointer-events-none" />
-                    </div>
-                    
-                    {cameraError && (
-                      <div className="text-red-500 text-sm mb-2">{cameraError}</div>
-                    )}
-                  </>
-                )}
-                
-                <form onSubmit={handleManualQRInput}>
-                  <div className="space-y-2">
-                    <Label htmlFor="qr-input">QR Code</Label>
-                    <Input
-                      id="qr-input"
-                      value={qrInput}
-                      onChange={(e) => setQrInput(e.target.value)}
-                      placeholder="Enter QR code (letters or numbers)"
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full mt-4" 
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Verifying..." : "Submit QR Code"}
-                  </Button>
-                </form>
-              </CardContent>
-              {isMobile && (
-                <CardFooter className="flex justify-center">
-                  <Button 
-                    variant="outline" 
-                    onClick={cameraActive ? stopCamera : startCamera}
-                    disabled={!!cameraError}
-                  >
-                    {cameraActive ? (
-                      <>
-                        <CameraOff className="h-4 w-4 mr-2" />
-                        Stop Camera
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="h-4 w-4 mr-2" />
-                        Start Camera
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              )}
-            </Card>
+            <QRScanner onScan={handleQRLogin} isLoading={isLoading} />
           </TabsContent>
         </Tabs>
       </div>
