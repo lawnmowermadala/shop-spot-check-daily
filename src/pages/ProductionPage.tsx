@@ -98,7 +98,7 @@ const ProductionPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['daily_production']);
+      queryClient.invalidateQueries({ queryKey: ['daily_production'] });
       setProductionData(prev => ({ ...prev, quantity: '', product_id: '' }));
       toast("Production logged successfully!");
     },
@@ -132,6 +132,7 @@ const ProductionPage = () => {
                   selected={date}
                   onSelect={setDate}
                   initialFocus
+                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -168,9 +169,9 @@ const ProductionPage = () => {
 
           <Button 
             onClick={() => addProduction.mutate()}
-            disabled={addProduction.isLoading}
+            disabled={addProduction.isPending}
           >
-            {addProduction.isLoading ? "Logging..." : "Log Production"}
+            {addProduction.isPending ? "Logging..." : "Log Production"}
           </Button>
         </CardContent>
       </Card>
