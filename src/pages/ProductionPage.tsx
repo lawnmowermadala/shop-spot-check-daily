@@ -74,7 +74,7 @@ const ProductionPage = () => {
     }
   });
 
-  // Fetch Production Batches
+  // Fetch Production Batches for selected date
   const { data: productionBatches = [] } = useQuery({
     queryKey: ['production_batches', date ? format(date, 'yyyy-MM-dd') : null],
     queryFn: async () => {
@@ -104,7 +104,7 @@ const ProductionPage = () => {
     }
   });
 
-  // Fetch Ingredients for a Batch
+  // Fetch Ingredients for active batch
   const { data: batchIngredients = [] } = useQuery({
     queryKey: ['production_ingredients', activeBatchId],
     queryFn: async () => {
@@ -121,7 +121,7 @@ const ProductionPage = () => {
     }
   });
 
-  // Add Production Batch Mutation
+  // Add Production Batch
   const addProductionBatch = useMutation({
     mutationFn: async () => {
       if (!date || !productionData.product_id || !productionData.quantity_produced) {
@@ -158,7 +158,7 @@ const ProductionPage = () => {
     }
   });
 
-  // Add Ingredient to Batch Mutation
+  // Add Ingredient to Batch
   const addIngredientToBatch = useMutation({
     mutationFn: async () => {
       if (!activeBatchId || !ingredientData.ingredient_name || !ingredientData.quantity_used || !ingredientData.cost_per_unit) {
@@ -192,7 +192,7 @@ const ProductionPage = () => {
     }
   });
 
-  // Delete Ingredient Mutation
+  // Delete Ingredient
   const deleteIngredient = useMutation({
     mutationFn: async (ingredientId: string) => {
       const { error } = await supabase
@@ -211,59 +211,55 @@ const ProductionPage = () => {
     }
   });
 
-  const handleAddProduction = () => {
-    addProductionBatch.mutate();
-  };
-
-  const handleAddIngredient = () => {
-    addIngredientToBatch.mutate();
-  };
-
-  const handleDeleteIngredient = (ingredientId: string) => {
-    if (window.confirm('Are you sure you want to remove this ingredient?')) {
-      deleteIngredient.mutate(ingredientId);
-    }
-  };
-
+  // Calculate total cost of ingredients for the active batch
   const calculateTotalCost = () => {
     return batchIngredients.reduce((total, ingredient) => {
       return total + (ingredient.quantity_used * ingredient.cost_per_unit);
     }, 0);
   };
 
+  // Calculate total production for the day
+  const calculateDailyProduction = () => {
+    return productionBatches.reduce((sum, batch) => sum + batch.quantity_produced, 0);
+  };
+
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
       <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-bold">Production Tracking</h1>
+        <h1 className="text-2xl font-bold">Daily Production Tracking</h1>
         <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">Production Staff</span>
       </div>
       
-      {/* Production Logging Card */}
+      {/* Date Picker */}
+      <div className="flex items-center gap-4">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="justify-start text-left font-normal">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date ? format(date, "PPP") : <span>Pick a date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        <div className="text-sm text-gray-600">
+          {productionBatches.length} batches | {calculateDailyProduction()} units produced
+        </div>
+      </div>
+
+      {/* Production Batch Creation */}
       <Card>
         <CardHeader>
-          <CardTitle>Create Production Batch</CardTitle>
+          <CardTitle>Create New Production Batch</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Date Picker */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start text-left font-normal">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-
-            {/* Product Selection */}
             <select
               className="p-2 border rounded"
               value={productionData.product_id}
@@ -278,7 +274,6 @@ const ProductionPage = () => {
               ))}
             </select>
 
-            {/* Quantity Produced */}
             <Input
               type="number"
               placeholder="Quantity Produced"
@@ -287,7 +282,6 @@ const ProductionPage = () => {
               required
             />
 
-            {/* Staff Name */}
             <Input
               placeholder="Staff Name"
               value={productionData.staff_name}
@@ -295,7 +289,6 @@ const ProductionPage = () => {
               required
             />
 
-            {/* Notes */}
             <Input
               placeholder="Notes (optional)"
               value={productionData.notes}
@@ -305,7 +298,7 @@ const ProductionPage = () => {
           </div>
 
           <Button 
-            onClick={handleAddProduction}
+            onClick={() => addProductionBatch.mutate()}
             disabled={addProductionBatch.isPending}
           >
             {addProductionBatch.isPending ? "Creating..." : "Create Batch"}
@@ -317,7 +310,7 @@ const ProductionPage = () => {
       {activeBatchId && (
         <Card>
           <CardHeader>
-            <CardTitle>Add Ingredients Used</CardTitle>
+            <CardTitle>Ingredients Used in This Batch</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -354,14 +347,14 @@ const ProductionPage = () => {
               />
             </div>
             <Button 
-              onClick={handleAddIngredient}
+              onClick={() => addIngredientToBatch.mutate()}
               disabled={addIngredientToBatch.isPending}
               className="flex items-center gap-1"
             >
               <Plus className="h-4 w-4" /> Add Ingredient
             </Button>
 
-            {/* Ingredients List */}
+            {/* Ingredients List with Costs */}
             {batchIngredients.length > 0 && (
               <div className="border rounded-lg divide-y">
                 <div className="grid grid-cols-12 p-2 font-medium bg-gray-50">
@@ -382,7 +375,7 @@ const ProductionPage = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-red-500 hover:text-red-700 h-8 w-8"
-                        onClick={() => handleDeleteIngredient(ingredient.id)}
+                        onClick={() => deleteIngredient.mutate(ingredient.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -399,7 +392,7 @@ const ProductionPage = () => {
         </Card>
       )}
 
-      {/* Production Batches List */}
+      {/* Daily Production Batches */}
       <Card>
         <CardHeader>
           <CardTitle>
