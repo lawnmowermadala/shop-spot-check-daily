@@ -1,11 +1,25 @@
-import React from 'react';
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
-// ... other imports ...
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Index from "./pages/Index";
+import Assignments from "./pages/Assignments";
+import StaffRatings from "./pages/StaffRatings";
+import RateStaff from "./pages/RateStaff";
+import Analytics from "./pages/Analytics";
+import NotFound from "./pages/NotFound";
+import DepartmentsPage from "./pages/DepartmentsPage";
+import StaffPage from "./pages/StaffPage";
+import UserManual from "./pages/UserManual";
+import SidebarMenu from "./components/SidebarMenu";
+import ProductsPage from "./pages/ProductsPage";
+import ProductionPage from "./pages/ProductionPage"; 
+import StockPage from "./pages/StockPage";
+import PromotionsPage from "./pages/PromotionsPage";
+import ExpiredStockPage from "./pages/ExpiredStockPage";
+import UserManagementPage from "./pages/UserManagementPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,62 +30,37 @@ const queryClient = new QueryClient({
   },
 });
 
-// 1. Add ProtectedRoute component right here in App.tsx
-const ProtectedRoute = ({ 
-  children, 
-  adminOnly = false 
-}: { 
-  children: React.ReactNode, 
-  adminOnly?: boolean 
-}) => {
-  const { user } = useAuth();
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  if (adminOnly && user.role !== 'admin') {
-    return <Navigate to="/" replace />;
-  }
-  
-  return children;
-};
-
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <Toaster />
-          <Sonner />
-          <SidebarMenu />
-          <Routes>
-            {/* Public route */}
-            <Route path="/login" element={<LoginPage />} />
-            
-            {/* Regular protected routes */}
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } />
-            
-            {/* Admin-only route */}
-            <Route path="/user-management" element={
-              <ProtectedRoute adminOnly>
-                <UserManagementPage />
-              </ProtectedRoute>
-            } />
-            
-            {/* Other protected routes... */}
-            {/* ... */}
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-};
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <SidebarMenu />
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/assignments" element={<Assignments />} />
+          <Route path="/ratings" element={<StaffRatings />} />
+          <Route path="/rate-staff" element={<RateStaff />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/departments" element={<DepartmentsPage />} />
+          <Route path="/staff" element={<StaffPage />} />
+          <Route path="/manual" element={<UserManual />} />
+          
+          {/* Bakery/Kitchen Production Routes */}
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/production" element={<ProductionPage />} />
+          <Route path="/stock" element={<StockPage />} />
+          <Route path="/promotions" element={<PromotionsPage />} />
+          <Route path="/expired" element={<ExpiredStockPage />} />
+          <Route path="/user-management" element={<UserManagementPage />} />
+          
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;
