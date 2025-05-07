@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -30,28 +29,17 @@ const LoginPage = () => {
     }
   }, [isMobile]);
 
-  // Redirect if already logged in
+  // Only redirect if there's a specific redirect path or for specific roles
   useEffect(() => {
     if (user) {
-      navigateBasedOnRole(user.role);
+      const from = location.state?.from?.pathname || '/';
+      
+      // Only redirect if not already on the main page
+      if (from !== '/') {
+        navigate(from, { replace: true });
+      }
     }
-  }, [user]);
-
-  const navigateBasedOnRole = (role: string) => {
-    switch (role) {
-      case 'admin':
-        navigate('/user-management');
-        break;
-      case 'supervisor':
-        navigate('/products');
-        break;
-      case 'kitchen-staff':
-        navigate('/production');
-        break;
-      default:
-        navigate('/');
-    }
-  };
+  }, [user, navigate, location.state]);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +51,7 @@ const LoginPage = () => {
     setIsLoading(true);
     try {
       await login(username, password);
+      // Don't navigate here - let the useEffect handle it
     } catch (error) {
       // Error is handled in the login function
     } finally {
@@ -75,6 +64,7 @@ const LoginPage = () => {
     try {
       await loginWithQR(qrCode);
       toast.success("QR code login successful!");
+      // Don't navigate here - let the useEffect handle it
     } catch (error) {
       // Error is handled in the loginWithQR function
     } finally {
