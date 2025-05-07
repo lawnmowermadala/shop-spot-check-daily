@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { toast } from '@/components/ui/sonner';
 
 interface ProtectedRouteProps {
   element: React.ReactNode;
@@ -13,6 +14,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   allowedRoles = [] 
 }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  
+  useEffect(() => {
+    // For redirected users, show a message about why they were redirected
+    const from = location.state?.from;
+    if (from && user) {
+      const roleMessage = allowedRoles.length > 0 && !allowedRoles.includes(user.role) 
+        ? `You don't have permission to access ${from}. Redirected to your designated area.`
+        : '';
+      
+      if (roleMessage) {
+        toast.info(roleMessage);
+      }
+    }
+  }, [location, user, allowedRoles]);
 
   // Show loading state
   if (loading) {
@@ -25,7 +41,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Not logged in - redirect to login
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" state={{ from: location.pathname }} />;
   }
 
   // Check role access if allowedRoles is provided and not empty
@@ -33,13 +49,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     // Redirect based on user's role
     switch (user.role) {
       case 'admin':
-        return <Navigate to="/user-management" />;
+        return <Navigate to="/user-management" state={{ from: location.pathname }} />;
       case 'supervisor':
-        return <Navigate to="/products" />;
+        return <Navigate to="/products" state={{ from: location.pathname }} />;
       case 'kitchen-staff':
-        return <Navigate to="/production" />;
+        return <Navigate to="/production" state={{ from: location.pathname }} />;
       default:
-        return <Navigate to="/" />;
+        return <Navigate to="/" state={{ from: location.pathname }} />;
     }
   }
 

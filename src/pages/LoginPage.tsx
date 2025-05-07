@@ -1,26 +1,37 @@
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, QrCode, Key } from 'lucide-react';
+import { Eye, EyeOff, QrCode, Key, Smartphone } from 'lucide-react';
 import QRScanner from '@/components/QRScanner';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/components/ui/sonner';
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, loginWithQR, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [defaultTab, setDefaultTab] = useState<string>('password');
+  const isMobile = useIsMobile();
+  
+  // Set default tab based on device type
+  useEffect(() => {
+    if (isMobile) {
+      setDefaultTab('qrcode');
+    }
+  }, [isMobile]);
 
   // Redirect if already logged in
-  React.useEffect(() => {
+  useEffect(() => {
     if (user) {
       navigateBasedOnRole(user.role);
     }
@@ -63,6 +74,7 @@ const LoginPage = () => {
     setIsLoading(true);
     try {
       await loginWithQR(qrCode);
+      toast.success("QR code login successful!");
     } catch (error) {
       // Error is handled in the loginWithQR function
     } finally {
@@ -76,9 +88,15 @@ const LoginPage = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold">Kitchen & Bakery</h1>
           <p className="text-gray-500">Production Management System</p>
+          {isMobile && (
+            <div className="mt-2 flex items-center justify-center text-sm text-muted-foreground">
+              <Smartphone className="h-4 w-4 mr-1" /> 
+              Mobile device detected
+            </div>
+          )}
         </div>
 
-        <Tabs defaultValue="password" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="password">
               <Key className="mr-2 h-4 w-4" />
