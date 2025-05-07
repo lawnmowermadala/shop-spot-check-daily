@@ -3,23 +3,25 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Croissant, ChefHat, CookingPot, ShoppingCart, AlertTriangle, BarChart4, BookOpen } from "lucide-react";
+import { Menu, Croissant, ChefHat, CookingPot, ShoppingCart, AlertTriangle, BarChart4, BookOpen, UserCog } from "lucide-react";
 
 interface MenuItemProps {
   icon: React.ReactElement;
   label: string;
   to: string;
   onClick?: () => void;
+  badge?: React.ReactNode;
 }
 
-const MenuItem = ({ icon, label, to, onClick }: MenuItemProps) => (
+const MenuItem = ({ icon, label, to, onClick, badge }: MenuItemProps) => (
   <Link to={to} onClick={onClick}>
     <Button 
       variant="ghost" 
-      className="w-full justify-start gap-3 px-3 py-6 font-normal hover:bg-slate-100"
+      className="w-full justify-start gap-3 px-3 py-6 font-normal hover:bg-slate-100 relative"
     >
       {icon}
       <span>{label}</span>
+      {badge}
     </Button>
   </Link>
 );
@@ -56,6 +58,7 @@ const SidebarMenu = () => {
                 label="Daily Production" 
                 to="/production"
                 onClick={handleClose}
+                badge={<span className="absolute right-3 rounded-full bg-orange-100 px-2 text-xs text-orange-800">Staff</span>}
               />
               <MenuItem 
                 icon={<CookingPot className="h-5 w-5" />} 
@@ -74,6 +77,7 @@ const SidebarMenu = () => {
                 label="Expired Stock" 
                 to="/expired"
                 onClick={handleClose}
+                badge={<span className="absolute right-3 rounded-full bg-orange-100 px-2 text-xs text-orange-800">Staff</span>}
               />
               <MenuItem 
                 icon={<BarChart4 className="h-5 w-5" />} 
@@ -86,6 +90,13 @@ const SidebarMenu = () => {
                 label="Help" 
                 to="/manual"
                 onClick={handleClose}
+              />
+              <MenuItem 
+                icon={<UserCog className="h-5 w-5" />} 
+                label="User Management" 
+                to="/user-management"
+                onClick={handleClose}
+                badge={<span className="absolute right-3 rounded-full bg-purple-100 px-2 text-xs text-purple-800">Admin</span>}
               />
             </div>
             

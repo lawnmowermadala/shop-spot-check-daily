@@ -57,7 +57,7 @@ const ProductionPage = () => {
 
   // 2. Fetch Daily Production
   const { data: dailyProduction = [] } = useQuery({
-    queryKey: ['daily_production', date],
+    queryKey: ['daily_production', date ? date.toISOString() : null],
     queryFn: async () => {
       if (!date) return [];
       
@@ -109,7 +109,10 @@ const ProductionPage = () => {
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
-      <h1 className="text-2xl font-bold">Daily Production Tracking</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold">Daily Production Tracking</h1>
+        <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">Kitchen Staff</span>
+      </div>
       
       {/* Production Logging Card */}
       <Card>
@@ -132,7 +135,6 @@ const ProductionPage = () => {
                   selected={date}
                   onSelect={setDate}
                   initialFocus
-                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
