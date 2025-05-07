@@ -1,5 +1,5 @@
 
-import React from 'react';  // Add explicit React import
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -31,11 +31,11 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
-  <React.StrictMode>
+const App = () => {
+  return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <TooltipProvider>
+      <TooltipProvider>
+        <BrowserRouter>
           <Toaster />
           <Sonner />
           <SidebarMenu />
@@ -60,10 +60,10 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </TooltipProvider>
-      </BrowserRouter>
+        </BrowserRouter>
+      </TooltipProvider>
     </QueryClientProvider>
-  </React.StrictMode>
-);
+  );
+};
 
 export default App;
