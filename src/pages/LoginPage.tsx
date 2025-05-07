@@ -43,7 +43,7 @@ const LoginPage = () => {
   const getDefaultRoute = (role: string) => {
     switch (role) {
       case 'admin':
-        return '/dashboard'; // Main admin page
+        return '/home'; // Main admin page
       case 'supervisor':
         return '/production'; // Production management
       case 'staff':
