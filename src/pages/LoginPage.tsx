@@ -10,6 +10,15 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/components/ui/sonner';
 import { useIsMobile } from "@/hooks/use-mobile";
 
+// Define your routes
+const ROUTES = {
+  ADMIN: '/admin',
+  PRODUCTION: '/production',
+  TASKS: '/tasks',
+  HOME: '/',
+  LOGIN: '/login'
+};
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,20 +45,25 @@ const LoginPage = () => {
   useEffect(() => {
     if (user) {
       const from = location.state?.from?.pathname || getDefaultRoute(user.role);
-      navigate(from, { replace: true });
+      
+      // Validate the route before navigating
+      const validRoutes = Object.values(ROUTES);
+      const safeRoute = validRoutes.includes(from) ? from : ROUTES.HOME;
+      
+      navigate(safeRoute, { replace: true });
     }
   }, [user, navigate, location.state]);
 
   const getDefaultRoute = (role: string) => {
     switch (role) {
       case 'admin':
-        return '/dashboard';
+        return ROUTES.ADMIN;
       case 'supervisor':
-        return '/production';
+        return ROUTES.PRODUCTION;
       case 'staff':
-        return '/tasks';
+        return ROUTES.TASKS;
       default:
-        return '/';
+        return ROUTES.HOME;
     }
   };
 
@@ -59,7 +73,7 @@ const LoginPage = () => {
       setCameraError(null);
       
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API not supported');
+        throw new Error('Camera API not supported in this browser');
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -76,7 +90,7 @@ const LoginPage = () => {
       }
     } catch (err) {
       setCameraActive(false);
-      setCameraError('Could not access camera. Please check permissions.');
+      setCameraError('Camera access denied. Please check permissions.');
       console.error('Camera error:', err);
     }
   };
@@ -108,7 +122,7 @@ const LoginPage = () => {
     try {
       await login(username, password);
     } catch (error) {
-      toast.error('Login failed. Please try again.');
+      toast.error('Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -248,7 +262,7 @@ const LoginPage = () => {
                         />
                       ) : (
                         <div className="flex items-center justify-center h-full text-gray-400">
-                          Camera inactive
+                          {cameraError ? 'Camera unavailable' : 'Camera inactive'}
                         </div>
                       )}
                       <div className="absolute inset-0 border-4 border-primary rounded-lg pointer-events-none" />
