@@ -102,7 +102,7 @@ const StockPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock_items'] });
+      queryClient.invalidateQueries(['stock_items']);
       setStockData({
         product_id: '',
         quantity: 1,
@@ -133,7 +133,7 @@ const StockPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock_items'] });
+      queryClient.invalidateQueries(['stock_items']);
       toast("Stock quantity updated!");
     },
     onError: (error: Error) => {
@@ -261,7 +261,6 @@ const StockPage = () => {
                     onSelect={(date) => date && setExpiryDate(date)}
                     initialFocus
                     disabled={(date) => date < today}
-                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
@@ -280,9 +279,9 @@ const StockPage = () => {
 
           <Button 
             onClick={() => addStockItem.mutate()}
-            disabled={addStockItem.isPending}
+            disabled={addStockItem.isLoading}
           >
-            {addStockItem.isPending ? "Adding..." : "Add to Stock"}
+            {addStockItem.isLoading ? "Adding..." : "Add to Stock"}
           </Button>
         </CardContent>
       </Card>

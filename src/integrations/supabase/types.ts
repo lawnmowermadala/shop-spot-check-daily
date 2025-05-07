@@ -116,39 +116,6 @@ export type Database = {
         }
         Relationships: []
       }
-      pos_users: {
-        Row: {
-          active: boolean | null
-          created_at: string | null
-          created_by: string | null
-          id: string
-          password: string
-          qr_code: string | null
-          role: string
-          username: string
-        }
-        Insert: {
-          active?: boolean | null
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          password: string
-          qr_code?: string | null
-          role: string
-          username: string
-        }
-        Update: {
-          active?: boolean | null
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          password?: string
-          qr_code?: string | null
-          role?: string
-          username?: string
-        }
-        Relationships: []
-      }
       production_logs: {
         Row: {
           created_at: string | null

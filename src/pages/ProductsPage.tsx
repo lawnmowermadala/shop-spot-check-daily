@@ -73,7 +73,7 @@ const ProductsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries(['products']);
       resetForm();
       toast(isEditing ? "Product updated successfully!" : "Product added successfully!");
     },
@@ -93,7 +93,7 @@ const ProductsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries(['products']);
       toast("Product deleted successfully!");
     },
     onError: (error: Error) => {
@@ -168,7 +168,7 @@ const ProductsPage = () => {
               />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" disabled={upsertProduct.isPending}>
+              <Button type="submit" disabled={upsertProduct.isLoading}>
                 {isEditing ? 'Update Product' : 'Add Product'}
               </Button>
               {isEditing && (
@@ -209,7 +209,7 @@ const ProductsPage = () => {
                   <TableRow key={product.id}>
                     <TableCell>{product.name}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>${product.unit_price?.toFixed(2) || '0.00'}</TableCell>
+                    <TableCell>${product.unit_price.toFixed(2)}</TableCell>
                     <TableCell>{product.description || '-'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

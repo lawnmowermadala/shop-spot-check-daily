@@ -108,7 +108,7 @@ const PromotionsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['promotions'] });
+      queryClient.invalidateQueries(['promotions']);
       setPromotionData({
         product_id: '',
         discount_percentage: 10,
@@ -132,7 +132,7 @@ const PromotionsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['promotions'] });
+      queryClient.invalidateQueries(['promotions']);
       toast("Promotion deleted successfully!");
     },
     onError: (error: Error) => {
@@ -214,7 +214,6 @@ const PromotionsPage = () => {
                     selected={startDate}
                     onSelect={(date) => date && setStartDate(date)}
                     initialFocus
-                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
@@ -237,7 +236,6 @@ const PromotionsPage = () => {
                     onSelect={(date) => date && setEndDate(date)}
                     initialFocus
                     disabled={(date) => date < startDate}
-                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
@@ -256,9 +254,9 @@ const PromotionsPage = () => {
 
           <Button 
             onClick={() => addPromotion.mutate()}
-            disabled={addPromotion.isPending}
+            disabled={addPromotion.isLoading}
           >
-            {addPromotion.isPending ? "Creating..." : "Create Promotion"}
+            {addPromotion.isLoading ? "Creating..." : "Create Promotion"}
           </Button>
         </CardContent>
       </Card>
@@ -293,7 +291,7 @@ const PromotionsPage = () => {
                     </TableCell>
                     <TableCell>
                       {isPromotionActive(promo.start_date, promo.end_date) ? (
-                        <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Active</Badge>
+                        <Badge variant="success" className="bg-green-100 text-green-800 hover:bg-green-200">Active</Badge>
                       ) : new Date(promo.start_date) > today ? (
                         <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-200">Upcoming</Badge>
                       ) : (

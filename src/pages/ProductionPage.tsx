@@ -57,7 +57,7 @@ const ProductionPage = () => {
 
   // 2. Fetch Daily Production
   const { data: dailyProduction = [] } = useQuery({
-    queryKey: ['daily_production', date ? date.toISOString() : null],
+    queryKey: ['daily_production', date],
     queryFn: async () => {
       if (!date) return [];
       
@@ -98,7 +98,7 @@ const ProductionPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily_production'] });
+      queryClient.invalidateQueries(['daily_production']);
       setProductionData(prev => ({ ...prev, quantity: '', product_id: '' }));
       toast("Production logged successfully!");
     },
@@ -109,10 +109,7 @@ const ProductionPage = () => {
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
-      <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-bold">Daily Production Tracking</h1>
-        <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">Kitchen Staff</span>
-      </div>
+      <h1 className="text-2xl font-bold">Daily Production Tracking</h1>
       
       {/* Production Logging Card */}
       <Card>
@@ -171,9 +168,9 @@ const ProductionPage = () => {
 
           <Button 
             onClick={() => addProduction.mutate()}
-            disabled={addProduction.isPending}
+            disabled={addProduction.isLoading}
           >
-            {addProduction.isPending ? "Logging..." : "Log Production"}
+            {addProduction.isLoading ? "Logging..." : "Log Production"}
           </Button>
         </CardContent>
       </Card>
