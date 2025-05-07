@@ -1,4 +1,5 @@
 
+import React from 'react';  // Add explicit React import
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -31,36 +32,38 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <SidebarMenu />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/assignments" element={<Assignments />} />
-          <Route path="/ratings" element={<StaffRatings />} />
-          <Route path="/rate-staff" element={<RateStaff />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/departments" element={<DepartmentsPage />} />
-          <Route path="/staff" element={<StaffPage />} />
-          <Route path="/manual" element={<UserManual />} />
-          
-          {/* Bakery/Kitchen Production Routes */}
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/production" element={<ProductionPage />} />
-          <Route path="/stock" element={<StockPage />} />
-          <Route path="/promotions" element={<PromotionsPage />} />
-          <Route path="/expired" element={<ExpiredStockPage />} />
-          <Route path="/user-management" element={<UserManagementPage />} />
-          
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <SidebarMenu />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/assignments" element={<Assignments />} />
+            <Route path="/ratings" element={<StaffRatings />} />
+            <Route path="/rate-staff" element={<RateStaff />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/departments" element={<DepartmentsPage />} />
+            <Route path="/staff" element={<StaffPage />} />
+            <Route path="/manual" element={<UserManual />} />
+            
+            {/* Bakery/Kitchen Production Routes */}
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/production" element={<ProductionPage />} />
+            <Route path="/stock" element={<StockPage />} />
+            <Route path="/promotions" element={<PromotionsPage />} />
+            <Route path="/expired" element={<ExpiredStockPage />} />
+            <Route path="/user-management" element={<UserManagementPage />} />
+            
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+    </QueryClientProvider>
+  </React.StrictMode>
 );
 
 export default App;
