@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,8 +14,8 @@ interface Product {
   id: string;
   name: string;
   category: string;
-  unit_price: number;
-  description?: string;
+  batch_size: string;
+  ingredients: string;
   created_at?: string;
 }
 
@@ -26,8 +25,8 @@ const ProductsPage = () => {
   const [currentProduct, setCurrentProduct] = useState<Partial<Product>>({
     name: '',
     category: '',
-    unit_price: 0,
-    description: ''
+    batch_size: '',
+    ingredients: ''
   });
 
   // Fetch products
@@ -37,7 +36,7 @@ const ProductsPage = () => {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .order('name');
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data as Product[];
@@ -51,26 +50,29 @@ const ProductsPage = () => {
         throw new Error('Name and category are required');
       }
       
-      const { error } = isEditing && product.id
+      const { data, error } = isEditing && product.id
         ? await supabase
             .from('products')
             .update({
               name: product.name,
               category: product.category,
-              unit_price: product.unit_price || 0,
-              description: product.description
+              batch_size: product.batch_size,
+              ingredients: product.ingredients
             })
             .eq('id', product.id)
+            .select()
         : await supabase
             .from('products')
             .insert([{
               name: product.name,
               category: product.category,
-              unit_price: product.unit_price || 0,
-              description: product.description
-            }]);
+              batch_size: product.batch_size,
+              ingredients: product.ingredients
+            }])
+            .select();
       
       if (error) throw error;
+      return data?.[0] as Product;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -122,8 +124,8 @@ const ProductsPage = () => {
     setCurrentProduct({
       name: '',
       category: '',
-      unit_price: 0,
-      description: ''
+      batch_size: '',
+      ingredients: ''
     });
   };
 
@@ -152,19 +154,15 @@ const ProductsPage = () => {
                 required
               />
               <Input
-                type="number"
-                placeholder="Unit Price"
-                value={currentProduct.unit_price || ''}
-                onChange={(e) => setCurrentProduct({
-                  ...currentProduct, 
-                  unit_price: parseFloat(e.target.value) || 0
-                })}
-                required
+                placeholder="Batch Size"
+                value={currentProduct.batch_size || ''}
+                onChange={(e) => setCurrentProduct({...currentProduct, batch_size: e.target.value})}
               />
               <Input
-                placeholder="Description (optional)"
-                value={currentProduct.description || ''}
-                onChange={(e) => setCurrentProduct({...currentProduct, description: e.target.value})}
+                placeholder="Ingredients (comma separated)"
+                value={currentProduct.ingredients || ''}
+                onChange={(e) => setCurrentProduct({...currentProduct, ingredients: e.target.value})}
+                className="md:col-span-2"
               />
             </div>
             <div className="flex gap-2">
@@ -199,8 +197,8 @@ const ProductsPage = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Unit Price</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Batch Size</TableHead>
+                  <TableHead>Ingredients</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -209,8 +207,18 @@ const ProductsPage = () => {
                   <TableRow key={product.id}>
                     <TableCell>{product.name}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>${product.unit_price?.toFixed(2) || '0.00'}</TableCell>
-                    <TableCell>{product.description || '-'}</TableCell>
+                    <TableCell>{product.batch_size || '-'}</TableCell>
+                    <TableCell>
+                      {product.ingredients ? (
+                        <div className="flex flex-wrap gap-1">
+                          {product.ingredients.split(',').map((ingredient, i) => (
+                            <span key={i} className="bg-gray-100 px-2 py-1 rounded text-sm">
+                              {ingredient.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button 
