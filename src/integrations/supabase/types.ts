@@ -89,6 +89,101 @@ export type Database = {
         }
         Relationships: []
       }
+      expired_items: {
+        Row: {
+          batch_date: string
+          created_at: string | null
+          id: string
+          product_name: string
+          quantity: string
+          removal_date: string
+        }
+        Insert: {
+          batch_date: string
+          created_at?: string | null
+          id?: string
+          product_name: string
+          quantity: string
+          removal_date: string
+        }
+        Update: {
+          batch_date?: string
+          created_at?: string | null
+          id?: string
+          product_name?: string
+          quantity?: string
+          removal_date?: string
+        }
+        Relationships: []
+      }
+      production_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_id: string | null
+          product_name: string
+          production_date: string
+          quantity: number
+          staff_id: string
+          staff_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_id?: string | null
+          product_name: string
+          production_date: string
+          quantity: number
+          staff_id: string
+          staff_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          production_date?: string
+          quantity?: number
+          staff_id?: string
+          staff_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          batch_size: string | null
+          category: string
+          created_at: string | null
+          id: string
+          ingredients: string | null
+          name: string
+        }
+        Insert: {
+          batch_size?: string | null
+          category: string
+          created_at?: string | null
+          id?: string
+          ingredients?: string | null
+          name: string
+        }
+        Update: {
+          batch_size?: string | null
+          category?: string
+          created_at?: string | null
+          id?: string
+          ingredients?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
       ratings: {
         Row: {
           comment: string | null

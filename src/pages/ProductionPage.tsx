@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,8 +9,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from '@/components/ui/sonner';
+import Navigation from '@/components/Navigation';
 
 // Types
 interface ProductionItem {
@@ -98,22 +100,15 @@ const ProductionPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(['daily_production']);
       setProductionData(prev => ({ ...prev, quantity: '', product_id: '' }));
-      toast({
-        title: "Success",
-        description: "Production logged successfully!",
-      });
+      toast("Production logged successfully!");
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast(error.message);
     }
   });
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
       <h1 className="text-2xl font-bold">Daily Production Tracking</h1>
       
       {/* Production Logging Card */}
@@ -248,6 +243,8 @@ const ProductionPage = () => {
           </CardContent>
         </Card>
       </div>
+      
+      <Navigation />
     </div>
   );
 };
