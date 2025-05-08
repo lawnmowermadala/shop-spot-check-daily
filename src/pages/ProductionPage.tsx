@@ -368,8 +368,8 @@ const ProductionPage = () => {
                   <div key={ingredient.id} className="grid grid-cols-12 p-2 items-center">
                     <div className="col-span-4">{ingredient.ingredient_name}</div>
                     <div className="col-span-2">{ingredient.quantity_used} {ingredient.unit}</div>
-                    <div className="col-span-2">${ingredient.cost_per_unit.toFixed(2)}/{ingredient.unit}</div>
-                    <div className="col-span-2">${(ingredient.quantity_used * ingredient.cost_per_unit).toFixed(2)}</div>
+                    <div className="col-span-2">R{ingredient.cost_per_unit.toFixed(2)}/{ingredient.unit}</div>
+                    <div className="col-span-2">R{(ingredient.quantity_used * ingredient.cost_per_unit).toFixed(2)}</div>
                     <div className="col-span-2 text-right">
                       <Button 
                         variant="ghost" 
@@ -384,7 +384,7 @@ const ProductionPage = () => {
                 ))}
                 <div className="grid grid-cols-12 p-2 font-medium border-t">
                   <div className="col-span-8">Total Ingredients Cost</div>
-                  <div className="col-span-4 text-right">${calculateTotalCost().toFixed(2)}</div>
+                  <div className="col-span-4 text-right">R{calculateTotalCost().toFixed(2)}</div>
                 </div>
               </div>
             )}
