@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Trash2, Package } from 'lucide-react';
+import { CalendarIcon, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,11 +17,12 @@ import Navigation from '@/components/Navigation';
 interface ProductionBatch {
   id: string;
   recipe_id: string;
-  recipe_name: string;
   quantity_produced: number;
   production_date: string;
   staff_name: string;
+  notes: string | null;
   created_at: string;
+  recipe_name?: string;
 }
 
 interface Recipe {
@@ -70,8 +71,7 @@ const ProductionCostPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('recipes')
-        .select('id, name, batch_size, unit')
-        .order('name');
+        .select('id, name, batch_size, unit');
       
       if (error) throw error;
       return data as Recipe[];
@@ -96,32 +96,42 @@ const ProductionCostPage = () => {
   });
 
   // Fetch Production Batches for selected date
-  const { data: productionBatches = [] } = useQuery({
+  const { data: productionBatches = [], isLoading: loadingBatches } = useQuery({
     queryKey: ['production_cost_batches', date ? format(date, 'yyyy-MM-dd') : null],
     queryFn: async () => {
       if (!date) return [];
       
       const dateStr = format(date, 'yyyy-MM-dd');
-      const { data, error } = await supabase
+      
+      // First fetch the batches
+      const { data: batchesData, error: batchesError } = await supabase
         .from('production_cost_batches')
-        .select(`
-          id,
-          recipe_id,
-          recipes(name, batch_size, unit),
-          quantity_produced,
-          production_date,
-          staff_name,
-          created_at
-        `)
+        .select('*')
         .eq('production_date', dateStr)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
-      return data.map((batch: any) => ({
-        ...batch,
-        recipe_name: batch.recipes.name
-      })) as ProductionBatch[];
-    }
+      if (batchesError) throw batchesError;
+      
+      // Fetch recipe names separately
+      const batches = batchesData as ProductionBatch[];
+      const enhancedBatches = await Promise.all(
+        batches.map(async (batch) => {
+          const { data: recipeData } = await supabase
+            .from('recipes')
+            .select('name')
+            .eq('id', batch.recipe_id)
+            .single();
+          
+          return {
+            ...batch,
+            recipe_name: recipeData?.name || 'Unknown Recipe'
+          };
+        })
+      );
+      
+      return enhancedBatches;
+    },
+    enabled: !!date
   });
 
   // Fetch Ingredients Usage for active batch
@@ -430,7 +440,9 @@ const ProductionCostPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {productionBatches.length > 0 ? (
+          {loadingBatches ? (
+            <p>Loading batches...</p>
+          ) : productionBatches.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>

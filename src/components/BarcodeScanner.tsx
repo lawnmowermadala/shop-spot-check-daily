@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Quagga } from '@ericblade/quagga2';
+import Quagga from '@ericblade/quagga2';
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;

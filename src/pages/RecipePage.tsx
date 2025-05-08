@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Barcode, Package, Plus, Trash2 } from 'lucide-react';
+import { Barcode, Plus, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
@@ -145,7 +145,7 @@ const RecipePage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipe_ingredients'] });
+      queryClient.invalidateQueries({ queryKey: ['recipe_ingredients', activeRecipeId] });
       setIngredientData({
         ingredient_name: '',
         barcode: '',
@@ -171,7 +171,7 @@ const RecipePage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipe_ingredients'] });
+      queryClient.invalidateQueries({ queryKey: ['recipe_ingredients', activeRecipeId] });
       toast("Ingredient removed successfully!");
     },
     onError: (error: Error) => {

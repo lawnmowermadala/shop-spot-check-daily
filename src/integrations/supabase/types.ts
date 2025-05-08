@@ -214,6 +214,82 @@ export type Database = {
           },
         ]
       }
+      production_cost_batches: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          production_date: string
+          quantity_produced: number
+          recipe_id: string
+          staff_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          production_date: string
+          quantity_produced: number
+          recipe_id: string
+          staff_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          production_date?: string
+          quantity_produced?: number
+          recipe_id?: string
+          staff_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_cost_batches_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_ingredient_usage: {
+        Row: {
+          cost_per_unit: number
+          created_at: string
+          id: string
+          ingredient_name: string
+          production_id: string
+          quantity_used: number
+          unit: string
+        }
+        Insert: {
+          cost_per_unit: number
+          created_at?: string
+          id?: string
+          ingredient_name: string
+          production_id: string
+          quantity_used: number
+          unit: string
+        }
+        Update: {
+          cost_per_unit?: number
+          created_at?: string
+          id?: string
+          ingredient_name?: string
+          production_id?: string
+          quantity_used?: number
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_ingredient_usage_production_id_fkey"
+            columns: ["production_id"]
+            isOneToOne: false
+            referencedRelation: "production_cost_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_ingredients: {
         Row: {
           batch_id: string | null
@@ -345,6 +421,74 @@ export type Database = {
           staff_id?: string
           staff_name?: string
           teamwork?: number
+        }
+        Relationships: []
+      }
+      recipe_ingredients: {
+        Row: {
+          barcode: string | null
+          cost_per_unit: number
+          created_at: string
+          id: string
+          ingredient_name: string
+          quantity: number
+          recipe_id: string
+          unit: string
+        }
+        Insert: {
+          barcode?: string | null
+          cost_per_unit: number
+          created_at?: string
+          id?: string
+          ingredient_name: string
+          quantity: number
+          recipe_id: string
+          unit?: string
+        }
+        Update: {
+          barcode?: string | null
+          cost_per_unit?: number
+          created_at?: string
+          id?: string
+          ingredient_name?: string
+          quantity?: number
+          recipe_id?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_ingredients_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipes: {
+        Row: {
+          batch_size: number
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          unit: string
+        }
+        Insert: {
+          batch_size: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          unit?: string
+        }
+        Update: {
+          batch_size?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          unit?: string
         }
         Relationships: []
       }
