@@ -21,6 +21,8 @@ import StockPage from "./pages/StockPage";
 import PromotionsPage from "./pages/PromotionsPage";
 import ExpiredStockPage from "./pages/ExpiredStockPage";
 import UserManagementPage from "./pages/UserManagementPage";
+import RecipePage from "./pages/RecipePage";
+import ProductionCostPage from "./pages/ProductionCostPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,6 +58,8 @@ const App = () => {
             <Route path="/promotions" element={<PromotionsPage />} />
             <Route path="/expired" element={<ExpiredStockPage />} />
             <Route path="/user-management" element={<UserManagementPage />} />
+            <Route path="/recipes" element={<RecipePage />} />
+            <Route path="/production-cost" element={<ProductionCostPage />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

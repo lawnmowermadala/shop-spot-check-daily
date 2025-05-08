@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Croissant, ChefHat, CookingPot, ShoppingCart, AlertTriangle, BarChart4, BookOpen, UserCog } from "lucide-react";
+import { Menu, Croissant, ChefHat, CookingPot, ShoppingCart, AlertTriangle, BarChart4, BookOpen, UserCog, Package } from "lucide-react";
 
 interface MenuItemProps {
   icon: React.ReactElement;
@@ -54,11 +54,23 @@ const SidebarMenu = () => {
                 onClick={handleClose}
               />
               <MenuItem 
+                icon={<Package className="h-5 w-5" />} 
+                label="Recipes" 
+                to="/recipes"
+                onClick={handleClose}
+              />
+              <MenuItem 
                 icon={<ChefHat className="h-5 w-5" />} 
                 label="Daily Production" 
                 to="/production"
                 onClick={handleClose}
                 badge={<span className="absolute right-3 rounded-full bg-orange-100 px-2 text-xs text-orange-800">Staff</span>}
+              />
+              <MenuItem 
+                icon={<CookingPot className="h-5 w-5" />} 
+                label="Production Cost" 
+                to="/production-cost"
+                onClick={handleClose}
               />
               <MenuItem 
                 icon={<CookingPot className="h-5 w-5" />} 

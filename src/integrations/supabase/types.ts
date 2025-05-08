@@ -116,6 +116,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ingredients: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          product_id: string | null
+          quantity: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          product_id?: string | null
+          quantity: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          product_id?: string | null
+          quantity?: string
+        }
+        Relationships: []
+      }
       pos_users: {
         Row: {
           active: boolean | null
@@ -149,6 +173,85 @@ export type Database = {
         }
         Relationships: []
       }
+      production_batches: {
+        Row: {
+          created_at: string | null
+          id: string
+          notes: string | null
+          product_id: string | null
+          production_date: string
+          quantity_produced: number
+          staff_id: string | null
+          staff_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string | null
+          production_date: string
+          quantity_produced: number
+          staff_id?: string | null
+          staff_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string | null
+          production_date?: string
+          quantity_produced?: number
+          staff_id?: string | null
+          staff_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_ingredients: {
+        Row: {
+          batch_id: string | null
+          cost_per_unit: number
+          created_at: string | null
+          id: string
+          ingredient_name: string
+          quantity_used: number
+          unit: string
+        }
+        Insert: {
+          batch_id?: string | null
+          cost_per_unit: number
+          created_at?: string | null
+          id?: string
+          ingredient_name: string
+          quantity_used: number
+          unit: string
+        }
+        Update: {
+          batch_id?: string | null
+          cost_per_unit?: number
+          created_at?: string | null
+          id?: string
+          ingredient_name?: string
+          quantity_used?: number
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_ingredients_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "production_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_logs: {
         Row: {
           created_at: string | null
@@ -180,39 +283,25 @@ export type Database = {
           staff_id?: string
           staff_name?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "production_logs_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       products: {
         Row: {
-          batch_size: string | null
-          category: string
+          code: string
           created_at: string | null
           id: string
-          ingredients: string | null
           name: string
         }
         Insert: {
-          batch_size?: string | null
-          category: string
+          code: string
           created_at?: string | null
           id?: string
-          ingredients?: string | null
           name: string
         }
         Update: {
-          batch_size?: string | null
-          category?: string
+          code?: string
           created_at?: string | null
           id?: string
-          ingredients?: string | null
           name?: string
         }
         Relationships: []
