@@ -327,7 +327,7 @@ const ProductionCostPage = () => {
                 {recipes.map(recipe => (
                   <div
                     key={recipe.id}
-                    className={`p-2 border rounded cursor-pointer ${selectedRecipeId === recipe.id ? 'bg-primary/10 border-primary' : 'hover:bg-gray-50'}`}
+                    className={`p-2 border rounded cursor-pointer R{selectedRecipeId === recipe.id ? 'bg-primary/10 border-primary' : 'hover:bg-gray-50'}`}
                     onClick={() => handleRecipeSelection(recipe.id)}
                   >
                     <div className="flex justify-between">
@@ -397,8 +397,8 @@ const ProductionCostPage = () => {
                     <TableRow key={index}>
                       <TableCell>{ingredient.ingredient_name}</TableCell>
                       <TableCell>{ingredient.adjusted_quantity.toFixed(2)} {ingredient.unit}</TableCell>
-                      <TableCell>${ingredient.cost_per_unit.toFixed(2)}</TableCell>
-                      <TableCell>${ingredient.total_cost.toFixed(2)}</TableCell>
+                      <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
+                      <TableCell>R{ingredient.total_cost.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -408,14 +408,14 @@ const ProductionCostPage = () => {
                 <div>
                   <span className="font-medium">Total Cost: </span>
                   <span className="text-lg font-bold">
-                    ${calculateIngredientsNeeded().reduce((sum, i) => sum + i.total_cost, 0).toFixed(2)}
+                    R{calculateIngredientsNeeded().reduce((sum, i) => sum + i.total_cost, 0).toFixed(2)}
                   </span>
                 </div>
                 
                 <div>
                   <span className="font-medium">Cost Per Unit: </span>
                   <span className="text-lg font-bold">
-                    ${(calculateIngredientsNeeded().reduce((sum, i) => sum + i.total_cost, 0) / Number(productionData.quantity_produced)).toFixed(2)}
+                    R{(calculateIngredientsNeeded().reduce((sum, i) => sum + i.total_cost, 0) / Number(productionData.quantity_produced)).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -519,8 +519,8 @@ const ProductionCostPage = () => {
                   <TableRow key={usage.id}>
                     <TableCell>{usage.ingredient_name}</TableCell>
                     <TableCell>{usage.quantity_used} {usage.unit}</TableCell>
-                    <TableCell>${usage.cost_per_unit.toFixed(2)}</TableCell>
-                    <TableCell>${(usage.quantity_used * usage.cost_per_unit).toFixed(2)}</TableCell>
+                    <TableCell>R{usage.cost_per_unit.toFixed(2)}</TableCell>
+                    <TableCell>R{(usage.quantity_used * usage.cost_per_unit).toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -532,14 +532,14 @@ const ProductionCostPage = () => {
                 <div className="border rounded-lg p-4 text-center">
                   <h3 className="text-sm font-medium text-gray-500">Total Production Cost</h3>
                   <p className="text-3xl font-bold">
-                    ${calculateBatchTotalCost(activeBatchId).toFixed(2)}
+                    R{calculateBatchTotalCost(activeBatchId).toFixed(2)}
                   </p>
                 </div>
                 
                 <div className="border rounded-lg p-4 text-center">
                   <h3 className="text-sm font-medium text-gray-500">Cost Per Unit</h3>
                   <p className="text-3xl font-bold">
-                    ${calculateBatchUnitCost(
+                    R{calculateBatchUnitCost(
                       activeBatchId, 
                       productionBatches.find(b => b.id === activeBatchId)?.quantity_produced || 0
                     ).toFixed(2)}
