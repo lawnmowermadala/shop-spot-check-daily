@@ -304,7 +304,7 @@ const RecipePage = () => {
                 {recipes.map(recipe => (
                   <div 
                     key={recipe.id}
-                    className={`p-3 border rounded-md cursor-pointer ${activeRecipeId === recipe.id ? 'bg-primary/10 border-primary' : 'hover:bg-gray-50'}`}
+                    className={`p-3 border rounded-md cursor-pointer R{activeRecipeId === recipe.id ? 'bg-primary/10 border-primary' : 'hover:bg-gray-50'}`}
                     onClick={() => setActiveRecipeId(recipe.id)}
                   >
                     <div className="flex justify-between items-center">
@@ -458,8 +458,8 @@ const RecipePage = () => {
                           <TableCell>{ingredient.ingredient_name}</TableCell>
                           <TableCell>{ingredient.barcode || '-'}</TableCell>
                           <TableCell>{ingredient.quantity} {ingredient.unit}</TableCell>
-                          <TableCell>${ingredient.cost_per_unit.toFixed(2)}</TableCell>
-                          <TableCell>${(ingredient.quantity * ingredient.cost_per_unit).toFixed(2)}</TableCell>
+                          <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
+                          <TableCell>R{(ingredient.quantity * ingredient.cost_per_unit).toFixed(2)}</TableCell>
                           <TableCell className="text-right">
                             <Button 
                               variant="ghost" 
@@ -490,12 +490,12 @@ const RecipePage = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="border rounded-lg p-4 text-center">
                       <h3 className="text-sm font-medium text-gray-500">Total Batch Cost</h3>
-                      <p className="text-2xl font-bold">${calculateTotalCost().toFixed(2)}</p>
+                      <p className="text-2xl font-bold">R{calculateTotalCost().toFixed(2)}</p>
                     </div>
                     
                     <div className="border rounded-lg p-4 text-center">
                       <h3 className="text-sm font-medium text-gray-500">Cost Per Unit</h3>
-                      <p className="text-2xl font-bold">${calculateCostPerUnit().toFixed(2)}</p>
+                      <p className="text-2xl font-bold">R{calculateCostPerUnit().toFixed(2)}</p>
                       <p className="text-xs text-gray-500">
                         Based on {recipes.find(r => r.id === activeRecipeId)?.batch_size} {recipes.find(r => r.id === activeRecipeId)?.unit} per batch
                       </p>
