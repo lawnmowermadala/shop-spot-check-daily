@@ -60,14 +60,21 @@ const ProductionPage = () => {
     cost_per_unit: ''
   });
 
-  // Unit conversion calculator state
+  // Elton Convertor Calculator state
   const [calculatorData, setCalculatorData] = useState({
+    // Unit Conversion
     inputValue: '',
     inputUnit: 'kg',
     outputUnit: 'g',
     costPerUnit: '',
     calculatedValue: '',
-    calculatedCost: ''
+    calculatedCost: '',
+    
+    // Quantity Subtraction
+    totalQuantity: '',
+    usedQuantity: '',
+    remainingQuantity: '',
+    subtractionUnit: 'kg'
   });
 
   // Handle unit conversion
@@ -110,6 +117,26 @@ const ProductionPage = () => {
         calculatedCost: cost.toString()
       });
     }
+  };
+
+  // Handle quantity subtraction
+  const handleQuantitySubtraction = () => {
+    const total = parseFloat(calculatorData.totalQuantity);
+    const used = parseFloat(calculatorData.usedQuantity);
+    
+    if (isNaN(total) || isNaN(used)) {
+      setCalculatorData({
+        ...calculatorData,
+        remainingQuantity: ''
+      });
+      return;
+    }
+
+    const remaining = total - used;
+    setCalculatorData({
+      ...calculatorData,
+      remainingQuantity: remaining >= 0 ? remaining.toFixed(4) : '0'
+    });
   };
 
   // Fetch Products
@@ -305,66 +332,109 @@ const ProductionPage = () => {
         </div>
       </div>
 
-      {/* Unit Conversion Calculator */}
+      {/* Elton Convertor Calculator */}
       <Card>
         <CardHeader>
-          <CardTitle>Unit Conversion Calculator</CardTitle>
+          <CardTitle>Elton Convertor Calculator</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            <Input
-              type="number"
-              placeholder="Value"
-              value={calculatorData.inputValue}
-              onChange={(e) => setCalculatorData({...calculatorData, inputValue: e.target.value})}
-              onBlur={handleUnitConversion}
-            />
-            <select
-              className="p-2 border rounded"
-              value={calculatorData.inputUnit}
-              onChange={(e) => setCalculatorData({...calculatorData, inputUnit: e.target.value})}
-            >
-              <option value="kg">kg</option>
-              <option value="g">g</option>
-              <option value="l">l</option>
-              <option value="ml">ml</option>
-            </select>
-            <div className="flex items-center justify-center">
-              <span className="text-gray-500">to</span>
-            </div>
-            <select
-              className="p-2 border rounded"
-              value={calculatorData.outputUnit}
-              onChange={(e) => setCalculatorData({...calculatorData, outputUnit: e.target.value})}
-            >
-              <option value="g">g</option>
-              <option value="kg">kg</option>
-              <option value="ml">ml</option>
-              <option value="l">l</option>
-            </select>
-            <Button onClick={handleUnitConversion}>Convert</Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
+        <CardContent className="space-y-6">
+          {/* Unit Conversion Section */}
+          <div className="space-y-4">
+            <h3 className="font-medium">Unit Conversion</h3>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
               <Input
                 type="number"
-                placeholder="Cost per input unit"
-                value={calculatorData.costPerUnit}
-                onChange={(e) => setCalculatorData({...calculatorData, costPerUnit: e.target.value})}
+                placeholder="Value"
+                value={calculatorData.inputValue}
+                onChange={(e) => setCalculatorData({...calculatorData, inputValue: e.target.value})}
                 onBlur={handleUnitConversion}
               />
+              <select
+                className="p-2 border rounded"
+                value={calculatorData.inputUnit}
+                onChange={(e) => setCalculatorData({...calculatorData, inputUnit: e.target.value})}
+              >
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+                <option value="l">l</option>
+                <option value="ml">ml</option>
+              </select>
+              <div className="flex items-center justify-center">
+                <span className="text-gray-500">to</span>
+              </div>
+              <select
+                className="p-2 border rounded"
+                value={calculatorData.outputUnit}
+                onChange={(e) => setCalculatorData({...calculatorData, outputUnit: e.target.value})}
+              >
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+                <option value="ml">ml</option>
+                <option value="l">l</option>
+              </select>
+              <Button onClick={handleUnitConversion}>Convert</Button>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Converted Value</div>
-              <div className="text-lg font-semibold">
-                {calculatorData.calculatedValue || '0'} {calculatorData.outputUnit}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Input
+                  type="number"
+                  placeholder="Cost per input unit"
+                  value={calculatorData.costPerUnit}
+                  onChange={(e) => setCalculatorData({...calculatorData, costPerUnit: e.target.value})}
+                  onBlur={handleUnitConversion}
+                />
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-500">Converted Value</div>
+                <div className="text-lg font-semibold">
+                  {calculatorData.calculatedValue || '0'} {calculatorData.outputUnit}
+                </div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-500">Cost per {calculatorData.outputUnit}</div>
+                <div className="text-lg font-semibold">
+                  {calculatorData.calculatedCost ? `R${calculatorData.calculatedCost}` : 'R0.00'}
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* Quantity Subtraction Section */}
+          <div className="space-y-4">
+            <h3 className="font-medium">Quantity Subtraction</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <Input
+                type="number"
+                placeholder="Total quantity"
+                value={calculatorData.totalQuantity}
+                onChange={(e) => setCalculatorData({...calculatorData, totalQuantity: e.target.value})}
+                onBlur={handleQuantitySubtraction}
+              />
+              <Input
+                type="number"
+                placeholder="Used quantity"
+                value={calculatorData.usedQuantity}
+                onChange={(e) => setCalculatorData({...calculatorData, usedQuantity: e.target.value})}
+                onBlur={handleQuantitySubtraction}
+              />
+              <select
+                className="p-2 border rounded"
+                value={calculatorData.subtractionUnit}
+                onChange={(e) => setCalculatorData({...calculatorData, subtractionUnit: e.target.value})}
+              >
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+                <option value="l">l</option>
+                <option value="ml">ml</option>
+              </select>
+              <Button onClick={handleQuantitySubtraction}>Calculate</Button>
+            </div>
+
             <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Cost per {calculatorData.outputUnit}</div>
+              <div className="text-sm text-gray-500">Remaining Quantity</div>
               <div className="text-lg font-semibold">
-                {calculatorData.calculatedCost ? `R${calculatorData.calculatedCost}` : 'R0.00'}
+                {calculatorData.remainingQuantity || '0'} {calculatorData.subtractionUnit}
               </div>
             </div>
           </div>
