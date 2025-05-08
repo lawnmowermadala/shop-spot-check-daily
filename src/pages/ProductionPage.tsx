@@ -60,58 +60,6 @@ const ProductionPage = () => {
     cost_per_unit: ''
   });
 
-  // Unit conversion calculator state
-  const [calculatorData, setCalculatorData] = useState({
-    inputValue: '',
-    inputUnit: 'kg',
-    outputUnit: 'g',
-    costPerUnit: '',
-    calculatedValue: '',
-    calculatedCost: ''
-  });
-
-  // Handle unit conversion
-  const handleUnitConversion = () => {
-    const value = parseFloat(calculatorData.inputValue);
-    const cost = parseFloat(calculatorData.costPerUnit) || 0;
-    
-    if (isNaN(value)) {
-      setCalculatorData({
-        ...calculatorData,
-        calculatedValue: '',
-        calculatedCost: ''
-      });
-      return;
-    }
-
-    // Conversion factors
-    const conversionFactors: Record<string, Record<string, number>> = {
-      kg: { g: 1000, l: 1, ml: 1000 },
-      g: { kg: 0.001, l: 0.001, ml: 1 },
-      l: { kg: 1, g: 1000, ml: 1000 },
-      ml: { kg: 0.001, g: 1, l: 0.001 }
-    };
-
-    // Check if conversion is possible
-    if (conversionFactors[calculatorData.inputUnit]?.[calculatorData.outputUnit]) {
-      const convertedValue = value * conversionFactors[calculatorData.inputUnit][calculatorData.outputUnit];
-      const convertedCost = cost / conversionFactors[calculatorData.inputUnit][calculatorData.outputUnit];
-      
-      setCalculatorData({
-        ...calculatorData,
-        calculatedValue: convertedValue.toFixed(4),
-        calculatedCost: convertedCost.toFixed(4)
-      });
-    } else {
-      // If same unit or invalid conversion
-      setCalculatorData({
-        ...calculatorData,
-        calculatedValue: value.toString(),
-        calculatedCost: cost.toString()
-      });
-    }
-  };
-
   // Fetch Products
   const { data: products = [] } = useQuery({
     queryKey: ['production_products'],
@@ -304,72 +252,6 @@ const ProductionPage = () => {
           {productionBatches.length} batches | {calculateDailyProduction()} units produced
         </div>
       </div>
-
-      {/* Unit Conversion Calculator */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Unit Conversion Calculator</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            <Input
-              type="number"
-              placeholder="Value"
-              value={calculatorData.inputValue}
-              onChange={(e) => setCalculatorData({...calculatorData, inputValue: e.target.value})}
-              onBlur={handleUnitConversion}
-            />
-            <select
-              className="p-2 border rounded"
-              value={calculatorData.inputUnit}
-              onChange={(e) => setCalculatorData({...calculatorData, inputUnit: e.target.value})}
-            >
-              <option value="kg">kg</option>
-              <option value="g">g</option>
-              <option value="l">l</option>
-              <option value="ml">ml</option>
-            </select>
-            <div className="flex items-center justify-center">
-              <span className="text-gray-500">to</span>
-            </div>
-            <select
-              className="p-2 border rounded"
-              value={calculatorData.outputUnit}
-              onChange={(e) => setCalculatorData({...calculatorData, outputUnit: e.target.value})}
-            >
-              <option value="g">g</option>
-              <option value="kg">kg</option>
-              <option value="ml">ml</option>
-              <option value="l">l</option>
-            </select>
-            <Button onClick={handleUnitConversion}>Convert</Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Input
-                type="number"
-                placeholder="Cost per input unit"
-                value={calculatorData.costPerUnit}
-                onChange={(e) => setCalculatorData({...calculatorData, costPerUnit: e.target.value})}
-                onBlur={handleUnitConversion}
-              />
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Converted Value</div>
-              <div className="text-lg font-semibold">
-                {calculatorData.calculatedValue || '0'} {calculatorData.outputUnit}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Cost per {calculatorData.outputUnit}</div>
-              <div className="text-lg font-semibold">
-                {calculatorData.calculatedCost ? `R${calculatorData.calculatedCost}` : 'R0.00'}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Production Batch Creation */}
       <Card>
