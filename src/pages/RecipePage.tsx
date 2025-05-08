@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +53,111 @@ const RecipePage = () => {
     unit: 'kg',
     cost_per_unit: ''
   });
+
+  // Elton Convertor Calculator state
+  const [calculatorData, setCalculatorData] = useState({
+    // Bulk purchase info
+    bulkQuantity: '',
+    bulkUnit: 'kg',
+    bulkPrice: '',
+    
+    // Usage info
+    usedQuantity: '',
+    usedUnit: 'kg',
+    
+    // Results
+    costPerUnit: '',
+    totalCost: '',
+    
+    // Unit conversion
+    convertValue: '',
+    convertFromUnit: 'kg',
+    convertToUnit: 'g',
+    convertedValue: ''
+  });
+
+  // Calculate cost based on bulk purchase and usage
+  const calculateCost = () => {
+    const bulkQty = parseFloat(calculatorData.bulkQuantity);
+    const bulkPrc = parseFloat(calculatorData.bulkPrice);
+    const usedQty = parseFloat(calculatorData.usedQuantity);
+    
+    if (isNaN(bulkQty)) {
+      setCalculatorData({
+        ...calculatorData,
+        costPerUnit: '',
+        totalCost: ''
+      });
+      return;
+    }
+
+    // First convert everything to grams for consistent calculations
+    const bulkInGrams = convertToGrams(bulkQty, calculatorData.bulkUnit);
+    const usedInGrams = convertToGrams(usedQty, calculatorData.usedUnit);
+
+    if (bulkInGrams <= 0 || isNaN(bulkPrc)) {
+      setCalculatorData({
+        ...calculatorData,
+        costPerUnit: '',
+        totalCost: ''
+      });
+      return;
+    }
+
+    const costPerGram = bulkPrc / bulkInGrams;
+    const costPerKg = costPerGram * 1000;
+    const costPerUsed = usedInGrams * costPerGram;
+
+    setCalculatorData({
+      ...calculatorData,
+      costPerUnit: costPerKg.toFixed(4),
+      totalCost: costPerUsed.toFixed(2)
+    });
+  };
+
+  // Handle unit conversion
+  const handleUnitConversion = () => {
+    const value = parseFloat(calculatorData.convertValue);
+    
+    if (isNaN(value)) {
+      setCalculatorData({
+        ...calculatorData,
+        convertedValue: ''
+      });
+      return;
+    }
+
+    // Convert to grams first, then to target unit
+    const valueInGrams = convertToGrams(value, calculatorData.convertFromUnit);
+    const convertedValue = convertFromGrams(valueInGrams, calculatorData.convertToUnit);
+    
+    setCalculatorData({
+      ...calculatorData,
+      convertedValue: convertedValue.toFixed(4)
+    });
+  };
+
+  // Convert any unit to grams
+  const convertToGrams = (value: number, unit: string): number => {
+    switch (unit) {
+      case 'kg': return value * 1000;
+      case 'g': return value;
+      case 'l': return value * 1000; // Assuming 1ml = 1g for water-based liquids
+      case 'ml': return value;
+      default: return value;
+    }
+  };
+
+  // Convert grams to any unit
+  const convertFromGrams = (grams: number, unit: string): number => {
+    switch (unit) {
+      case 'kg': return grams / 1000;
+      case 'g': return grams;
+      case 'l': return grams / 1000;
+      case 'ml': return grams;
+      default: return grams;
+    }
+  };
 
   // Fetch Recipes
   const { data: recipes = [], isLoading } = useQuery({
@@ -238,6 +342,134 @@ const RecipePage = () => {
         </Button>
       </div>
       
+      {/* Elton Convertor Calculator */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Elton Convertor Calculator</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Cost Calculation Section */}
+          <div className="space-y-4">
+            <h3 className="font-medium">Cost Calculation</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm text-gray-500">Bulk Purchase</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Quantity"
+                    value={calculatorData.bulkQuantity}
+                    onChange={(e) => setCalculatorData({...calculatorData, bulkQuantity: e.target.value})}
+                    onBlur={calculateCost}
+                  />
+                  <select
+                    className="p-2 border rounded"
+                    value={calculatorData.bulkUnit}
+                    onChange={(e) => setCalculatorData({...calculatorData, bulkUnit: e.target.value})}
+                  >
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="l">l</option>
+                    <option value="ml">ml</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-gray-500">Total Price</label>
+                <Input
+                  type="number"
+                  placeholder="Price paid"
+                  value={calculatorData.bulkPrice}
+                  onChange={(e) => setCalculatorData({...calculatorData, bulkPrice: e.target.value})}
+                  onBlur={calculateCost}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-gray-500">Amount Used</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Quantity used"
+                    value={calculatorData.usedQuantity}
+                    onChange={(e) => setCalculatorData({...calculatorData, usedQuantity: e.target.value})}
+                    onBlur={calculateCost}
+                  />
+                  <select
+                    className="p-2 border rounded"
+                    value={calculatorData.usedUnit}
+                    onChange={(e) => setCalculatorData({...calculatorData, usedUnit: e.target.value})}
+                  >
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="l">l</option>
+                    <option value="ml">ml</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-500">Cost per kg</div>
+                <div className="text-lg font-semibold">
+                  {calculatorData.costPerUnit ? `R${calculatorData.costPerUnit}` : 'R0.0000'}
+                </div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-500">Total Cost for Used Amount</div>
+                <div className="text-lg font-semibold">
+                  {calculatorData.totalCost ? `R${calculatorData.totalCost}` : 'R0.00'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Unit Conversion Section */}
+          <div className="space-y-4">
+            <h3 className="font-medium">Unit Conversion</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <Input
+                type="number"
+                placeholder="Value"
+                value={calculatorData.convertValue}
+                onChange={(e) => setCalculatorData({...calculatorData, convertValue: e.target.value})}
+                onBlur={handleUnitConversion}
+              />
+              <select
+                className="p-2 border rounded"
+                value={calculatorData.convertFromUnit}
+                onChange={(e) => setCalculatorData({...calculatorData, convertFromUnit: e.target.value})}
+              >
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+                <option value="l">l</option>
+                <option value="ml">ml</option>
+              </select>
+              <div className="flex items-center justify-center">
+                <span className="text-gray-500">to</span>
+              </div>
+              <select
+                className="p-2 border rounded"
+                value={calculatorData.convertToUnit}
+                onChange={(e) => setCalculatorData({...calculatorData, convertToUnit: e.target.value})}
+              >
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+                <option value="ml">ml</option>
+                <option value="l">l</option>
+              </select>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-500">Converted Value</div>
+              <div className="text-lg font-semibold">
+                {calculatorData.convertedValue || '0'} {calculatorData.convertToUnit}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* New Recipe Form */}
       {showNewRecipeForm && (
         <Card>
@@ -304,7 +536,7 @@ const RecipePage = () => {
                 {recipes.map(recipe => (
                   <div 
                     key={recipe.id}
-                    className={`p-3 border rounded-md cursor-pointer R{activeRecipeId === recipe.id ? 'bg-primary/10 border-primary' : 'hover:bg-gray-50'}`}
+                    className={`p-3 border rounded-md cursor-pointer ${activeRecipeId === recipe.id ? 'bg-primary/10 border-primary' : 'hover:bg-gray-50'}`}
                     onClick={() => setActiveRecipeId(recipe.id)}
                   >
                     <div className="flex justify-between items-center">
