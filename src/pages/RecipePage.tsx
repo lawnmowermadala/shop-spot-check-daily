@@ -8,7 +8,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
-import BarcodeScanner from '@/components/BarcodeScanner';
+import dynamic from 'next/dynamic';
+
+// Dynamically import BarcodeScanner with no SSR
+const BarcodeScanner = dynamic(
+  () => import('@/components/BarcodeScanner'),
+  { 
+    ssr: false,
+    loading: () => <div className="p-8 text-center">Loading scanner...</div>
+  }
+);
 
 // Types
 interface Recipe {
@@ -56,25 +65,33 @@ const RecipePage = () => {
 
   // Elton Convertor Calculator state
   const [calculatorData, setCalculatorData] = useState({
-    // Bulk purchase info
     bulkQuantity: '',
     bulkUnit: 'kg',
     bulkPrice: '',
-    
-    // Usage info
     usedQuantity: '',
     usedUnit: 'kg',
-    
-    // Results
     costPerUnit: '',
     totalCost: '',
-    
-    // Unit conversion
     convertValue: '',
     convertFromUnit: 'kg',
     convertToUnit: 'g',
     convertedValue: ''
   });
+
+  // Check if browser supports Barcode Detection API
+  const isBarcodeScannerSupported = () => {
+    if (typeof window !== 'undefined') {
+      return 'BarcodeDetector' in window;
+    }
+    return false;
+  };
+
+  // Handle barcode scan
+  const handleBarcodeScan = (barcode: string) => {
+    setIngredientData(prev => ({ ...prev, barcode }));
+    setShowBarcodeScanner(false);
+    toast.success(`Barcode scanned: ${barcode}`);
+  };
 
   // Calculate cost based on bulk purchase and usage
   const calculateCost = () => {
@@ -91,7 +108,6 @@ const RecipePage = () => {
       return;
     }
 
-    // First convert everything to grams for consistent calculations
     const bulkInGrams = convertToGrams(bulkQty, calculatorData.bulkUnit);
     const usedInGrams = convertToGrams(usedQty, calculatorData.usedUnit);
 
@@ -127,7 +143,6 @@ const RecipePage = () => {
       return;
     }
 
-    // Convert to grams first, then to target unit
     const valueInGrams = convertToGrams(value, calculatorData.convertFromUnit);
     const convertedValue = convertFromGrams(valueInGrams, calculatorData.convertToUnit);
     
@@ -142,7 +157,7 @@ const RecipePage = () => {
     switch (unit) {
       case 'kg': return value * 1000;
       case 'g': return value;
-      case 'l': return value * 1000; // Assuming 1ml = 1g for water-based liquids
+      case 'l': return value * 1000;
       case 'ml': return value;
       default: return value;
     }
@@ -221,10 +236,10 @@ const RecipePage = () => {
       });
       setShowNewRecipeForm(false);
       setActiveRecipeId(recipe.id);
-      toast("Recipe created successfully!");
+      toast.success("Recipe created successfully!");
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -257,10 +272,10 @@ const RecipePage = () => {
         unit: 'kg',
         cost_per_unit: ''
       });
-      toast("Ingredient added successfully!");
+      toast.success("Ingredient added successfully!");
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -276,17 +291,16 @@ const RecipePage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipe_ingredients', activeRecipeId] });
-      toast("Ingredient removed successfully!");
+      toast.success("Ingredient removed successfully!");
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
   // Delete Recipe
   const deleteRecipe = useMutation({
     mutationFn: async (recipeId: string) => {
-      // First, delete all ingredients associated with the recipe
       const { error: ingredientsError } = await supabase
         .from('recipe_ingredients')
         .delete()
@@ -294,7 +308,6 @@ const RecipePage = () => {
       
       if (ingredientsError) throw ingredientsError;
       
-      // Then delete the recipe itself
       const { error } = await supabase
         .from('recipes')
         .delete()
@@ -305,10 +318,10 @@ const RecipePage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       setActiveRecipeId(null);
-      toast("Recipe deleted successfully!");
+      toast.success("Recipe deleted successfully!");
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -325,12 +338,6 @@ const RecipePage = () => {
     if (!activeRecipe || activeRecipe.batch_size <= 0) return 0;
     
     return calculateTotalCost() / activeRecipe.batch_size;
-  };
-
-  // Handle barcode scan
-  const handleBarcodeScan = (barcode: string) => {
-    setIngredientData({...ingredientData, barcode});
-    setShowBarcodeScanner(false);
   };
 
   return (
@@ -603,7 +610,13 @@ const RecipePage = () => {
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => setShowBarcodeScanner(true)}
+                      onClick={() => {
+                        if (!isBarcodeScannerSupported()) {
+                          toast.warning('Barcode scanning requires Chrome or Edge on mobile devices');
+                          return;
+                        }
+                        setShowBarcodeScanner(true);
+                      }}
                     >
                       <Barcode className="h-4 w-4" />
                     </Button>
@@ -656,17 +669,21 @@ const RecipePage = () => {
                 
                 {/* Barcode Scanner Modal */}
                 {showBarcodeScanner && (
-                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white p-4 rounded-lg max-w-md w-full">
-                      <h3 className="text-lg font-medium mb-2">Scan Barcode</h3>
-                      <BarcodeScanner onScan={handleBarcodeScan} />
-                      <Button 
-                        variant="outline" 
-                        className="mt-4 w-full" 
-                        onClick={() => setShowBarcodeScanner(false)}
-                      >
-                        Cancel
-                      </Button>
+                  <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white p-6 rounded-lg max-w-md w-full">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-bold">Scan Barcode</h3>
+                        <button 
+                          onClick={() => setShowBarcodeScanner(false)}
+                          className="text-gray-500 hover:text-gray-700 text-2xl"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                      <BarcodeScanner 
+                        onScan={handleBarcodeScan}
+                        onClose={() => setShowBarcodeScanner(false)}
+                      />
                     </div>
                   </div>
                 )}
