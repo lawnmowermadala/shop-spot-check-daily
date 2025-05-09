@@ -10,28 +10,42 @@ interface BarcodeScannerProps {
 const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
+    const checkSupport = async () => {
+      try {
+        // Check for browser support
+        // @ts-ignore
+        if (!('BarcodeDetector' in window)) {
+          throw new Error('Barcode scanning not supported in your browser');
+        }
+
+        // Check camera permissions
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' }
+        });
+        stream.getTracks().forEach(track => track.stop());
+        
+        setIsSupported(true);
+      } catch (err) {
+        console.error('Scanner initialization error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to initialize scanner');
+        setIsSupported(false);
+      }
+    };
+
+    checkSupport();
+  }, []);
+
+  useEffect(() => {
+    if (!isSupported) return;
+
     let stream: MediaStream | null = null;
-    let barcodeDetector: any = null;
     let animationFrameId: number;
 
     const startScanning = async () => {
       try {
-        setIsScanning(true);
-        
-        // Check for browser support
-        if (!('BarcodeDetector' in window)) {
-          throw new Error('Barcode scanning not supported in your browser. Try Chrome or Edge.');
-        }
-
-        // Initialize barcode detector
-        // @ts-ignore
-        barcodeDetector = new BarcodeDetector({
-          formats: ['ean_13', 'upc_a', 'code_128', 'code_39']
-        });
-
         // Get camera stream
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' }
@@ -39,8 +53,13 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          await videoRef.current.play();
         }
+
+        // @ts-ignore
+        const barcodeDetector = new BarcodeDetector({
+          formats: ['ean_13', 'upc_a', 'code_128']
+        });
 
         const detectBarcode = async () => {
           if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
@@ -59,17 +78,15 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         };
 
         detectBarcode();
-
       } catch (err) {
         console.error('Error starting scanner:', err);
-        setError(err instanceof Error ? err.message : 'Failed to access camera');
+        setError('Failed to access camera. Please check permissions.');
         stopScanning();
       }
     };
 
     const stopScanning = () => {
-      setIsScanning(false);
-      cancelAnimationFrame(animationFrameId);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
@@ -83,7 +100,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
     return () => {
       stopScanning();
     };
-  }, [onScan]);
+  }, [isSupported, onScan]);
 
   return (
     <div className="space-y-4">
@@ -91,9 +108,11 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
         <div className="bg-red-50 p-4 rounded-lg">
           <p className="text-red-600 font-medium">{error}</p>
           <p className="text-sm text-red-500 mt-1">
-            You can still manually enter the barcode below.
+            Supported browsers: Chrome/Edge on Android/iOS or Safari 16.4+ on iOS
           </p>
         </div>
+      ) : !isSupported ? (
+        <div className="text-center py-8">Checking scanner support...</div>
       ) : (
         <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
           <video
@@ -104,13 +123,11 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 border-4 border-primary pointer-events-none" />
-          {isScanning && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="animate-pulse text-white text-lg font-medium">
-                Scanning for barcodes...
-              </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="animate-pulse text-white text-lg font-medium">
+              Point camera at barcode...
             </div>
-          )}
+          </div>
         </div>
       )}
       
