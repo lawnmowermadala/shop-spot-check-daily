@@ -8,13 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
-import dynamic from 'next/dynamic';
-
-// Dynamically import BarcodeScanner to avoid SSR issues
-const BarcodeScanner = dynamic(
-  () => import('@/components/BarcodeScanner'),
-  { ssr: false }
-);
+import BarcodeScanner from '@/components/BarcodeScanner';
 
 // Types
 interface Recipe {
@@ -62,13 +56,20 @@ const RecipePage = () => {
 
   // Elton Convertor Calculator state
   const [calculatorData, setCalculatorData] = useState({
+    // Bulk purchase info
     bulkQuantity: '',
     bulkUnit: 'kg',
     bulkPrice: '',
+    
+    // Usage info
     usedQuantity: '',
     usedUnit: 'kg',
+    
+    // Results
     costPerUnit: '',
     totalCost: '',
+    
+    // Unit conversion
     convertValue: '',
     convertFromUnit: 'kg',
     convertToUnit: 'g',
@@ -90,6 +91,7 @@ const RecipePage = () => {
       return;
     }
 
+    // First convert everything to grams for consistent calculations
     const bulkInGrams = convertToGrams(bulkQty, calculatorData.bulkUnit);
     const usedInGrams = convertToGrams(usedQty, calculatorData.usedUnit);
 
@@ -125,6 +127,7 @@ const RecipePage = () => {
       return;
     }
 
+    // Convert to grams first, then to target unit
     const valueInGrams = convertToGrams(value, calculatorData.convertFromUnit);
     const convertedValue = convertFromGrams(valueInGrams, calculatorData.convertToUnit);
     
@@ -139,7 +142,7 @@ const RecipePage = () => {
     switch (unit) {
       case 'kg': return value * 1000;
       case 'g': return value;
-      case 'l': return value * 1000;
+      case 'l': return value * 1000; // Assuming 1ml = 1g for water-based liquids
       case 'ml': return value;
       default: return value;
     }
@@ -283,6 +286,7 @@ const RecipePage = () => {
   // Delete Recipe
   const deleteRecipe = useMutation({
     mutationFn: async (recipeId: string) => {
+      // First, delete all ingredients associated with the recipe
       const { error: ingredientsError } = await supabase
         .from('recipe_ingredients')
         .delete()
@@ -290,6 +294,7 @@ const RecipePage = () => {
       
       if (ingredientsError) throw ingredientsError;
       
+      // Then delete the recipe itself
       const { error } = await supabase
         .from('recipes')
         .delete()
@@ -326,7 +331,6 @@ const RecipePage = () => {
   const handleBarcodeScan = (barcode: string) => {
     setIngredientData({...ingredientData, barcode});
     setShowBarcodeScanner(false);
-    toast.success(`Barcode scanned: ${barcode}`);
   };
 
   return (
@@ -654,19 +658,8 @@ const RecipePage = () => {
                 {showBarcodeScanner && (
                   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white p-4 rounded-lg max-w-md w-full">
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-lg font-medium">Scan Barcode</h3>
-                        <button 
-                          onClick={() => setShowBarcodeScanner(false)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      <h3 className="text-lg font-medium mb-2">Scan Barcode</h3>
                       <BarcodeScanner onScan={handleBarcodeScan} />
-                      <div className="mt-2 text-center text-sm text-gray-500">
-                        Point your camera at a barcode to scan
-                      </div>
                       <Button 
                         variant="outline" 
                         className="mt-4 w-full" 
