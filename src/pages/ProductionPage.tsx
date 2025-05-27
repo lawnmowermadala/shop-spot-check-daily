@@ -1,16 +1,37 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarIcon, Plus, Trash2, Printer, BarChart2 } from 'lucide-react';
+import { format, subDays } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { useReactToPrint } from 'react-to-print';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 // Types
 interface ProductionBatch {
@@ -39,10 +60,18 @@ interface Product {
   code: string;
 }
 
+interface DailyProduction {
+  date: string;
+  total_production: number;
+}
+
 const ProductionPage = () => {
   const queryClient = useQueryClient();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonDays, setComparisonDays] = useState(7);
+  const reportRef = useRef<HTMLDivElement>(null);
   
   // Production form state
   const [productionData, setProductionData] = useState({
@@ -121,6 +150,33 @@ const ProductionPage = () => {
     }
   });
 
+  // Fetch historical production data for comparison
+  const { data: historicalProduction = [] } = useQuery({
+    queryKey: ['historical_production', comparisonDays],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('production_batches')
+        .select('production_date, quantity_produced')
+        .gte('production_date', format(subDays(new Date(), comparisonDays), 'yyyy-MM-dd')
+        .order('production_date', { ascending: true });
+      
+      if (error) throw error;
+      
+      // Group by date and sum quantities
+      const grouped = data.reduce((acc: Record<string, number>, item: any) => {
+        const date = item.production_date;
+        acc[date] = (acc[date] || 0) + item.quantity_produced;
+        return acc;
+      }, {});
+      
+      return Object.entries(grouped).map(([date, total_production]) => ({
+        date,
+        total_production
+      })) as DailyProduction[];
+    },
+    enabled: showComparison
+  });
+
   // Add Production Batch
   const addProductionBatch = useMutation({
     mutationFn: async () => {
@@ -144,6 +200,7 @@ const ProductionPage = () => {
     },
     onSuccess: (batch) => {
       queryClient.invalidateQueries({ queryKey: ['production_batches'] });
+      queryClient.invalidateQueries({ queryKey: ['historical_production'] });
       setProductionData({
         product_id: '',
         quantity_produced: '',
@@ -223,6 +280,64 @@ const ProductionPage = () => {
     return productionBatches.reduce((sum, batch) => sum + batch.quantity_produced, 0);
   };
 
+  // Prepare chart data
+  const chartData = {
+    labels: historicalProduction.map(item => format(new Date(item.date), 'MMM d')),
+    datasets: [
+      {
+        label: 'Daily Production (units)',
+        data: historicalProduction.map(item => item.total_production),
+        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: `Production Comparison (Last ${comparisonDays} Days)`,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Units Produced',
+        },
+      },
+    },
+  };
+
+  // Handle print
+  const handlePrint = useReactToPrint({
+    content: () => reportRef.current,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
+      @media print {
+        body {
+          padding: 20px;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .print-section {
+          break-inside: avoid;
+        }
+      }
+    `,
+  });
+
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
       <div className="flex items-center gap-2">
@@ -230,28 +345,161 @@ const ProductionPage = () => {
         <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">Production Staff</span>
       </div>
       
-      {/* Date Picker */}
-      <div className="flex items-center gap-4">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="justify-start text-left font-normal">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date ? format(date, "PPP") : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-        <div className="text-sm text-gray-600">
-          {productionBatches.length} batches | {calculateDailyProduction()} units produced
+      {/* Date Picker and Actions */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <div className="text-sm text-gray-600">
+            {productionBatches.length} batches | {calculateDailyProduction()} units produced
+          </div>
+        </div>
+        
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowComparison(!showComparison)}
+            className="flex items-center gap-2"
+          >
+            <BarChart2 className="h-4 w-4" />
+            {showComparison ? 'Hide Comparison' : 'Show Comparison'}
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handlePrint}
+            className="flex items-center gap-2 no-print"
+          >
+            <Printer className="h-4 w-4" />
+            Print Report
+          </Button>
         </div>
       </div>
+
+      {/* Printable Report */}
+      <div className="hidden">
+        <div ref={reportRef} className="p-6 bg-white">
+          <h1 className="text-2xl font-bold mb-4">Production Report - {date && format(date, 'MMMM d, yyyy')}</h1>
+          
+          <div className="mb-6 print-section">
+            <h2 className="text-xl font-semibold mb-2">Summary</h2>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="border p-3 rounded">
+                <div className="text-sm text-gray-500">Total Batches</div>
+                <div className="text-2xl font-bold">{productionBatches.length}</div>
+              </div>
+              <div className="border p-3 rounded">
+                <div className="text-sm text-gray-500">Total Production</div>
+                <div className="text-2xl font-bold">{calculateDailyProduction()} units</div>
+              </div>
+              <div className="border p-3 rounded">
+                <div className="text-sm text-gray-500">Active Batch Ingredients</div>
+                <div className="text-2xl font-bold">R{calculateTotalCost().toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+          
+          {productionBatches.length > 0 && (
+            <div className="mb-6 print-section">
+              <h2 className="text-xl font-semibold mb-2">Production Batches</h2>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="p-2 text-left border">Product</th>
+                    <th className="p-2 text-left border">Code</th>
+                    <th className="p-2 text-left border">Quantity</th>
+                    <th className="p-2 text-left border">Staff</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productionBatches.map(batch => (
+                    <tr key={batch.id} className="border-b">
+                      <td className="p-2 border">{batch.product_name}</td>
+                      <td className="p-2 border">{batch.product_code}</td>
+                      <td className="p-2 border">{batch.quantity_produced}</td>
+                      <td className="p-2 border">{batch.staff_name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          
+          {activeBatchId && batchIngredients.length > 0 && (
+            <div className="print-section">
+              <h2 className="text-xl font-semibold mb-2">Ingredients for Selected Batch</h2>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="p-2 text-left border">Ingredient</th>
+                    <th className="p-2 text-left border">Quantity</th>
+                    <th className="p-2 text-left border">Unit Cost</th>
+                    <th className="p-2 text-left border">Total Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchIngredients.map(ingredient => (
+                    <tr key={ingredient.id} className="border-b">
+                      <td className="p-2 border">{ingredient.ingredient_name}</td>
+                      <td className="p-2 border">{ingredient.quantity_used} {ingredient.unit}</td>
+                      <td className="p-2 border">R{ingredient.cost_per_unit.toFixed(2)}/{ingredient.unit}</td>
+                      <td className="p-2 border">R{(ingredient.quantity_used * ingredient.cost_per_unit).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold">
+                    <td className="p-2 border" colSpan={3}>Total Ingredients Cost</td>
+                    <td className="p-2 border">R{calculateTotalCost().toFixed(2)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+          
+          <div className="mt-6 text-sm text-gray-500">
+            Report generated on {format(new Date(), 'PPPPp')}
+          </div>
+        </div>
+      </div>
+
+      {/* Production Comparison Chart */}
+      {showComparison && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              <span>Production Comparison</span>
+              <select 
+                value={comparisonDays}
+                onChange={(e) => setComparisonDays(Number(e.target.value))}
+                className="p-2 border rounded text-sm"
+              >
+                <option value="7">Last 7 Days</option>
+                <option value="14">Last 14 Days</option>
+                <option value="30">Last 30 Days</option>
+              </select>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <Bar data={chartData} options={chartOptions} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Production Batch Creation */}
       <Card>
