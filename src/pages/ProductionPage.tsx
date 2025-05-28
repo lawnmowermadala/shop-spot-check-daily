@@ -77,7 +77,7 @@ const ProductionPage = () => {
   const [productionData, setProductionData] = useState({
     product_id: '',
     quantity_produced: '',
-    staff_name: 'Elton',
+    staff_name: 'Name here ',
     notes: ''
   });
   
