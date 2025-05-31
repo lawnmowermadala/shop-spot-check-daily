@@ -195,7 +195,7 @@ const ProductionPage = () => {
       setProductionData({
         product_id: '',
         quantity_produced: '',
-        staff_name: 'Elton',
+        staff_name: 'Who Produce?',
         notes: ''
       });
       toast.success('Production batch created successfully');
