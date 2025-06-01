@@ -12,26 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
-import { Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-
-// Register ChartJS components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Types
 interface ProductionBatch {
@@ -248,78 +229,16 @@ const ProductionPage = () => {
   };
 
   // Prepare chart data for production comparison
-  const chartData = {
-    labels: historicalProduction.map(item => format(new Date(item.date), 'MMM d')),
-    datasets: [
-      {
-        label: 'Daily Production (units)',
-        data: historicalProduction.map(item => item.total_production),
-        backgroundColor: 'rgba(59, 130, 246, 0.7)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 1,
-      },
-    ],
-  };
+  const chartData = historicalProduction.map(item => ({
+    date: format(new Date(item.date), 'MMM d'),
+    production: item.total_production
+  }));
 
   // Prepare chart data for staff analytics
-  const staffChartData = {
-    labels: staffStats.map(stat => stat.staff_name),
-    datasets: [
-      {
-        label: 'Total Units Produced',
-        data: staffStats.map(stat => stat.total_units),
-        backgroundColor: 'rgba(34, 197, 94, 0.7)',
-        borderColor: 'rgba(34, 197, 94, 1)',
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: `Production Comparison (Last ${comparisonDays} Days)`,
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Units Produced',
-        },
-      },
-    },
-  };
-
-  const staffChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: `Staff Production Analytics (Last ${comparisonDays} Days)`,
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Units Produced',
-        },
-      },
-    },
-  };
+  const staffChartData = staffStats.map(stat => ({
+    name: stat.staff_name,
+    units: stat.total_units
+  }));
 
   // Create production batch mutation
   const createBatchMutation = useMutation({
@@ -655,11 +574,16 @@ const ProductionPage = () => {
           </CardHeader>
           <CardContent>
             <div className="h-80 w-full mb-4">
-              <Bar 
-                data={staffChartData} 
-                options={staffChartOptions}
-                redraw={true}
-              />
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={staffChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="units" fill="#22c55e" name="Total Units Produced" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
             
             {/* Staff Stats Table */}
@@ -711,11 +635,16 @@ const ProductionPage = () => {
           </CardHeader>
           <CardContent>
             <div className="h-80 w-full">
-              <Bar 
-                data={chartData} 
-                options={chartOptions}
-                redraw={true}
-              />
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="production" fill="#3b82f6" name="Daily Production (units)" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
