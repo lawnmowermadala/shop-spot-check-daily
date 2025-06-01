@@ -45,10 +45,6 @@ interface Product {
 interface StaffMember {
   id: number;
   name: string;
-  department_id?: number;
-  departments?: {
-    name: string;
-  };
 }
 
 interface DailyProduction {
@@ -87,18 +83,13 @@ const ProductionPage = () => {
     cost_per_unit: ''
   });
 
-  // Fetch staff members from staff table
+  // Fetch staff members from staff table - just id and name
   const { data: staffMembers = [] } = useQuery<StaffMember[]>({
     queryKey: ['staff_members'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('staff')
-        .select(`
-          id,
-          name,
-          department_id,
-          departments:department_id (name)
-        `)
+        .select('id, name')
         .order('name', { ascending: true });
       
       if (error) throw error;
@@ -687,7 +678,7 @@ const ProductionPage = () => {
                 <option value="">Select staff member</option>
                 {staffMembers.map((staff) => (
                   <option key={staff.id} value={staff.id.toString()}>
-                    {staff.name} {staff.departments?.name && `(${staff.departments.name})`}
+                    {staff.name}
                   </option>
                 ))}
               </select>
