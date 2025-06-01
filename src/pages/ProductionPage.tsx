@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,10 +43,12 @@ interface Product {
 }
 
 interface StaffMember {
-  id: string;
+  id: number;
   name: string;
-  department?: string;
-  position?: string;
+  department_id?: number;
+  departments?: {
+    name: string;
+  };
 }
 
 interface DailyProduction {
@@ -86,13 +87,18 @@ const ProductionPage = () => {
     cost_per_unit: ''
   });
 
-  // Fetch staff members
+  // Fetch staff members from staff table
   const { data: staffMembers = [] } = useQuery<StaffMember[]>({
     queryKey: ['staff_members'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('staff_members')
-        .select('*')
+        .from('staff')
+        .select(`
+          id,
+          name,
+          department_id,
+          departments:department_id (name)
+        `)
         .order('name', { ascending: true });
       
       if (error) throw error;
@@ -248,7 +254,7 @@ const ProductionPage = () => {
       }
 
       // Get staff name from staff_id
-      const selectedStaff = staffMembers.find(s => s.id === productionData.staff_id);
+      const selectedStaff = staffMembers.find(s => s.id.toString() === productionData.staff_id);
       if (!selectedStaff) {
         throw new Error('Selected staff member not found');
       }
@@ -680,8 +686,8 @@ const ProductionPage = () => {
               >
                 <option value="">Select staff member</option>
                 {staffMembers.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.name} {staff.department && `(${staff.department})`}
+                  <option key={staff.id} value={staff.id.toString()}>
+                    {staff.name} {staff.departments?.name && `(${staff.departments.name})`}
                   </option>
                 ))}
               </select>
