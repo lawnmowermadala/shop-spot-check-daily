@@ -484,12 +484,17 @@ const ProductionPage = () => {
               </tbody>
             </table>
           ` : ''}
+          
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
         </body>
       </html>
     `);
     
     printWindow.document.close();
-    setTimeout(() => printWindow.focus(), 500);
   };
 
   return (
