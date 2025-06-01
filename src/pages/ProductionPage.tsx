@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ interface ProductionBatch {
   id: string;
   product_id: string;
   product_name: string;
+  product_code?: string;
   quantity_produced: number;
   production_date: string;
   staff_name: string;
@@ -109,7 +111,7 @@ const ProductionPage = () => {
       
       const { data, error } = await supabase
         .from('production_batches')
-        .select('*, products(name)')
+        .select('*, products(name, code)')
         .gte('production_date', startOfDay.toISOString())
         .lte('production_date', endOfDay.toISOString())
         .order('created_at', { ascending: false });
@@ -117,7 +119,8 @@ const ProductionPage = () => {
       if (error) throw error;
       return data.map(batch => ({
         ...batch,
-        product_name: (batch.products as any)?.name || 'Unknown'
+        product_name: (batch.products as any)?.name || 'Unknown',
+        product_code: (batch.products as any)?.code || 'N/A'
       }));
     }
   });
@@ -415,7 +418,8 @@ const ProductionPage = () => {
           <table>
             <thead>
               <tr>
-                <th>Product</th>
+                <th>Product Code</th>
+                <th>Product Name</th>
                 <th>Quantity</th>
                 <th>Staff Member</th>
                 <th>Time</th>
@@ -425,6 +429,7 @@ const ProductionPage = () => {
             <tbody>
               ${productionBatches.map(batch => `
                 <tr>
+                  <td>${batch.product_code}</td>
                   <td>${batch.product_name}</td>
                   <td>${batch.quantity_produced}</td>
                   <td>${batch.staff_name}</td>
@@ -735,7 +740,7 @@ const ProductionPage = () => {
                 <div key={batch.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-medium">{batch.product_name}</h3>
+                      <h3 className="font-medium">{batch.product_code} - {batch.product_name}</h3>
                       <p className="text-sm text-gray-600">
                         {batch.quantity_produced} units • {batch.staff_name}
                       </p>
