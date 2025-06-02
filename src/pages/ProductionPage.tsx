@@ -319,6 +319,56 @@ const ProductionPage = () => {
     return quantity > 0 ? totalCost / quantity : 0;
   };
 
+  // Mutation to update batch cost
+  const updateBatchCostMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      // Fetch all ingredients for the batch
+      const { data: ingredients, error: ingredientsError } = await supabase
+        .from('production_ingredients')
+        .select('*')
+        .eq('batch_id', batchId);
+      
+      if (ingredientsError) throw ingredientsError;
+      
+      // Calculate total ingredient cost
+      const totalIngredientCost = ingredients.reduce(
+        (sum, ingredient) => sum + (ingredient.quantity_used * ingredient.cost_per_unit),
+        0
+      );
+      
+      // Fetch batch to get quantity produced
+      const { data: batch, error: batchError } = await supabase
+        .from('production_batches')
+        .select('quantity_produced')
+        .eq('id', batchId)
+        .single();
+      
+      if (batchError) throw batchError;
+      
+      // Calculate cost per unit
+      const costPerUnit = batch.quantity_produced > 0 
+        ? totalIngredientCost / batch.quantity_produced 
+        : 0;
+      
+      // Update batch with new costs
+      const { error: updateError } = await supabase
+        .from('production_batches')
+        .update({
+          total_ingredient_cost: totalIngredientCost,
+          cost_per_unit: costPerUnit
+        })
+        .eq('id', batchId);
+      
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['production_batches'] });
+    },
+    onError: (error: Error) => {
+      toast('Failed to update batch cost: ' + error.message);
+    }
+  });
+
   // Create production batch mutation
   const createBatchMutation = useMutation({
     mutationFn: async () => {
@@ -456,6 +506,11 @@ const ProductionPage = () => {
         cost_per_unit: ''
       });
       toast('Ingredient added successfully!');
+      
+      // Update batch cost after adding ingredient
+      if (activeBatchId) {
+        updateBatchCostMutation.mutate(activeBatchId);
+      }
     },
     onError: (error: Error) => {
       toast(error.message);
@@ -472,9 +527,14 @@ const ProductionPage = () => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, ingredientId) => {
       queryClient.invalidateQueries({ queryKey: ['batch_ingredients'] });
       toast('Ingredient removed successfully!');
+      
+      // Update batch cost after deleting ingredient
+      if (activeBatchId) {
+        updateBatchCostMutation.mutate(activeBatchId);
+      }
     },
     onError: (error: Error) => {
       toast(error.message);
