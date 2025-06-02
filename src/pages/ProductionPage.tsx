@@ -104,16 +104,14 @@ const ProductionPage = () => {
     queryKey: ['production_batches', date?.toISOString()],
     queryFn: async () => {
       if (!date) return [];
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+      
+      // Format date as YYYY-MM-DD for proper date comparison
+      const dateStr = format(date, 'yyyy-MM-dd');
       
       const { data, error } = await supabase
         .from('production_batches')
         .select('*, products(name, code)')
-        .gte('production_date', startOfDay.toISOString())
-        .lte('production_date', endOfDay.toISOString())
+        .eq('production_date', dateStr)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -253,12 +251,15 @@ const ProductionPage = () => {
         throw new Error('Selected staff member not found');
       }
 
+      // Format date as YYYY-MM-DD for consistency
+      const dateStr = format(date, 'yyyy-MM-dd');
+
       const { data, error } = await supabase
         .from('production_batches')
         .insert({
           product_id: productionData.product_id,
           quantity_produced: Number(productionData.quantity_produced),
-          production_date: date.toISOString(),
+          production_date: dateStr,
           staff_name: selectedStaff.name,
           staff_id: productionData.staff_id,
           notes: productionData.notes
