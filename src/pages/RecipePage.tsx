@@ -45,16 +45,18 @@ const RecipePage = () => {
     unit: 'units'
   });
   
-  // Ingredient form state
+  // Simplified ingredient form state
   const [ingredientData, setIngredientData] = useState({
     ingredient_name: '',
     barcode: '',
-    quantity: '',
-    unit: 'kg',
-    cost_per_unit: ''
+    pack_size: '',
+    pack_unit: 'kg',
+    pack_price: '',
+    recipe_quantity: '',
+    recipe_unit: 'g'
   });
 
-  // Elton Convertor Calculator state
+  // Elton Convertor Calculator state - keeping this as it's useful
   const [calculatorData, setCalculatorData] = useState({
     // Bulk purchase info
     bulkQuantity: '',
@@ -75,6 +77,27 @@ const RecipePage = () => {
     convertToUnit: 'g',
     convertedValue: ''
   });
+
+  // Calculate cost based on pack info and recipe usage
+  const calculateIngredientCost = () => {
+    const packSize = parseFloat(ingredientData.pack_size);
+    const packPrice = parseFloat(ingredientData.pack_price);
+    const recipeQty = parseFloat(ingredientData.recipe_quantity);
+    
+    if (isNaN(packSize) || isNaN(packPrice) || isNaN(recipeQty) || packSize <= 0) {
+      return { costPerUnit: 0, totalCost: 0 };
+    }
+
+    // Convert everything to grams for consistent calculations
+    const packSizeInGrams = convertToGrams(packSize, ingredientData.pack_unit);
+    const recipeQtyInGrams = convertToGrams(recipeQty, ingredientData.recipe_unit);
+    
+    const costPerGram = packPrice / packSizeInGrams;
+    const costPerKg = costPerGram * 1000;
+    const totalCost = recipeQtyInGrams * costPerGram;
+
+    return { costPerUnit: costPerKg, totalCost };
+  };
 
   // Calculate cost based on bulk purchase and usage
   const calculateCost = () => {
@@ -231,9 +254,12 @@ const RecipePage = () => {
   // Add Ingredient to Recipe
   const addIngredient = useMutation({
     mutationFn: async () => {
-      if (!activeRecipeId || !ingredientData.ingredient_name || !ingredientData.quantity || !ingredientData.cost_per_unit) {
+      if (!activeRecipeId || !ingredientData.ingredient_name || !ingredientData.pack_size || 
+          !ingredientData.pack_price || !ingredientData.recipe_quantity) {
         throw new Error('Please fill all required ingredient fields');
       }
+
+      const { costPerUnit } = calculateIngredientCost();
 
       const { error } = await supabase
         .from('recipe_ingredients')
@@ -241,9 +267,9 @@ const RecipePage = () => {
           recipe_id: activeRecipeId,
           ingredient_name: ingredientData.ingredient_name,
           barcode: ingredientData.barcode || null,
-          quantity: Number(ingredientData.quantity),
-          unit: ingredientData.unit,
-          cost_per_unit: Number(ingredientData.cost_per_unit)
+          quantity: Number(ingredientData.recipe_quantity),
+          unit: ingredientData.recipe_unit,
+          cost_per_unit: costPerUnit
         });
       
       if (error) throw error;
@@ -253,9 +279,11 @@ const RecipePage = () => {
       setIngredientData({
         ingredient_name: '',
         barcode: '',
-        quantity: '',
-        unit: 'kg',
-        cost_per_unit: ''
+        pack_size: '',
+        pack_unit: 'kg',
+        pack_price: '',
+        recipe_quantity: '',
+        recipe_unit: 'g'
       });
       toast("Ingredient added successfully!");
     },
@@ -332,6 +360,9 @@ const RecipePage = () => {
     setIngredientData({...ingredientData, barcode});
     setShowBarcodeScanner(false);
   };
+
+  // Get the current calculated costs for display
+  const currentCalculation = calculateIngredientCost();
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
@@ -577,81 +608,139 @@ const RecipePage = () => {
           <div className="md:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Ingredients for {recipes.find(r => r.id === activeRecipeId)?.name}</CardTitle>
+                <CardTitle>Add Ingredients to {recipes.find(r => r.id === activeRecipeId)?.name}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Ingredient Form */}
-                <div className="grid grid-cols-12 gap-2 items-end">
-                  <div className="col-span-12 md:col-span-3">
-                    <Input
-                      placeholder="Ingredient Name"
-                      value={ingredientData.ingredient_name}
-                      onChange={(e) => setIngredientData({...ingredientData, ingredient_name: e.target.value})}
-                      required
-                    />
+                {/* Simplified Ingredient Form */}
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Basic Info Row */}
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-6">
+                      <label className="block text-sm font-medium mb-1">Ingredient Name</label>
+                      <Input
+                        placeholder="e.g., Flour, Sugar, etc."
+                        value={ingredientData.ingredient_name}
+                        onChange={(e) => setIngredientData({...ingredientData, ingredient_name: e.target.value})}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="col-span-5">
+                      <label className="block text-sm font-medium mb-1">Barcode (Optional)</label>
+                      <Input
+                        placeholder="Scan or enter barcode"
+                        value={ingredientData.barcode}
+                        onChange={(e) => setIngredientData({...ingredientData, barcode: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="col-span-1">
+                      <label className="block text-sm font-medium mb-1">&nbsp;</label>
+                      <Button
+                        variant="outline"
+                        className="w-full h-10"
+                        onClick={() => setShowBarcodeScanner(true)}
+                      >
+                        <Barcode className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   
-                  <div className="col-span-10 md:col-span-3 relative">
-                    <Input
-                      placeholder="Barcode (optional)"
-                      value={ingredientData.barcode}
-                      onChange={(e) => setIngredientData({...ingredientData, barcode: e.target.value})}
-                    />
+                  {/* Pack Information Row */}
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-4">
+                      <label className="block text-sm font-medium mb-1">Pack Size</label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 5"
+                        value={ingredientData.pack_size}
+                        onChange={(e) => setIngredientData({...ingredientData, pack_size: e.target.value})}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="col-span-4">
+                      <label className="block text-sm font-medium mb-1">Pack Unit</label>
+                      <select
+                        className="w-full p-2 border rounded h-10"
+                        value={ingredientData.pack_unit}
+                        onChange={(e) => setIngredientData({...ingredientData, pack_unit: e.target.value})}
+                      >
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="l">l</option>
+                        <option value="ml">ml</option>
+                        <option value="units">units</option>
+                      </select>
+                    </div>
+                    
+                    <div className="col-span-4">
+                      <label className="block text-sm font-medium mb-1">Pack Price (R)</label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 45.99"
+                        value={ingredientData.pack_price}
+                        onChange={(e) => setIngredientData({...ingredientData, pack_price: e.target.value})}
+                        required
+                      />
+                    </div>
                   </div>
                   
-                  <div className="col-span-2 md:col-span-1">
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => setShowBarcodeScanner(true)}
-                    >
-                      <Barcode className="h-4 w-4" />
-                    </Button>
+                  {/* Recipe Usage Row */}
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-4">
+                      <label className="block text-sm font-medium mb-1">Recipe Quantity</label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 500"
+                        value={ingredientData.recipe_quantity}
+                        onChange={(e) => setIngredientData({...ingredientData, recipe_quantity: e.target.value})}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="col-span-4">
+                      <label className="block text-sm font-medium mb-1">Recipe Unit</label>
+                      <select
+                        className="w-full p-2 border rounded h-10"
+                        value={ingredientData.recipe_unit}
+                        onChange={(e) => setIngredientData({...ingredientData, recipe_unit: e.target.value})}
+                      >
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                        <option value="ml">ml</option>
+                        <option value="l">l</option>
+                        <option value="units">units</option>
+                      </select>
+                    </div>
+                    
+                    <div className="col-span-4 flex items-end">
+                      <Button 
+                        onClick={() => addIngredient.mutate()}
+                        disabled={addIngredient.isPending}
+                        className="w-full h-10"
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Add Ingredient
+                      </Button>
+                    </div>
                   </div>
                   
-                  <div className="col-span-5 md:col-span-1">
-                    <Input
-                      type="number"
-                      placeholder="Qty"
-                      value={ingredientData.quantity}
-                      onChange={(e) => setIngredientData({...ingredientData, quantity: e.target.value})}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="col-span-7 md:col-span-1">
-                    <select
-                      className="w-full p-2 border rounded"
-                      value={ingredientData.unit}
-                      onChange={(e) => setIngredientData({...ingredientData, unit: e.target.value})}
-                    >
-                      <option value="kg">kg</option>
-                      <option value="g">g</option>
-                      <option value="l">l</option>
-                      <option value="ml">ml</option>
-                      <option value="units">units</option>
-                    </select>
-                  </div>
-                  
-                  <div className="col-span-12 md:col-span-2">
-                    <Input
-                      type="number"
-                      placeholder="Cost per unit"
-                      value={ingredientData.cost_per_unit}
-                      onChange={(e) => setIngredientData({...ingredientData, cost_per_unit: e.target.value})}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="col-span-12 md:col-span-1">
-                    <Button 
-                      onClick={() => addIngredient.mutate()}
-                      disabled={addIngredient.isPending}
-                      className="w-full"
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Add
-                    </Button>
-                  </div>
+                  {/* Cost Preview */}
+                  {ingredientData.pack_size && ingredientData.pack_price && ingredientData.recipe_quantity && (
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <div className="text-sm text-blue-600">Cost Preview:</div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Cost per kg: </span>
+                          <span>R{currentCalculation.costPerUnit.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">Total cost for recipe: </span>
+                          <span>R{currentCalculation.totalCost.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Barcode Scanner Modal */}
@@ -679,7 +768,7 @@ const RecipePage = () => {
                         <TableHead>Ingredient</TableHead>
                         <TableHead>Barcode</TableHead>
                         <TableHead>Quantity</TableHead>
-                        <TableHead>Cost per Unit</TableHead>
+                        <TableHead>Cost per kg</TableHead>
                         <TableHead>Total Cost</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -691,7 +780,7 @@ const RecipePage = () => {
                           <TableCell>{ingredient.barcode || '-'}</TableCell>
                           <TableCell>{ingredient.quantity} {ingredient.unit}</TableCell>
                           <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
-                          <TableCell>R{(ingredient.quantity * ingredient.cost_per_unit).toFixed(2)}</TableCell>
+                          <TableCell>R{(ingredient.quantity * ingredient.cost_per_unit / 1000).toFixed(2)}</TableCell>
                           <TableCell className="text-right">
                             <Button 
                               variant="ghost" 
@@ -722,12 +811,12 @@ const RecipePage = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="border rounded-lg p-4 text-center">
                       <h3 className="text-sm font-medium text-gray-500">Total Batch Cost</h3>
-                      <p className="text-2xl font-bold">R{calculateTotalCost().toFixed(2)}</p>
+                      <p className="text-2xl font-bold">R{(calculateTotalCost() / 1000).toFixed(2)}</p>
                     </div>
                     
                     <div className="border rounded-lg p-4 text-center">
                       <h3 className="text-sm font-medium text-gray-500">Cost Per Unit</h3>
-                      <p className="text-2xl font-bold">R{calculateCostPerUnit().toFixed(2)}</p>
+                      <p className="text-2xl font-bold">R{(calculateCostPerUnit() / 1000).toFixed(2)}</p>
                       <p className="text-xs text-gray-500">
                         Based on {recipes.find(r => r.id === activeRecipeId)?.batch_size} {recipes.find(r => r.id === activeRecipeId)?.unit} per batch
                       </p>
