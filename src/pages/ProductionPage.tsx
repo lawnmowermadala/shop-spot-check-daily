@@ -521,6 +521,7 @@ const ProductionPage = () => {
             <strong>Report Date:</strong> ${dateText}<br>
             <strong>Total Batches:</strong> ${productionBatches.length}<br>
             <strong>Total Units Produced:</strong> ${calculateDailyProduction()}<br>
+            <strong>Total Production Cost:</strong> R${productionBatches.reduce((sum, batch) => sum + (batch.total_ingredient_cost || 0), 0).toFixed(2)}<br>
             <strong>Generated:</strong> ${new Date().toLocaleString()}
           </div>
           
@@ -532,7 +533,9 @@ const ProductionPage = () => {
                 <th>Product Name</th>
                 <th>Quantity</th>
                 <th>Staff Member</th>
-                <th>Time</th>
+                <th>Recipe</th>
+                <th>Batch Cost</th>
+                <th>Cost per Unit</th>
                 <th>Notes</th>
               </tr>
             </thead>
@@ -543,7 +546,9 @@ const ProductionPage = () => {
                   <td>${batch.product_name}</td>
                   <td>${batch.quantity_produced}</td>
                   <td>${batch.staff_name}</td>
-                  <td>${new Date(batch.created_at).toLocaleTimeString()}</td>
+                  <td>${batch.recipe_name || 'No Recipe'}</td>
+                  <td>R${(batch.total_ingredient_cost || 0).toFixed(2)}</td>
+                  <td>R${(batch.cost_per_unit || 0).toFixed(2)}</td>
                   <td>${batch.notes || '-'}</td>
                 </tr>
               `).join('')}
