@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,11 +19,15 @@ interface ProductionBatch {
   product_id: string;
   product_name: string;
   product_code?: string;
+  recipe_id?: string;
+  recipe_name?: string;
   quantity_produced: number;
   production_date: string;
   staff_name: string;
   staff_id?: string;
   notes?: string;
+  total_ingredient_cost?: number;
+  cost_per_unit?: number;
   created_at: string;
 }
 
@@ -42,6 +45,22 @@ interface Product {
   id: string;
   name: string;
   code: string;
+}
+
+interface Recipe {
+  id: string;
+  name: string;
+  batch_size: number;
+  unit: string;
+}
+
+interface RecipeIngredient {
+  id: string;
+  recipe_id: string;
+  ingredient_name: string;
+  quantity: number;
+  unit: string;
+  cost_per_unit: number;
 }
 
 interface StaffMember {
@@ -72,6 +91,7 @@ const ProductionPage = () => {
   // Production form state
   const [productionData, setProductionData] = useState({
     product_id: '',
+    recipe_id: '',
     quantity_produced: '',
     staff_id: '',
     notes: ''
@@ -99,6 +119,37 @@ const ProductionPage = () => {
     }
   });
 
+  // Fetch recipes
+  const { data: recipes = [] } = useQuery<Recipe[]>({
+    queryKey: ['recipes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('recipes')
+        .select('*')
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch recipe ingredients for selected recipe
+  const { data: recipeIngredients = [] } = useQuery<RecipeIngredient[]>({
+    queryKey: ['recipe_ingredients', productionData.recipe_id],
+    queryFn: async () => {
+      if (!productionData.recipe_id) return [];
+      
+      const { data, error } = await supabase
+        .from('recipe_ingredients')
+        .select('*')
+        .eq('recipe_id', productionData.recipe_id);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!productionData.recipe_id
+  });
+
   // Fetch production batches
   const { data: productionBatches = [] } = useQuery<ProductionBatch[]>({
     queryKey: ['production_batches', date?.toISOString()],
@@ -110,7 +161,7 @@ const ProductionPage = () => {
       
       const { data, error } = await supabase
         .from('production_batches')
-        .select('*, products(name, code)')
+        .select('*, products(name, code), recipes(name)')
         .eq('production_date', dateStr)
         .order('created_at', { ascending: false });
       
@@ -118,7 +169,8 @@ const ProductionPage = () => {
       return data.map(batch => ({
         ...batch,
         product_name: (batch.products as any)?.name || 'Unknown',
-        product_code: (batch.products as any)?.code || 'N/A'
+        product_code: (batch.products as any)?.code || 'N/A',
+        recipe_name: (batch.recipes as any)?.name || 'No Recipe'
       }));
     }
   });
@@ -238,6 +290,35 @@ const ProductionPage = () => {
     units: stat.total_units
   }));
 
+  // Calculate ingredients needed based on recipe and production quantity
+  const calculateIngredientsNeeded = () => {
+    if (!productionData.recipe_id || !productionData.quantity_produced || !recipeIngredients.length) {
+      return [];
+    }
+
+    const selectedRecipe = recipes.find(r => r.id === productionData.recipe_id);
+    if (!selectedRecipe || selectedRecipe.batch_size <= 0) return [];
+
+    const scalingFactor = Number(productionData.quantity_produced) / selectedRecipe.batch_size;
+
+    return recipeIngredients.map(ingredient => ({
+      ...ingredient,
+      adjusted_quantity: ingredient.quantity * scalingFactor,
+      total_cost: ingredient.quantity * ingredient.cost_per_unit * scalingFactor
+    }));
+  };
+
+  const calculateTotalCost = () => {
+    const ingredients = calculateIngredientsNeeded();
+    return ingredients.reduce((sum, ingredient) => sum + ingredient.total_cost, 0);
+  };
+
+  const calculateCostPerUnit = () => {
+    const totalCost = calculateTotalCost();
+    const quantity = Number(productionData.quantity_produced);
+    return quantity > 0 ? totalCost / quantity : 0;
+  };
+
   // Create production batch mutation
   const createBatchMutation = useMutation({
     mutationFn: async () => {
@@ -254,20 +335,47 @@ const ProductionPage = () => {
       // Format date as YYYY-MM-DD for consistency
       const dateStr = format(date, 'yyyy-MM-dd');
 
+      // Calculate costs if recipe is selected
+      const totalCost = productionData.recipe_id ? calculateTotalCost() : 0;
+      const costPerUnit = productionData.recipe_id ? calculateCostPerUnit() : 0;
+
       const { data, error } = await supabase
         .from('production_batches')
         .insert({
           product_id: productionData.product_id,
+          recipe_id: productionData.recipe_id || null,
           quantity_produced: Number(productionData.quantity_produced),
           production_date: dateStr,
           staff_name: selectedStaff.name,
           staff_id: productionData.staff_id,
-          notes: productionData.notes
+          notes: productionData.notes,
+          total_ingredient_cost: totalCost,
+          cost_per_unit: costPerUnit
         })
         .select()
         .single();
 
       if (error) throw error;
+
+      // If recipe is selected, automatically add calculated ingredients
+      if (productionData.recipe_id && recipeIngredients.length > 0) {
+        const ingredientsToAdd = calculateIngredientsNeeded();
+        
+        const ingredientInserts = ingredientsToAdd.map(ingredient => ({
+          batch_id: data.id,
+          ingredient_name: ingredient.ingredient_name,
+          quantity_used: ingredient.adjusted_quantity,
+          unit: ingredient.unit,
+          cost_per_unit: ingredient.cost_per_unit
+        }));
+
+        const { error: ingredientError } = await supabase
+          .from('production_ingredients')
+          .insert(ingredientInserts);
+
+        if (ingredientError) throw ingredientError;
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -275,6 +383,7 @@ const ProductionPage = () => {
       queryClient.invalidateQueries({ queryKey: ['staff_production_stats'] });
       setProductionData({
         product_id: '',
+        recipe_id: '',
         quantity_produced: '',
         staff_id: '',
         notes: ''
@@ -664,7 +773,7 @@ const ProductionPage = () => {
           <CardTitle>Add Production Batch</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Product</label>
               <select
@@ -674,7 +783,23 @@ const ProductionPage = () => {
               >
                 <option value="">Select a product</option>
                 {products.map((product) => (
-                  <option key={product.id} value={product.id}>{product.name}</option>
+                  <option key={product.id} value={product.id}>{product.code} - {product.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Recipe (Optional)</label>
+              <select
+                value={productionData.recipe_id}
+                onChange={(e) => setProductionData({...productionData, recipe_id: e.target.value})}
+                className="w-full p-2 border rounded"
+              >
+                <option value="">Select a recipe</option>
+                {recipes.map((recipe) => (
+                  <option key={recipe.id} value={recipe.id}>
+                    {recipe.name} (Batch: {recipe.batch_size} {recipe.unit})
+                  </option>
                 ))}
               </select>
             </div>
@@ -714,6 +839,27 @@ const ProductionPage = () => {
               placeholder="Optional notes"
             />
           </div>
+
+          {/* Recipe Cost Preview */}
+          {productionData.recipe_id && productionData.quantity_produced && recipeIngredients.length > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-medium mb-2">Cost Preview (Based on Recipe)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Recipe:</span>
+                  <div className="font-medium">{recipes.find(r => r.id === productionData.recipe_id)?.name}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Total Ingredient Cost:</span>
+                  <div className="font-medium text-lg">R{calculateTotalCost().toFixed(2)}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Cost Per Unit:</span>
+                  <div className="font-medium text-lg">R{calculateCostPerUnit().toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          )}
           
           <div className="mt-4">
             <Button 
@@ -742,9 +888,18 @@ const ProductionPage = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-medium">{batch.product_code} - {batch.product_name}</h3>
+                      {batch.recipe_name && batch.recipe_name !== 'No Recipe' && (
+                        <p className="text-sm text-blue-600">Recipe: {batch.recipe_name}</p>
+                      )}
                       <p className="text-sm text-gray-600">
                         {batch.quantity_produced} units • {batch.staff_name}
                       </p>
+                      {batch.total_ingredient_cost && batch.total_ingredient_cost > 0 && (
+                        <p className="text-sm text-green-600">
+                          Total Cost: R{batch.total_ingredient_cost.toFixed(2)} • 
+                          Cost per Unit: R{batch.cost_per_unit?.toFixed(2) || '0.00'}
+                        </p>
+                      )}
                       {batch.notes && (
                         <p className="text-sm mt-1 text-gray-600">Notes: {batch.notes}</p>
                       )}

@@ -173,36 +173,84 @@ export type Database = {
         }
         Relationships: []
       }
+      product_recipes: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          product_id: string
+          recipe_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          product_id: string
+          recipe_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          product_id?: string
+          recipe_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_recipes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_recipes_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_batches: {
         Row: {
+          cost_per_unit: number | null
           created_at: string | null
           id: string
           notes: string | null
           product_id: string | null
           production_date: string
           quantity_produced: number
+          recipe_id: string | null
           staff_id: string | null
           staff_name: string
+          total_ingredient_cost: number | null
         }
         Insert: {
+          cost_per_unit?: number | null
           created_at?: string | null
           id?: string
           notes?: string | null
           product_id?: string | null
           production_date: string
           quantity_produced: number
+          recipe_id?: string | null
           staff_id?: string | null
           staff_name: string
+          total_ingredient_cost?: number | null
         }
         Update: {
+          cost_per_unit?: number | null
           created_at?: string | null
           id?: string
           notes?: string | null
           product_id?: string | null
           production_date?: string
           quantity_produced?: number
+          recipe_id?: string | null
           staff_id?: string | null
           staff_name?: string
+          total_ingredient_cost?: number | null
         }
         Relationships: [
           {
@@ -210,6 +258,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_batches_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
         ]
