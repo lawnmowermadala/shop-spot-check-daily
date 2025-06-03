@@ -81,7 +81,7 @@ interface StaffProductionStats {
 
 const ProductionPage = () => {
   const queryClient = useQueryClient();
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date>(new Date());
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [showStaffAnalytics, setShowStaffAnalytics] = useState(false);
@@ -152,10 +152,8 @@ const ProductionPage = () => {
 
   // Fetch production batches
   const { data: productionBatches = [] } = useQuery<ProductionBatch[]>({
-    queryKey: ['production_batches', date?.toISOString()],
+    queryKey: ['production_batches', date.toISOString().split('T')[0]],
     queryFn: async () => {
-      if (!date) return [];
-      
       // Format date as YYYY-MM-DD for proper date comparison
       const dateStr = format(date, 'yyyy-MM-dd');
       
@@ -177,16 +175,16 @@ const ProductionPage = () => {
 
   // Fetch staff production analytics
   const { data: staffStats = [] } = useQuery<StaffProductionStats[]>({
-    queryKey: ['staff_production_stats', comparisonDays],
+    queryKey: ['staff_production_stats', comparisonDays, date.toISOString().split('T')[0]],
     queryFn: async () => {
-      const endDate = date || new Date();
+      const endDate = date;
       const startDate = subDays(endDate, comparisonDays);
       
       const { data, error } = await supabase
         .from('production_batches')
         .select('staff_name, quantity_produced')
-        .gte('production_date', startDate.toISOString())
-        .lte('production_date', endDate.toISOString());
+        .gte('production_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('production_date', format(endDate, 'yyyy-MM-dd'));
       
       if (error) throw error;
       
@@ -243,16 +241,16 @@ const ProductionPage = () => {
 
   // Fetch historical production data
   const { data: historicalProduction = [] } = useQuery<DailyProduction[]>({
-    queryKey: ['historical_production', comparisonDays],
+    queryKey: ['historical_production', comparisonDays, date.toISOString().split('T')[0]],
     queryFn: async () => {
-      const endDate = date || new Date();
+      const endDate = date;
       const startDate = subDays(endDate, comparisonDays);
       
       const { data, error } = await supabase
         .from('production_batches')
         .select('production_date, quantity_produced')
-        .gte('production_date', startDate.toISOString())
-        .lte('production_date', endDate.toISOString());
+        .gte('production_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('production_date', format(endDate, 'yyyy-MM-dd'));
       
       if (error) throw error;
       
@@ -302,7 +300,7 @@ const ProductionPage = () => {
   // Calculate cost per unit for production batch
   const calculateProductionCostPerUnit = () => {
     const totalRecipeCost = calculateRecipeTotalCost();
-    const quantity = Number(productionData.quantity_produced);
+    const quantity = Number(productionData.quantity_produced) || 0;
     return quantity > 0 ? totalRecipeCost / quantity : 0;
   };
 
@@ -371,14 +369,14 @@ const ProductionPage = () => {
       queryClient.invalidateQueries({ queryKey: ['production_batches'] });
     },
     onError: (error: Error) => {
-      toast('Failed to update batch cost: ' + error.message);
+      toast.error('Failed to update batch cost: ' + error.message);
     }
   });
 
   // Create production batch mutation
   const createBatchMutation = useMutation({
     mutationFn: async () => {
-      if (!productionData.product_id || !productionData.quantity_produced || !productionData.staff_id || !date) {
+      if (!productionData.product_id || !productionData.quantity_produced || !productionData.staff_id) {
         throw new Error('Please fill all required fields');
       }
 
@@ -444,10 +442,10 @@ const ProductionPage = () => {
         staff_id: '',
         notes: ''
       });
-      toast('Production batch created successfully!');
+      toast.success('Production batch created successfully!');
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -474,10 +472,10 @@ const ProductionPage = () => {
       queryClient.invalidateQueries({ queryKey: ['production_batches'] });
       queryClient.invalidateQueries({ queryKey: ['staff_production_stats'] });
       setActiveBatchId(null);
-      toast('Production batch deleted successfully!');
+      toast.success('Production batch deleted successfully!');
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -511,7 +509,7 @@ const ProductionPage = () => {
         unit: 'kg',
         cost_per_unit: ''
       });
-      toast('Ingredient added successfully!');
+      toast.success('Ingredient added successfully!');
       
       // Update batch cost after adding ingredient
       if (activeBatchId) {
@@ -519,7 +517,7 @@ const ProductionPage = () => {
       }
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -535,7 +533,7 @@ const ProductionPage = () => {
     },
     onSuccess: (_, ingredientId) => {
       queryClient.invalidateQueries({ queryKey: ['batch_ingredients'] });
-      toast('Ingredient removed successfully!');
+      toast.success('Ingredient removed successfully!');
       
       // Update batch cost after deleting ingredient
       if (activeBatchId) {
@@ -543,7 +541,7 @@ const ProductionPage = () => {
       }
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -552,11 +550,11 @@ const ProductionPage = () => {
     const printWindow = window.open('', '_blank');
     
     if (!printWindow) {
-      toast('Unable to open print window. Please check your browser settings.');
+      toast.error('Unable to open print window. Please check your browser settings.');
       return;
     }
     
-    const dateText = date ? format(date, 'MMMM dd, yyyy') : 'All Dates';
+    const dateText = format(date, 'MMMM dd, yyyy');
     
     printWindow.document.write(`
       <html>
@@ -638,7 +636,7 @@ const ProductionPage = () => {
                     <td>${stat.staff_name}</td>
                     <td>${stat.total_batches}</td>
                     <td>${stat.total_units}</td>
-                    <td>${(stat.total_units / stat.total_batches).toFixed(1)}</td>
+                    <td>${stat.total_batches > 0 ? (stat.total_units / stat.total_batches).toFixed(1) : '0.0'}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -698,14 +696,14 @@ const ProductionPage = () => {
             <PopoverTrigger asChild>
               <Button variant="outline" className="justify-start text-left font-normal w-[280px]">
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {date ? format(date, "PPP") : <span>Pick a date</span>}
+                {format(date, "PPP")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">
               <Calendar
                 mode="single"
                 selected={date}
-                onSelect={setDate}
+                onSelect={(selectedDate) => selectedDate && setDate(selectedDate)}
                 initialFocus
               />
             </PopoverContent>
@@ -794,7 +792,7 @@ const ProductionPage = () => {
                       </TableCell>
                       <TableCell>{stat.total_batches}</TableCell>
                       <TableCell>{stat.total_units}</TableCell>
-                      <TableCell>{(stat.total_units / stat.total_batches).toFixed(1)}</TableCell>
+                      <TableCell>{stat.total_batches > 0 ? (stat.total_units / stat.total_batches).toFixed(1) : '0.0'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -846,11 +844,12 @@ const ProductionPage = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Product</label>
+              <label className="block text-sm font-medium mb-1">Product *</label>
               <select
                 value={productionData.product_id}
                 onChange={(e) => setProductionData({...productionData, product_id: e.target.value})}
                 className="w-full p-2 border rounded"
+                required
               >
                 <option value="">Select a product</option>
                 {products.map((product) => (
@@ -876,11 +875,12 @@ const ProductionPage = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Staff Member</label>
+              <label className="block text-sm font-medium mb-1">Staff Member *</label>
               <select
                 value={productionData.staff_id}
                 onChange={(e) => setProductionData({...productionData, staff_id: e.target.value})}
                 className="w-full p-2 border rounded"
+                required
               >
                 <option value="">Select staff member</option>
                 {staffMembers.map((staff) => (
@@ -892,12 +892,13 @@ const ProductionPage = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Quantity</label>
+              <label className="block text-sm font-medium mb-1">Quantity *</label>
               <Input
                 type="number"
                 value={productionData.quantity_produced}
                 onChange={(e) => setProductionData({...productionData, quantity_produced: e.target.value})}
                 placeholder="0"
+                required
               />
             </div>
           </div>
@@ -1024,6 +1025,7 @@ const ProductionPage = () => {
                             deleteBatchMutation.mutate(batch.id);
                           }
                         }}
+                        disabled={deleteBatchMutation.isPending}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1060,6 +1062,7 @@ const ProductionPage = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => deleteIngredientMutation.mutate(ingredient.id)}
+                                    disabled={deleteIngredientMutation.isPending}
                                   >
                                     <Trash2 className="h-4 w-4 text-red-500" />
                                   </Button>
