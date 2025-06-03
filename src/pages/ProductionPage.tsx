@@ -290,8 +290,24 @@ const ProductionPage = () => {
     units: stat.total_units
   }));
 
-  // Calculate ingredients needed based on recipe and production quantity
-  const calculateIngredientsNeeded = () => {
+  // Calculate total recipe cost based on recipe ingredients
+  const calculateRecipeTotalCost = () => {
+    if (!recipeIngredients.length) return 0;
+    
+    return recipeIngredients.reduce((total, ingredient) => {
+      return total + (ingredient.cost_per_unit * ingredient.quantity);
+    }, 0);
+  };
+
+  // Calculate cost per unit for production batch
+  const calculateProductionCostPerUnit = () => {
+    const totalRecipeCost = calculateRecipeTotalCost();
+    const quantity = Number(productionData.quantity_produced);
+    return quantity > 0 ? totalRecipeCost / quantity : 0;
+  };
+
+  // Calculate scaled ingredient costs for production quantity
+  const calculateScaledIngredientCosts = () => {
     if (!productionData.recipe_id || !productionData.quantity_produced || !recipeIngredients.length) {
       return [];
     }
@@ -299,33 +315,14 @@ const ProductionPage = () => {
     const selectedRecipe = recipes.find(r => r.id === productionData.recipe_id);
     if (!selectedRecipe || selectedRecipe.batch_size <= 0) return [];
 
-    // Calculate total ingredients used in the recipe batch
-    const totalIngredientsBatch = recipeIngredients.reduce((total, ingredient) => {
-      return total + ingredient.quantity;
-    }, 0);
-
-    // If no ingredients or zero total, return empty
-    if (totalIngredientsBatch <= 0) return [];
-
-    // Scaling factor: production quantity divided by total ingredients batch
-    const scalingFactor = Number(productionData.quantity_produced) / totalIngredientsBatch;
+    const scalingFactor = Number(productionData.quantity_produced) / selectedRecipe.batch_size;
 
     return recipeIngredients.map(ingredient => ({
       ...ingredient,
-      adjusted_quantity: ingredient.quantity * scalingFactor,
-      total_cost: ingredient.quantity * ingredient.cost_per_unit * scalingFactor
+      scaled_quantity: ingredient.quantity * scalingFactor,
+      scaled_cost: ingredient.cost_per_unit * ingredient.quantity * scalingFactor,
+      used_unit: ingredient.unit
     }));
-  };
-
-  const calculateTotalCost = () => {
-    const ingredients = calculateIngredientsNeeded();
-    return ingredients.reduce((sum, ingredient) => sum + ingredient.total_cost, 0);
-  };
-
-  const calculateCostPerUnit = () => {
-    const totalCost = calculateTotalCost();
-    const quantity = Number(productionData.quantity_produced);
-    return quantity > 0 ? totalCost / quantity : 0;
   };
 
   // Mutation to update batch cost
@@ -394,9 +391,9 @@ const ProductionPage = () => {
       // Format date as YYYY-MM-DD for consistency
       const dateStr = format(date, 'yyyy-MM-dd');
 
-      // Calculate costs if recipe is selected
-      const totalCost = productionData.recipe_id ? calculateTotalCost() : 0;
-      const costPerUnit = productionData.recipe_id ? calculateCostPerUnit() : 0;
+      // Calculate costs based on recipe ingredients if recipe is selected
+      const totalRecipeCost = productionData.recipe_id ? calculateRecipeTotalCost() : 0;
+      const costPerUnit = productionData.recipe_id ? calculateProductionCostPerUnit() : 0;
 
       const { data, error } = await supabase
         .from('production_batches')
@@ -408,7 +405,7 @@ const ProductionPage = () => {
           staff_name: selectedStaff.name,
           staff_id: productionData.staff_id,
           notes: productionData.notes,
-          total_ingredient_cost: totalCost,
+          total_ingredient_cost: totalRecipeCost,
           cost_per_unit: costPerUnit
         })
         .select()
@@ -416,15 +413,15 @@ const ProductionPage = () => {
 
       if (error) throw error;
 
-      // If recipe is selected, automatically add calculated ingredients
+      // If recipe is selected, automatically add scaled ingredients from recipe
       if (productionData.recipe_id && recipeIngredients.length > 0) {
-        const ingredientsToAdd = calculateIngredientsNeeded();
+        const scaledIngredients = calculateScaledIngredientCosts();
         
-        const ingredientInserts = ingredientsToAdd.map(ingredient => ({
+        const ingredientInserts = scaledIngredients.map(ingredient => ({
           batch_id: data.id,
           ingredient_name: ingredient.ingredient_name,
-          quantity_used: ingredient.adjusted_quantity,
-          unit: ingredient.unit,
+          quantity_used: ingredient.scaled_quantity,
+          unit: ingredient.used_unit || ingredient.unit,
           cost_per_unit: ingredient.cost_per_unit
         }));
 
@@ -914,32 +911,53 @@ const ProductionPage = () => {
             />
           </div>
 
-          {/* Recipe Cost Preview - Updated calculation info */}
+          {/* Recipe Cost Preview */}
           {productionData.recipe_id && productionData.quantity_produced && recipeIngredients.length > 0 && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium mb-2">Cost Preview (Based on Recipe)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+              
+              {/* Recipe Ingredients Preview */}
+              <div className="mb-4">
+                <h5 className="text-sm font-medium mb-2">Scaled Ingredients for Production:</h5>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ingredient</TableHead>
+                      <TableHead>Recipe Qty</TableHead>
+                      <TableHead>Scaled Qty</TableHead>
+                      <TableHead>Unit Cost</TableHead>
+                      <TableHead>Total Cost</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {calculateScaledIngredientCosts().map((ingredient, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{ingredient.ingredient_name}</TableCell>
+                        <TableCell>{ingredient.quantity} {ingredient.used_unit || ingredient.unit}</TableCell>
+                        <TableCell>{ingredient.scaled_quantity.toFixed(2)} {ingredient.used_unit || ingredient.unit}</TableCell>
+                        <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
+                        <TableCell>R{ingredient.scaled_cost.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-600">Recipe:</span>
-                  <div className="font-medium">{recipes.find(r => r.id === productionData.recipe_id)?.name}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Total Ingredients Batch:</span>
+                  <span className="text-gray-600">Recipe Batch Size:</span>
                   <div className="font-medium">
-                    {recipeIngredients.reduce((total, ingredient) => total + ingredient.quantity, 0).toFixed(2)} mixed units
+                    {recipes.find(r => r.id === productionData.recipe_id)?.batch_size} {recipes.find(r => r.id === productionData.recipe_id)?.unit}
                   </div>
                 </div>
                 <div>
                   <span className="text-gray-600">Total Ingredient Cost:</span>
-                  <div className="font-medium text-lg">R{calculateTotalCost().toFixed(2)}</div>
+                  <div className="font-medium text-lg">R{(calculateScaledIngredientCosts().reduce((sum, i) => sum + i.scaled_cost, 0)).toFixed(2)}</div>
                 </div>
                 <div>
                   <span className="text-gray-600">Cost Per Unit:</span>
-                  <div className="font-medium text-lg">R{calculateCostPerUnit().toFixed(2)}</div>
+                  <div className="font-medium text-lg">R{calculateProductionCostPerUnit().toFixed(2)}</div>
                 </div>
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                Calculation: Production quantity ({productionData.quantity_produced}) ÷ Total ingredients batch = Scaling factor
               </div>
             </div>
           )}

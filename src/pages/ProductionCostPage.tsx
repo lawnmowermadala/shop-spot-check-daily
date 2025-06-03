@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +38,7 @@ interface RecipeIngredient {
   quantity: number;
   unit: string;
   cost_per_unit: number;
+  calculated_cost: number;
 }
 
 interface ProductionIngredientUsage {
@@ -78,7 +78,7 @@ const ProductionCostPage = () => {
     }
   });
 
-  // Fetch Recipe Ingredients
+  // Fetch Recipe Ingredients with all cost data
   const { data: recipeIngredients = [] } = useQuery({
     queryKey: ['selected_recipe_ingredients', selectedRecipeId],
     queryFn: async () => {
@@ -152,20 +152,40 @@ const ProductionCostPage = () => {
     enabled: !!activeBatchId
   });
 
-  // Calculate ingredients needed for production quantity
+  // Calculate total recipe cost
+  const calculateRecipeTotalCost = () => {
+    return recipeIngredients.reduce((total, ingredient) => {
+      return total + (ingredient.calculated_cost || 0);
+    }, 0);
+  };
+
+  // Calculate scaled ingredients and costs for production quantity
   const calculateIngredientsNeeded = () => {
     if (!selectedRecipeId || !productionData.quantity_produced) return [];
     
     const selectedRecipe = recipes.find(r => r.id === selectedRecipeId);
     if (!selectedRecipe || selectedRecipe.batch_size <= 0) return [];
     
-    const quantityRatio = Number(productionData.quantity_produced) / selectedRecipe.batch_size;
+    const scalingFactor = Number(productionData.quantity_produced) / selectedRecipe.batch_size;
     
     return recipeIngredients.map(ingredient => ({
       ...ingredient,
-      adjusted_quantity: ingredient.quantity * quantityRatio,
-      total_cost: ingredient.quantity * ingredient.cost_per_unit * quantityRatio
+      scaled_quantity: (ingredient.quantity_used || 0) * scalingFactor,
+      scaled_cost: (ingredient.calculated_cost || 0) * scalingFactor
     }));
+  };
+
+  // Calculate total production cost
+  const calculateTotalProductionCost = () => {
+    const ingredientsNeeded = calculateIngredientsNeeded();
+    return ingredientsNeeded.reduce((sum, ingredient) => sum + ingredient.scaled_cost, 0);
+  };
+
+  // Calculate cost per unit
+  const calculateCostPerUnit = () => {
+    const totalCost = calculateTotalProductionCost();
+    const quantity = Number(productionData.quantity_produced);
+    return quantity > 0 ? totalCost / quantity : 0;
   };
 
   // Add Production Batch
@@ -175,11 +195,9 @@ const ProductionCostPage = () => {
         throw new Error('Please fill all required fields');
       }
 
-      // Calculate ingredients needed
-      const ingredientsNeeded = calculateIngredientsNeeded();
-      if (ingredientsNeeded.length === 0) {
-        throw new Error('No ingredients found for this recipe');
-      }
+      // Calculate costs
+      const totalCost = calculateTotalProductionCost();
+      const costPerUnit = calculateCostPerUnit();
 
       // Insert production batch
       const { data, error } = await supabase
@@ -197,12 +215,13 @@ const ProductionCostPage = () => {
       
       const batchId = data[0].id;
       
-      // Insert ingredient usage records
+      // Insert ingredient usage records based on scaled recipe ingredients
+      const ingredientsNeeded = calculateIngredientsNeeded();
       const ingredientUsages = ingredientsNeeded.map(ingredient => ({
         production_id: batchId,
         ingredient_name: ingredient.ingredient_name,
-        quantity_used: ingredient.adjusted_quantity,
-        unit: ingredient.unit,
+        quantity_used: ingredient.scaled_quantity,
+        unit: ingredient.used_unit || ingredient.unit,
         cost_per_unit: ingredient.cost_per_unit
       }));
       
@@ -286,7 +305,6 @@ const ProductionCostPage = () => {
   // Handle quantity change and calculate ingredients needed
   const handleQuantityChange = (quantity: string) => {
     setProductionData({...productionData, quantity_produced: quantity});
-    // This will trigger a recalculation of the ingredients needed
   };
 
   return (
@@ -327,7 +345,7 @@ const ProductionCostPage = () => {
                 {recipes.map(recipe => (
                   <div
                     key={recipe.id}
-                    className={`p-2 border rounded cursor-pointer R{selectedRecipeId === recipe.id ? 'bg-primary/10 border-primary' : 'hover:bg-gray-50'}`}
+                    className={`p-2 border rounded cursor-pointer ${selectedRecipeId === recipe.id ? 'bg-primary/10 border-primary' : 'hover:bg-gray-50'}`}
                     onClick={() => handleRecipeSelection(recipe.id)}
                   >
                     <div className="flex justify-between">
@@ -355,7 +373,7 @@ const ProductionCostPage = () => {
                   type="number"
                   value={productionData.quantity_produced}
                   onChange={(e) => handleQuantityChange(e.target.value)}
-                  placeholder="How many units/kg/etc produced"
+                  placeholder="How many units produced"
                 />
               </div>
               
@@ -382,12 +400,13 @@ const ProductionCostPage = () => {
           {/* Calculated Ingredients Table */}
           {selectedRecipeId && productionData.quantity_produced && (
             <div>
-              <h3 className="font-medium my-2">Calculated Ingredients Needed:</h3>
+              <h3 className="font-medium my-2">Scaled Ingredients for Production:</h3>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Ingredient</TableHead>
-                    <TableHead>Quantity Needed</TableHead>
+                    <TableHead>Recipe Quantity</TableHead>
+                    <TableHead>Scaled Quantity</TableHead>
                     <TableHead>Cost per Unit</TableHead>
                     <TableHead>Total Cost</TableHead>
                   </TableRow>
@@ -396,9 +415,10 @@ const ProductionCostPage = () => {
                   {calculateIngredientsNeeded().map((ingredient, index) => (
                     <TableRow key={index}>
                       <TableCell>{ingredient.ingredient_name}</TableCell>
-                      <TableCell>{ingredient.adjusted_quantity.toFixed(2)} {ingredient.unit}</TableCell>
+                      <TableCell>{ingredient.quantity_used || 0} {ingredient.used_unit || ingredient.unit}</TableCell>
+                      <TableCell>{ingredient.scaled_quantity.toFixed(2)} {ingredient.used_unit || ingredient.unit}</TableCell>
                       <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
-                      <TableCell>R{ingredient.total_cost.toFixed(2)}</TableCell>
+                      <TableCell>R{ingredient.scaled_cost.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -406,16 +426,16 @@ const ProductionCostPage = () => {
               
               <div className="mt-4 p-3 bg-gray-50 rounded-md flex justify-between items-center">
                 <div>
-                  <span className="font-medium">Total Cost: </span>
+                  <span className="font-medium">Total Production Cost: </span>
                   <span className="text-lg font-bold">
-                    R{calculateIngredientsNeeded().reduce((sum, i) => sum + i.total_cost, 0).toFixed(2)}
+                    R{calculateTotalProductionCost().toFixed(2)}
                   </span>
                 </div>
                 
                 <div>
                   <span className="font-medium">Cost Per Unit: </span>
                   <span className="text-lg font-bold">
-                    R{(calculateIngredientsNeeded().reduce((sum, i) => sum + i.total_cost, 0) / Number(productionData.quantity_produced)).toFixed(2)}
+                    R{calculateCostPerUnit().toFixed(2)}
                   </span>
                 </div>
               </div>
