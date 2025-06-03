@@ -299,7 +299,16 @@ const ProductionPage = () => {
     const selectedRecipe = recipes.find(r => r.id === productionData.recipe_id);
     if (!selectedRecipe || selectedRecipe.batch_size <= 0) return [];
 
-    const scalingFactor = Number(productionData.quantity_produced) / selectedRecipe.batch_size;
+    // Calculate total ingredients used in the recipe batch
+    const totalIngredientsBatch = recipeIngredients.reduce((total, ingredient) => {
+      return total + ingredient.quantity;
+    }, 0);
+
+    // If no ingredients or zero total, return empty
+    if (totalIngredientsBatch <= 0) return [];
+
+    // Scaling factor: production quantity divided by total ingredients batch
+    const scalingFactor = Number(productionData.quantity_produced) / totalIngredientsBatch;
 
     return recipeIngredients.map(ingredient => ({
       ...ingredient,
@@ -905,14 +914,20 @@ const ProductionPage = () => {
             />
           </div>
 
-          {/* Recipe Cost Preview */}
+          {/* Recipe Cost Preview - Updated calculation info */}
           {productionData.recipe_id && productionData.quantity_produced && recipeIngredients.length > 0 && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium mb-2">Cost Preview (Based on Recipe)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <span className="text-gray-600">Recipe:</span>
                   <div className="font-medium">{recipes.find(r => r.id === productionData.recipe_id)?.name}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Total Ingredients Batch:</span>
+                  <div className="font-medium">
+                    {recipeIngredients.reduce((total, ingredient) => total + ingredient.quantity, 0).toFixed(2)} mixed units
+                  </div>
                 </div>
                 <div>
                   <span className="text-gray-600">Total Ingredient Cost:</span>
@@ -922,6 +937,9 @@ const ProductionPage = () => {
                   <span className="text-gray-600">Cost Per Unit:</span>
                   <div className="font-medium text-lg">R{calculateCostPerUnit().toFixed(2)}</div>
                 </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                Calculation: Production quantity ({productionData.quantity_produced}) ÷ Total ingredients batch = Scaling factor
               </div>
             </div>
           )}
