@@ -482,33 +482,51 @@ export type Database = {
       recipe_ingredients: {
         Row: {
           barcode: string | null
+          calculated_cost: number | null
           cost_per_unit: number
           created_at: string
           id: string
           ingredient_name: string
+          pack_price: number | null
+          pack_size: number | null
+          pack_unit: string | null
           quantity: number
+          quantity_used: number | null
           recipe_id: string
           unit: string
+          used_unit: string | null
         }
         Insert: {
           barcode?: string | null
+          calculated_cost?: number | null
           cost_per_unit: number
           created_at?: string
           id?: string
           ingredient_name: string
+          pack_price?: number | null
+          pack_size?: number | null
+          pack_unit?: string | null
           quantity: number
+          quantity_used?: number | null
           recipe_id: string
           unit?: string
+          used_unit?: string | null
         }
         Update: {
           barcode?: string | null
+          calculated_cost?: number | null
           cost_per_unit?: number
           created_at?: string
           id?: string
           ingredient_name?: string
+          pack_price?: number | null
+          pack_size?: number | null
+          pack_unit?: string | null
           quantity?: number
+          quantity_used?: number | null
           recipe_id?: string
           unit?: string
+          used_unit?: string | null
         }
         Relationships: [
           {

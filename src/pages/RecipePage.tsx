@@ -305,7 +305,10 @@ const RecipePage = () => {
           pack_price: Number(ingredientData.pack_price),
           quantity_used: Number(ingredientData.quantity_used),
           used_unit: ingredientData.used_unit,
-          calculated_cost: calculatedCost
+          calculated_cost: calculatedCost,
+          quantity: Number(ingredientData.quantity_used), // Keep for backward compatibility
+          cost_per_unit: calculatedCost / Number(ingredientData.quantity_used), // Keep for backward compatibility
+          unit: ingredientData.used_unit // Keep for backward compatibility
         })
         .select()
         .single();
@@ -350,7 +353,10 @@ const RecipePage = () => {
           pack_price: Number(data.pack_price),
           quantity_used: Number(data.quantity_used),
           used_unit: data.used_unit,
-          calculated_cost: calculatedCost
+          calculated_cost: calculatedCost,
+          quantity: Number(data.quantity_used), // Keep for backward compatibility
+          cost_per_unit: calculatedCost / Number(data.quantity_used), // Keep for backward compatibility
+          unit: data.used_unit // Keep for backward compatibility
         })
         .eq('id', ingredientId);
 
