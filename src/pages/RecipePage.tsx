@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +32,42 @@ interface RecipeIngredient {
   created_at: string;
 }
 
+// Unit conversion function
+const convertUnits = (value: number, fromUnit: string, toUnit: string): number => {
+  // Weight conversions
+  const weightConversions: { [key: string]: number } = {
+    'kg': 1000, // 1 kg = 1000 g
+    'g': 1      // 1 g = 1 g
+  };
+  
+  // Volume conversions
+  const volumeConversions: { [key: string]: number } = {
+    'L': 1000,  // 1 L = 1000 ml
+    'ml': 1     // 1 ml = 1 ml
+  };
+  
+  // If units are the same, no conversion needed
+  if (fromUnit === toUnit) return value;
+  
+  // Weight conversions
+  if (weightConversions[fromUnit] && weightConversions[toUnit]) {
+    // Convert to grams first, then to target unit
+    const inGrams = value * weightConversions[fromUnit];
+    return inGrams / weightConversions[toUnit];
+  }
+  
+  // Volume conversions
+  if (volumeConversions[fromUnit] && volumeConversions[toUnit]) {
+    // Convert to ml first, then to target unit
+    const inMl = value * volumeConversions[fromUnit];
+    return inMl / volumeConversions[toUnit];
+  }
+  
+  // If no conversion available, return original value
+  console.warn(`No conversion available from ${fromUnit} to ${toUnit}`);
+  return value;
+};
+
 const RecipePage = () => {
   const queryClient = useQueryClient();
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
@@ -54,7 +89,7 @@ const RecipePage = () => {
     pack_unit: 'kg',
     pack_price: '',
     quantity_used: '',
-    used_unit: 'kg'
+    used_unit: 'g'
   });
 
   // Edit states
@@ -74,11 +109,25 @@ const RecipePage = () => {
     used_unit: ''
   });
 
-  // Calculate cost based on pack size and quantity used
-  const calculateIngredientCost = (packSize: number, packPrice: number, quantityUsed: number) => {
+  // Calculate cost with unit conversion
+  const calculateIngredientCost = (packSize: number, packUnit: string, packPrice: number, quantityUsed: number, usedUnit: string) => {
     if (packSize <= 0) return 0;
+    
+    // Convert quantity used to the same unit as pack size
+    const convertedQuantity = convertUnits(quantityUsed, usedUnit, packUnit);
+    
+    // Calculate cost per unit in pack unit
     const costPerUnit = packPrice / packSize;
-    return costPerUnit * quantityUsed;
+    
+    // Calculate total cost
+    const totalCost = costPerUnit * convertedQuantity;
+    
+    console.log(`Calculating cost: ${packSize}${packUnit} for R${packPrice}, using ${quantityUsed}${usedUnit}`);
+    console.log(`Converted quantity: ${convertedQuantity}${packUnit}`);
+    console.log(`Cost per ${packUnit}: R${costPerUnit.toFixed(4)}`);
+    console.log(`Total cost: R${totalCost.toFixed(2)}`);
+    
+    return totalCost;
   };
 
   // Fetch Recipes
@@ -95,7 +144,7 @@ const RecipePage = () => {
     }
   });
 
-  // Fetch Recipe Ingredients with new structure
+  // Fetch Recipe Ingredients
   const { data: recipeIngredients = [] } = useQuery({
     queryKey: ['recipe_ingredients', selectedRecipeId],
     queryFn: async () => {
@@ -109,17 +158,16 @@ const RecipePage = () => {
       
       if (error) throw error;
       
-      // Transform the data to match our new structure
       return data.map(ingredient => ({
         id: ingredient.id,
         recipe_id: ingredient.recipe_id,
         ingredient_name: ingredient.ingredient_name,
-        pack_size: ingredient.quantity || 1, // Use existing quantity as pack_size
-        pack_unit: ingredient.unit,
-        pack_price: ingredient.cost_per_unit || 0, // Use cost_per_unit as pack_price
-        quantity_used: ingredient.quantity || 1,
-        used_unit: ingredient.unit,
-        calculated_cost: ingredient.quantity * ingredient.cost_per_unit,
+        pack_size: ingredient.pack_size || 1,
+        pack_unit: ingredient.pack_unit || 'kg',
+        pack_price: ingredient.pack_price || 0,
+        quantity_used: ingredient.quantity_used || 1,
+        used_unit: ingredient.used_unit || 'g',
+        calculated_cost: ingredient.calculated_cost || 0,
         created_at: ingredient.created_at
       })) as RecipeIngredient[];
     },
@@ -241,19 +289,23 @@ const RecipePage = () => {
 
       const calculatedCost = calculateIngredientCost(
         Number(ingredientData.pack_size),
+        ingredientData.pack_unit,
         Number(ingredientData.pack_price),
-        Number(ingredientData.quantity_used)
+        Number(ingredientData.quantity_used),
+        ingredientData.used_unit
       );
 
-      // Store in the existing table structure
       const { data, error } = await supabase
         .from('recipe_ingredients')
         .insert({
           recipe_id: selectedRecipeId,
           ingredient_name: ingredientData.ingredient_name,
-          quantity: Number(ingredientData.quantity_used),
-          unit: ingredientData.used_unit,
-          cost_per_unit: calculatedCost / Number(ingredientData.quantity_used) // Store cost per unit used
+          pack_size: Number(ingredientData.pack_size),
+          pack_unit: ingredientData.pack_unit,
+          pack_price: Number(ingredientData.pack_price),
+          quantity_used: Number(ingredientData.quantity_used),
+          used_unit: ingredientData.used_unit,
+          calculated_cost: calculatedCost
         })
         .select()
         .single();
@@ -269,7 +321,7 @@ const RecipePage = () => {
         pack_unit: 'kg',
         pack_price: '',
         quantity_used: '',
-        used_unit: 'kg'
+        used_unit: 'g'
       });
       toast('Ingredient added successfully!');
     },
@@ -283,17 +335,22 @@ const RecipePage = () => {
     mutationFn: async ({ ingredientId, data }: { ingredientId: string, data: any }) => {
       const calculatedCost = calculateIngredientCost(
         Number(data.pack_size),
+        data.pack_unit,
         Number(data.pack_price),
-        Number(data.quantity_used)
+        Number(data.quantity_used),
+        data.used_unit
       );
 
       const { error } = await supabase
         .from('recipe_ingredients')
         .update({
           ingredient_name: data.ingredient_name,
-          quantity: Number(data.quantity_used),
-          unit: data.used_unit,
-          cost_per_unit: calculatedCost / Number(data.quantity_used)
+          pack_size: Number(data.pack_size),
+          pack_unit: data.pack_unit,
+          pack_price: Number(data.pack_price),
+          quantity_used: Number(data.quantity_used),
+          used_unit: data.used_unit,
+          calculated_cost: calculatedCost
         })
         .eq('id', ingredientId);
 
@@ -616,7 +673,7 @@ const RecipePage = () => {
                     step="0.01"
                     value={ingredientData.quantity_used}
                     onChange={(e) => setIngredientData({...ingredientData, quantity_used: e.target.value})}
-                    placeholder="e.g., 2.5"
+                    placeholder="e.g., 500"
                   />
                 </div>
                 <div>
@@ -640,13 +697,21 @@ const RecipePage = () => {
                 <div className="p-3 bg-gray-50 rounded-md">
                   <p className="text-sm font-medium">Cost Calculation:</p>
                   <p className="text-sm">
-                    Cost per {ingredientData.pack_unit}: R{(Number(ingredientData.pack_price) / Number(ingredientData.pack_size)).toFixed(2)}
+                    Pack: {ingredientData.pack_size}{ingredientData.pack_unit} for R{ingredientData.pack_price}
+                  </p>
+                  <p className="text-sm">
+                    Using: {ingredientData.quantity_used}{ingredientData.used_unit}
+                  </p>
+                  <p className="text-sm">
+                    Cost per {ingredientData.pack_unit}: R{(Number(ingredientData.pack_price) / Number(ingredientData.pack_size)).toFixed(4)}
                   </p>
                   <p className="text-sm font-bold">
                     Total ingredient cost: R{calculateIngredientCost(
                       Number(ingredientData.pack_size),
+                      ingredientData.pack_unit,
                       Number(ingredientData.pack_price),
-                      Number(ingredientData.quantity_used)
+                      Number(ingredientData.quantity_used),
+                      ingredientData.used_unit
                     ).toFixed(2)}
                   </p>
                 </div>
@@ -691,7 +756,12 @@ const RecipePage = () => {
                                 className="w-full"
                               />
                             ) : (
-                              ingredient.ingredient_name
+                              <div>
+                                <div className="font-medium">{ingredient.ingredient_name}</div>
+                                <div className="text-xs text-gray-500">
+                                  Pack: {ingredient.pack_size}{ingredient.pack_unit} @ R{ingredient.pack_price}
+                                </div>
+                              </div>
                             )}
                           </TableCell>
                           <TableCell>
@@ -730,6 +800,19 @@ const RecipePage = () => {
                                   onChange={(e) => setEditIngredientData({...editIngredientData, pack_size: e.target.value})}
                                   className="w-20"
                                 />
+                                <label className="text-xs">Pack unit:</label>
+                                <select
+                                  value={editIngredientData.pack_unit}
+                                  onChange={(e) => setEditIngredientData({...editIngredientData, pack_unit: e.target.value})}
+                                  className="p-1 border rounded text-xs w-full"
+                                >
+                                  <option value="kg">kg</option>
+                                  <option value="g">g</option>
+                                  <option value="L">L</option>
+                                  <option value="ml">ml</option>
+                                  <option value="units">units</option>
+                                  <option value="pieces">pieces</option>
+                                </select>
                                 <label className="text-xs">Pack price:</label>
                                 <Input
                                   type="number"
@@ -741,8 +824,10 @@ const RecipePage = () => {
                                   <p className="text-xs text-green-600">
                                     R{calculateIngredientCost(
                                       Number(editIngredientData.pack_size),
+                                      editIngredientData.pack_unit,
                                       Number(editIngredientData.pack_price),
-                                      Number(editIngredientData.quantity_used)
+                                      Number(editIngredientData.quantity_used),
+                                      editIngredientData.used_unit
                                     ).toFixed(2)}
                                   </p>
                                 )}
