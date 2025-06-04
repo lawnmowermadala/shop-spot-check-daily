@@ -4,14 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, Plus } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
 
-// Types
+// Updated interface to match the database schema
 interface Ingredient {
   id: string;
   name: string;
@@ -21,19 +20,15 @@ interface Ingredient {
   vat_amount: number;
   total_price: number;
   supplier: string | null;
-  created_at: string;
-}
-
-interface Recipe {
-  id: string;
-  name: string;
+  quantity: string;
+  product_id: string | null;
+  created_at: string | null;
 }
 
 const IngredientsPage = () => {
   const queryClient = useQueryClient();
   
-  // Form state
-  const [ingredientData, setIngredientData] = useState({
+  const [newIngredient, setNewIngredient] = useState({
     name: '',
     weight: '',
     unit: 'kg',
@@ -41,17 +36,7 @@ const IngredientsPage = () => {
     supplier: ''
   });
 
-  // Calculate VAT (14%)
-  const calculateVAT = (priceExVat: number) => {
-    return priceExVat * 0.14;
-  };
-
-  // Calculate total price including VAT
-  const calculateTotalPrice = (priceExVat: number) => {
-    return priceExVat + calculateVAT(priceExVat);
-  };
-
-  // Fetch ingredients
+  // Fetch all ingredients
   const { data: ingredients = [], isLoading } = useQuery({
     queryKey: ['ingredients'],
     queryFn: async () => {
@@ -65,40 +50,35 @@ const IngredientsPage = () => {
     }
   });
 
-  // Fetch recipes for linking
-  const { data: recipes = [] } = useQuery({
-    queryKey: ['recipes_for_ingredients'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('recipes')
-        .select('id, name');
-      
-      if (error) throw error;
-      return data as Recipe[];
-    }
-  });
+  // Calculate VAT and total price
+  const calculateVAT = (priceExVat: number) => {
+    const vatAmount = priceExVat * 0.14;
+    const totalPrice = priceExVat + vatAmount;
+    return { vatAmount, totalPrice };
+  };
 
-  // Add ingredient mutation
+  // Add new ingredient
   const addIngredient = useMutation({
     mutationFn: async () => {
-      if (!ingredientData.name || !ingredientData.weight || !ingredientData.price_ex_vat) {
-        throw new Error('Please fill all required fields');
+      if (!newIngredient.name || !newIngredient.weight || !newIngredient.price_ex_vat) {
+        throw new Error('Please fill in all required fields');
       }
 
-      const priceExVat = Number(ingredientData.price_ex_vat);
-      const vatAmount = calculateVAT(priceExVat);
-      const totalPrice = calculateTotalPrice(priceExVat);
+      const priceExVat = parseFloat(newIngredient.price_ex_vat);
+      const weight = parseFloat(newIngredient.weight);
+      const { vatAmount, totalPrice } = calculateVAT(priceExVat);
 
       const { data, error } = await supabase
         .from('ingredients')
         .insert({
-          name: ingredientData.name,
-          weight: Number(ingredientData.weight),
-          unit: ingredientData.unit,
+          name: newIngredient.name,
+          weight: weight,
+          unit: newIngredient.unit,
           price_ex_vat: priceExVat,
           vat_amount: vatAmount,
           total_price: totalPrice,
-          supplier: ingredientData.supplier || null
+          supplier: newIngredient.supplier || null,
+          quantity: `${weight} ${newIngredient.unit}` // Keep existing quantity format
         })
         .select();
       
@@ -107,7 +87,7 @@ const IngredientsPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
-      setIngredientData({
+      setNewIngredient({
         name: '',
         weight: '',
         unit: 'kg',
@@ -121,13 +101,13 @@ const IngredientsPage = () => {
     }
   });
 
-  // Delete ingredient mutation
+  // Delete ingredient
   const deleteIngredient = useMutation({
-    mutationFn: async (ingredientId: string) => {
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('ingredients')
         .delete()
-        .eq('id', ingredientId);
+        .eq('id', id);
       
       if (error) throw error;
     },
@@ -140,9 +120,10 @@ const IngredientsPage = () => {
     }
   });
 
-  // Calculate preview values
-  const previewVAT = ingredientData.price_ex_vat ? calculateVAT(Number(ingredientData.price_ex_vat)) : 0;
-  const previewTotal = ingredientData.price_ex_vat ? calculateTotalPrice(Number(ingredientData.price_ex_vat)) : 0;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    addIngredient.mutate();
+  };
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
@@ -150,106 +131,104 @@ const IngredientsPage = () => {
         <h1 className="text-2xl font-bold">Ingredients Management</h1>
       </div>
       
-      {/* Add Ingredient Form */}
+      {/* Add New Ingredient Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Add New Ingredient</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Add New Ingredient
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block mb-1 text-sm font-medium">Ingredient Name *</label>
-              <Input
-                value={ingredientData.name}
-                onChange={(e) => setIngredientData({...ingredientData, name: e.target.value})}
-                placeholder="e.g., Flour, Sugar, etc."
-              />
-            </div>
-            
-            <div>
-              <label className="block mb-1 text-sm font-medium">Weight *</label>
-              <div className="flex gap-2">
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block mb-1 text-sm font-medium">Ingredient Name *</label>
+                <Input
+                  value={newIngredient.name}
+                  onChange={(e) => setNewIngredient({...newIngredient, name: e.target.value})}
+                  placeholder="e.g., Flour, Sugar, etc."
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block mb-1 text-sm font-medium">Weight *</label>
                 <Input
                   type="number"
-                  value={ingredientData.weight}
-                  onChange={(e) => setIngredientData({...ingredientData, weight: e.target.value})}
-                  placeholder="Weight"
                   step="0.01"
+                  value={newIngredient.weight}
+                  onChange={(e) => setNewIngredient({...newIngredient, weight: e.target.value})}
+                  placeholder="e.g., 5"
+                  required
                 />
-                <Select 
-                  value={ingredientData.unit} 
-                  onValueChange={(value) => setIngredientData({...ingredientData, unit: value})}
+              </div>
+              
+              <div>
+                <label className="block mb-1 text-sm font-medium">Unit</label>
+                <select 
+                  value={newIngredient.unit}
+                  onChange={(e) => setNewIngredient({...newIngredient, unit: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-md"
                 >
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="kg">kg</SelectItem>
-                    <SelectItem value="g">g</SelectItem>
-                    <SelectItem value="l">l</SelectItem>
-                    <SelectItem value="ml">ml</SelectItem>
-                    <SelectItem value="units">units</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                  <option value="l">l</option>
+                  <option value="ml">ml</option>
+                  <option value="pieces">pieces</option>
+                  <option value="units">units</option>
+                </select>
               </div>
+              
+              <div>
+                <label className="block mb-1 text-sm font-medium">Price (Ex VAT) *</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={newIngredient.price_ex_vat}
+                  onChange={(e) => setNewIngredient({...newIngredient, price_ex_vat: e.target.value})}
+                  placeholder="e.g., 45.00"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block mb-1 text-sm font-medium">Supplier</label>
+                <Input
+                  value={newIngredient.supplier}
+                  onChange={(e) => setNewIngredient({...newIngredient, supplier: e.target.value})}
+                  placeholder="e.g., ABC Suppliers"
+                />
+              </div>
+              
+              {/* VAT Preview */}
+              {newIngredient.price_ex_vat && (
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <h4 className="text-sm font-medium mb-2">Price Breakdown:</h4>
+                  <div className="text-sm space-y-1">
+                    <div>Ex VAT: R{parseFloat(newIngredient.price_ex_vat || '0').toFixed(2)}</div>
+                    <div>VAT (14%): R{(parseFloat(newIngredient.price_ex_vat || '0') * 0.14).toFixed(2)}</div>
+                    <div className="font-medium">Total: R{(parseFloat(newIngredient.price_ex_vat || '0') * 1.14).toFixed(2)}</div>
+                  </div>
+                </div>
+              )}
             </div>
             
-            <div>
-              <label className="block mb-1 text-sm font-medium">Price (Excl. VAT) *</label>
-              <Input
-                type="number"
-                value={ingredientData.price_ex_vat}
-                onChange={(e) => setIngredientData({...ingredientData, price_ex_vat: e.target.value})}
-                placeholder="0.00"
-                step="0.01"
-              />
-            </div>
-            
-            <div>
-              <label className="block mb-1 text-sm font-medium">Supplier (Optional)</label>
-              <Input
-                value={ingredientData.supplier}
-                onChange={(e) => setIngredientData({...ingredientData, supplier: e.target.value})}
-                placeholder="Supplier name"
-              />
-            </div>
-          </div>
-          
-          {/* Price Preview */}
-          {ingredientData.price_ex_vat && (
-            <div className="p-3 bg-gray-50 rounded-md">
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Price (Excl. VAT):</span>
-                  <div className="font-medium">R{Number(ingredientData.price_ex_vat).toFixed(2)}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">VAT (14%):</span>
-                  <div className="font-medium">R{previewVAT.toFixed(2)}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Total Price:</span>
-                  <div className="font-bold text-lg">R{previewTotal.toFixed(2)}</div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <Button 
-            onClick={() => addIngredient.mutate()}
-            disabled={addIngredient.isPending || !ingredientData.name || !ingredientData.weight || !ingredientData.price_ex_vat}
-            className="mt-4"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {addIngredient.isPending ? "Adding..." : "Add Ingredient"}
-          </Button>
+            <Button 
+              type="submit" 
+              disabled={addIngredient.isPending}
+              className="mt-4"
+            >
+              {addIngredient.isPending ? "Adding..." : "Add Ingredient"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
       
       {/* Ingredients List */}
       <Card>
         <CardHeader>
-          <CardTitle>Ingredients Inventory</CardTitle>
+          <CardTitle>All Ingredients</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -259,12 +238,11 @@ const IngredientsPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Weight</TableHead>
-                  <TableHead>Price (Excl. VAT)</TableHead>
+                  <TableHead>Weight & Unit</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead>Price (Ex VAT)</TableHead>
                   <TableHead>VAT (14%)</TableHead>
                   <TableHead>Total Price</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Added</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -273,15 +251,14 @@ const IngredientsPage = () => {
                   <TableRow key={ingredient.id}>
                     <TableCell className="font-medium">{ingredient.name}</TableCell>
                     <TableCell>{ingredient.weight} {ingredient.unit}</TableCell>
+                    <TableCell>{ingredient.supplier || 'N/A'}</TableCell>
                     <TableCell>R{ingredient.price_ex_vat.toFixed(2)}</TableCell>
                     <TableCell>R{ingredient.vat_amount.toFixed(2)}</TableCell>
                     <TableCell className="font-medium">R{ingredient.total_price.toFixed(2)}</TableCell>
-                    <TableCell>{ingredient.supplier || '-'}</TableCell>
-                    <TableCell>{new Date(ingredient.created_at).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
                       <Button 
                         variant="ghost"
-                        size="icon" 
+                        size="icon"
                         className="text-red-500 hover:text-red-700 h-8 w-8"
                         onClick={() => {
                           if(confirm('Are you sure you want to delete this ingredient?')) {

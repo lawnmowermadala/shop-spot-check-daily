@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,8 @@ interface RecipeIngredient {
   unit: string;
   cost_per_unit: number;
   calculated_cost: number;
+  quantity_used: number | null;
+  used_unit: string | null;
 }
 
 interface ProductionIngredientUsage {
@@ -170,7 +173,7 @@ const ProductionCostPage = () => {
     
     return recipeIngredients.map(ingredient => ({
       ...ingredient,
-      scaled_quantity: (ingredient.quantity_used || 0) * scalingFactor,
+      scaled_quantity: (ingredient.quantity_used || ingredient.quantity || 0) * scalingFactor,
       scaled_cost: (ingredient.calculated_cost || 0) * scalingFactor
     }));
   };
@@ -415,7 +418,7 @@ const ProductionCostPage = () => {
                   {calculateIngredientsNeeded().map((ingredient, index) => (
                     <TableRow key={index}>
                       <TableCell>{ingredient.ingredient_name}</TableCell>
-                      <TableCell>{ingredient.quantity_used || 0} {ingredient.used_unit || ingredient.unit}</TableCell>
+                      <TableCell>{ingredient.quantity_used || ingredient.quantity || 0} {ingredient.used_unit || ingredient.unit}</TableCell>
                       <TableCell>{ingredient.scaled_quantity.toFixed(2)} {ingredient.used_unit || ingredient.unit}</TableCell>
                       <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
                       <TableCell>R{ingredient.scaled_cost.toFixed(2)}</TableCell>

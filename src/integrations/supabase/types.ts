@@ -121,22 +121,40 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
+          price_ex_vat: number
           product_id: string | null
           quantity: string
+          supplier: string | null
+          total_price: number
+          unit: string
+          vat_amount: number
+          weight: number
         }
         Insert: {
           created_at?: string | null
           id?: string
           name: string
+          price_ex_vat?: number
           product_id?: string | null
           quantity: string
+          supplier?: string | null
+          total_price?: number
+          unit?: string
+          vat_amount?: number
+          weight?: number
         }
         Update: {
           created_at?: string | null
           id?: string
           name?: string
+          price_ex_vat?: number
           product_id?: string | null
           quantity?: string
+          supplier?: string | null
+          total_price?: number
+          unit?: string
+          vat_amount?: number
+          weight?: number
         }
         Relationships: []
       }
