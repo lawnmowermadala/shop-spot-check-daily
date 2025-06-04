@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +33,7 @@ const IngredientsPage = () => {
     weight: '',
     unit: 'kg',
     price_ex_vat: '',
+    includes_vat: false,  // VAT inclusion flag
     supplier: ''
   });
 
@@ -51,14 +51,25 @@ const IngredientsPage = () => {
     }
   });
 
-  // Calculate VAT (14%)
-  const calculateVAT = (priceExVat: number) => {
-    return priceExVat * 0.14;
-  };
-
-  // Calculate total price
-  const calculateTotalPrice = (priceExVat: number) => {
-    return priceExVat + calculateVAT(priceExVat);
+  // Calculate prices based on VAT inclusion
+  const calculatePrices = (price: number, includesVat: boolean) => {
+    if (includesVat) {
+      const priceExVat = price / 1.14;
+      const vatAmount = price - priceExVat;
+      return {
+        price_ex_vat: priceExVat,
+        vat_amount: vatAmount,
+        total_price: price
+      };
+    } else {
+      const vatAmount = price * 0.14;
+      const totalPrice = price + vatAmount;
+      return {
+        price_ex_vat: price,
+        vat_amount: vatAmount,
+        total_price: totalPrice
+      };
+    }
   };
 
   // Add/Update Ingredient
@@ -68,17 +79,19 @@ const IngredientsPage = () => {
         throw new Error('Please fill all required fields');
       }
 
-      const priceExVat = Number(formData.price_ex_vat);
-      const vatAmount = calculateVAT(priceExVat);
-      const totalPrice = calculateTotalPrice(priceExVat);
+      const price = Number(formData.price_ex_vat);
+      const { price_ex_vat, vat_amount, total_price } = calculatePrices(
+        price,
+        formData.includes_vat
+      );
 
       const ingredientData = {
         name: formData.name,
         weight: Number(formData.weight),
         unit: formData.unit,
-        price_ex_vat: priceExVat,
-        vat_amount: vatAmount,
-        total_price: totalPrice,
+        price_ex_vat,
+        vat_amount,
+        total_price,
         supplier: formData.supplier || null,
         quantity: `${formData.weight} ${formData.unit}`
       };
@@ -105,6 +118,7 @@ const IngredientsPage = () => {
         weight: '',
         unit: 'kg',
         price_ex_vat: '',
+        includes_vat: false,
         supplier: ''
       });
       setEditingId(null);
@@ -141,6 +155,7 @@ const IngredientsPage = () => {
       weight: ingredient.weight.toString(),
       unit: ingredient.unit,
       price_ex_vat: ingredient.price_ex_vat.toString(),
+      includes_vat: false, // Always show as ex VAT when editing
       supplier: ingredient.supplier || ''
     });
     setEditingId(ingredient.id);
@@ -153,10 +168,37 @@ const IngredientsPage = () => {
       weight: '',
       unit: 'kg',
       price_ex_vat: '',
+      includes_vat: false,
       supplier: ''
     });
     setEditingId(null);
   };
+
+  // Calculate preview prices
+  const getPreviewPrices = () => {
+    if (!formData.price_ex_vat) return null;
+    
+    const price = Number(formData.price_ex_vat);
+    if (formData.includes_vat) {
+      const exVat = price / 1.14;
+      const vat = price - exVat;
+      return {
+        exVat,
+        vat,
+        total: price
+      };
+    } else {
+      const vat = price * 0.14;
+      const total = price + vat;
+      return {
+        exVat: price,
+        vat,
+        total
+      };
+    }
+  };
+
+  const previewPrices = getPreviewPrices();
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
@@ -204,14 +246,50 @@ const IngredientsPage = () => {
               </select>
             </div>
             
-            <div>
-              <label className="block mb-1 text-sm font-medium">Price (Ex VAT) *</label>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="block text-sm font-medium">
+                  Price {formData.includes_vat ? '(Inc VAT)' : '(Ex VAT)'} *
+                </label>
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium" htmlFor="vat-toggle">
+                    Includes VAT
+                  </label>
+                  <button
+                    type="button"
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      formData.includes_vat 
+                        ? 'bg-green-500' 
+                        : 'bg-gray-300'
+                    }`}
+                    onClick={() => setFormData({
+                      ...formData,
+                      includes_vat: !formData.includes_vat
+                    })}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        formData.includes_vat 
+                          ? 'translate-x-6' 
+                          : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
               <Input
                 type="number"
                 step="0.01"
                 value={formData.price_ex_vat}
-                onChange={(e) => setFormData({...formData, price_ex_vat: e.target.value})}
-                placeholder="Enter price excluding VAT"
+                onChange={(e) => setFormData({
+                  ...formData, 
+                  price_ex_vat: e.target.value
+                })}
+                placeholder={
+                  formData.includes_vat 
+                    ? "Enter price including VAT" 
+                    : "Enter price excluding VAT"
+                }
               />
             </div>
             
@@ -225,12 +303,36 @@ const IngredientsPage = () => {
             </div>
             
             {/* Price Preview */}
-            {formData.price_ex_vat && (
+            {previewPrices && (
               <div className="bg-gray-50 p-3 rounded-md">
-                <p className="text-sm text-gray-600 font-medium">Price Preview:</p>
-                <p className="text-sm">Ex VAT: R{Number(formData.price_ex_vat).toFixed(2)}</p>
-                <p className="text-sm">VAT (14%): R{calculateVAT(Number(formData.price_ex_vat)).toFixed(2)}</p>
-                <p className="text-sm font-bold text-green-600">Total: R{calculateTotalPrice(Number(formData.price_ex_vat)).toFixed(2)}</p>
+                <p className="text-sm text-gray-600 font-medium mb-1">
+                  Price Preview:
+                </p>
+                {formData.includes_vat ? (
+                  <>
+                    <p className="text-sm">
+                      Inc VAT: R{Number(formData.price_ex_vat).toFixed(2)}
+                    </p>
+                    <p className="text-sm">
+                      VAT (14%): R{previewPrices.vat.toFixed(2)}
+                    </p>
+                    <p className="text-sm">
+                      Ex VAT: R{previewPrices.exVat.toFixed(2)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm">
+                      Ex VAT: R{Number(formData.price_ex_vat).toFixed(2)}
+                    </p>
+                    <p className="text-sm">
+                      VAT (14%): R{previewPrices.vat.toFixed(2)}
+                    </p>
+                    <p className="text-sm font-bold text-green-600">
+                      Total: R{previewPrices.total.toFixed(2)}
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>
