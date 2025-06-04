@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,9 +31,23 @@ interface Recipe {
   unit: string;
 }
 
+interface Ingredient {
+  id: string;
+  name: string;
+  weight: number;
+  unit: string;
+  price_ex_vat: number;
+  vat_amount: number;
+  total_price: number;
+  supplier: string | null;
+  quantity: string;
+  created_at: string;
+}
+
 interface RecipeIngredient {
   id: string;
   recipe_id: string;
+  ingredient_id: string;
   ingredient_name: string;
   quantity: number;
   unit: string;
@@ -47,6 +60,7 @@ interface RecipeIngredient {
 interface ProductionIngredientUsage {
   id: string;
   production_id: string;
+  ingredient_id: string;
   ingredient_name: string;
   quantity_used: number;
   unit: string;
@@ -81,7 +95,21 @@ const ProductionCostPage = () => {
     }
   });
 
-  // Fetch Recipe Ingredients with all cost data
+  // Fetch Ingredients
+  const { data: ingredients = [] } = useQuery({
+    queryKey: ['production_ingredients'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ingredients')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data as Ingredient[];
+    }
+  });
+
+  // Fetch Recipe Ingredients with enriched ingredient data
   const { data: recipeIngredients = [] } = useQuery({
     queryKey: ['selected_recipe_ingredients', selectedRecipeId],
     queryFn: async () => {
@@ -93,7 +121,29 @@ const ProductionCostPage = () => {
         .eq('recipe_id', selectedRecipeId);
       
       if (error) throw error;
-      return data as RecipeIngredient[];
+      
+      // Enrich with ingredient data
+      const enrichedIngredients = await Promise.all(
+        (data as RecipeIngredient[]).map(async (ingredient) => {
+          if (ingredient.ingredient_id) {
+            const { data: ingredientData } = await supabase
+              .from('ingredients')
+              .select('*')
+              .eq('id', ingredient.ingredient_id)
+              .single();
+            
+            return {
+              ...ingredient,
+              cost_per_unit: ingredientData?.price_ex_vat || ingredient.cost_per_unit,
+              ingredient_name: ingredientData?.name || ingredient.ingredient_name,
+              unit: ingredientData?.unit || ingredient.unit
+            };
+          }
+          return ingredient;
+        })
+      );
+      
+      return enrichedIngredients;
     },
     enabled: !!selectedRecipeId
   });
@@ -150,7 +200,29 @@ const ProductionCostPage = () => {
         .order('ingredient_name');
       
       if (error) throw error;
-      return data as ProductionIngredientUsage[];
+      
+      // Enrich with ingredient data
+      const enrichedUsage = await Promise.all(
+        (data as ProductionIngredientUsage[]).map(async (usage) => {
+          if (usage.ingredient_id) {
+            const { data: ingredientData } = await supabase
+              .from('ingredients')
+              .select('*')
+              .eq('id', usage.ingredient_id)
+              .single();
+            
+            return {
+              ...usage,
+              ingredient_name: ingredientData?.name || usage.ingredient_name,
+              unit: ingredientData?.unit || usage.unit,
+              cost_per_unit: ingredientData?.price_ex_vat || usage.cost_per_unit
+            };
+          }
+          return usage;
+        })
+      );
+      
+      return enrichedUsage;
     },
     enabled: !!activeBatchId
   });
@@ -174,7 +246,8 @@ const ProductionCostPage = () => {
     return recipeIngredients.map(ingredient => ({
       ...ingredient,
       scaled_quantity: (ingredient.quantity_used || ingredient.quantity || 0) * scalingFactor,
-      scaled_cost: (ingredient.calculated_cost || 0) * scalingFactor
+      scaled_cost: (ingredient.calculated_cost || 0) * scalingFactor,
+      supplier: ingredients.find(i => i.id === ingredient.ingredient_id)?.supplier || 'N/A'
     }));
   };
 
@@ -222,6 +295,7 @@ const ProductionCostPage = () => {
       const ingredientsNeeded = calculateIngredientsNeeded();
       const ingredientUsages = ingredientsNeeded.map(ingredient => ({
         production_id: batchId,
+        ingredient_id: ingredient.ingredient_id,
         ingredient_name: ingredient.ingredient_name,
         quantity_used: ingredient.scaled_quantity,
         unit: ingredient.used_unit || ingredient.unit,
@@ -408,6 +482,7 @@ const ProductionCostPage = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Ingredient</TableHead>
+                    <TableHead>Supplier</TableHead>
                     <TableHead>Recipe Quantity</TableHead>
                     <TableHead>Scaled Quantity</TableHead>
                     <TableHead>Cost per Unit</TableHead>
@@ -418,6 +493,7 @@ const ProductionCostPage = () => {
                   {calculateIngredientsNeeded().map((ingredient, index) => (
                     <TableRow key={index}>
                       <TableCell>{ingredient.ingredient_name}</TableCell>
+                      <TableCell>{ingredient.supplier || 'N/A'}</TableCell>
                       <TableCell>{ingredient.quantity_used || ingredient.quantity || 0} {ingredient.used_unit || ingredient.unit}</TableCell>
                       <TableCell>{ingredient.scaled_quantity.toFixed(2)} {ingredient.used_unit || ingredient.unit}</TableCell>
                       <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
@@ -532,20 +608,25 @@ const ProductionCostPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Ingredient</TableHead>
+                  <TableHead>Supplier</TableHead>
                   <TableHead>Quantity Used</TableHead>
                   <TableHead>Cost per Unit</TableHead>
                   <TableHead>Total Cost</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {batchIngredientUsage.map(usage => (
-                  <TableRow key={usage.id}>
-                    <TableCell>{usage.ingredient_name}</TableCell>
-                    <TableCell>{usage.quantity_used} {usage.unit}</TableCell>
-                    <TableCell>R{usage.cost_per_unit.toFixed(2)}</TableCell>
-                    <TableCell>R{(usage.quantity_used * usage.cost_per_unit).toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
+                {batchIngredientUsage.map(usage => {
+                  const ingredient = ingredients.find(i => i.id === usage.ingredient_id);
+                  return (
+                    <TableRow key={usage.id}>
+                      <TableCell>{usage.ingredient_name}</TableCell>
+                      <TableCell>{ingredient?.supplier || 'N/A'}</TableCell>
+                      <TableCell>{usage.quantity_used} {usage.unit}</TableCell>
+                      <TableCell>R{usage.cost_per_unit.toFixed(2)}</TableCell>
+                      <TableCell>R{(usage.quantity_used * usage.cost_per_unit).toFixed(2)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
             
