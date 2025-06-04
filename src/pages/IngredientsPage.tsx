@@ -10,16 +10,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
 
-// Types
+// Types - matching the actual database schema
 interface Ingredient {
   id: string;
   name: string;
-  pack_size: number;
-  pack_unit: string;
+  weight: number;
+  unit: string;
   price_ex_vat: number;
   vat_amount: number;
   total_price: number;
   supplier: string | null;
+  quantity: string;
   created_at: string;
 }
 
@@ -30,8 +31,8 @@ const IngredientsPage = () => {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    pack_size: '',
-    pack_unit: 'kg',
+    weight: '',
+    unit: 'kg',
     price_ex_vat: '',
     supplier: ''
   });
@@ -63,7 +64,7 @@ const IngredientsPage = () => {
   // Add/Update Ingredient
   const saveIngredient = useMutation({
     mutationFn: async () => {
-      if (!formData.name || !formData.pack_size || !formData.price_ex_vat) {
+      if (!formData.name || !formData.weight || !formData.price_ex_vat) {
         throw new Error('Please fill all required fields');
       }
 
@@ -73,12 +74,13 @@ const IngredientsPage = () => {
 
       const ingredientData = {
         name: formData.name,
-        pack_size: Number(formData.pack_size),
-        pack_unit: formData.pack_unit,
+        weight: Number(formData.weight),
+        unit: formData.unit,
         price_ex_vat: priceExVat,
         vat_amount: vatAmount,
         total_price: totalPrice,
-        supplier: formData.supplier || null
+        supplier: formData.supplier || null,
+        quantity: `${formData.weight} ${formData.unit}` // Set quantity as a string combining weight and unit
       };
 
       if (editingId) {
@@ -102,8 +104,8 @@ const IngredientsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
       setFormData({
         name: '',
-        pack_size: '',
-        pack_unit: 'kg',
+        weight: '',
+        unit: 'kg',
         price_ex_vat: '',
         supplier: ''
       });
@@ -138,8 +140,8 @@ const IngredientsPage = () => {
   const handleEdit = (ingredient: Ingredient) => {
     setFormData({
       name: ingredient.name,
-      pack_size: ingredient.pack_size.toString(),
-      pack_unit: ingredient.pack_unit,
+      weight: ingredient.weight.toString(),
+      unit: ingredient.unit,
       price_ex_vat: ingredient.price_ex_vat.toString(),
       supplier: ingredient.supplier || ''
     });
@@ -150,8 +152,8 @@ const IngredientsPage = () => {
   const handleCancel = () => {
     setFormData({
       name: '',
-      pack_size: '',
-      pack_unit: 'kg',
+      weight: '',
+      unit: 'kg',
       price_ex_vat: '',
       supplier: ''
     });
@@ -179,22 +181,22 @@ const IngredientsPage = () => {
             </div>
             
             <div>
-              <label className="block mb-1 text-sm font-medium">Pack Size</label>
+              <label className="block mb-1 text-sm font-medium">Weight</label>
               <Input
                 type="number"
                 step="0.01"
-                value={formData.pack_size}
-                onChange={(e) => setFormData({...formData, pack_size: e.target.value})}
-                placeholder="Enter pack size"
+                value={formData.weight}
+                onChange={(e) => setFormData({...formData, weight: e.target.value})}
+                placeholder="Enter weight"
               />
             </div>
             
             <div>
-              <label className="block mb-1 text-sm font-medium">Pack Unit</label>
+              <label className="block mb-1 text-sm font-medium">Unit</label>
               <select 
                 className="w-full p-2 border rounded-md"
-                value={formData.pack_unit}
-                onChange={(e) => setFormData({...formData, pack_unit: e.target.value})}
+                value={formData.unit}
+                onChange={(e) => setFormData({...formData, unit: e.target.value})}
               >
                 <option value="kg">kg</option>
                 <option value="g">g</option>
@@ -265,7 +267,7 @@ const IngredientsPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Pack Size</TableHead>
+                  <TableHead>Weight</TableHead>
                   <TableHead>Price Ex VAT</TableHead>
                   <TableHead>VAT (14%)</TableHead>
                   <TableHead>Total Price</TableHead>
@@ -277,7 +279,7 @@ const IngredientsPage = () => {
                 {ingredients.map(ingredient => (
                   <TableRow key={ingredient.id}>
                     <TableCell className="font-medium">{ingredient.name}</TableCell>
-                    <TableCell>{ingredient.pack_size} {ingredient.pack_unit}</TableCell>
+                    <TableCell>{ingredient.weight} {ingredient.unit}</TableCell>
                     <TableCell>R{ingredient.price_ex_vat.toFixed(2)}</TableCell>
                     <TableCell>R{ingredient.vat_amount.toFixed(2)}</TableCell>
                     <TableCell className="font-bold">R{ingredient.total_price.toFixed(2)}</TableCell>
