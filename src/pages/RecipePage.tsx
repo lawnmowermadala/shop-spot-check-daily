@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -137,7 +136,7 @@ const RecipePage = () => {
   // Handle ingredient selection from dropdown
   const handleIngredientSelect = (ingredientId: string) => {
     const selectedIngredient = availableIngredients.find(ing => ing.id === ingredientId);
-    if (selectedIngredient) {
+    if (selectedIngredient && ingredientId !== 'manual-entry') {
       setIngredientData({
         ingredient_id: selectedIngredient.id,
         ingredient_name: selectedIngredient.name,
@@ -395,14 +394,14 @@ const RecipePage = () => {
             <div>
               <label className="block mb-1 text-sm font-medium">Select from Available Ingredients (Optional)</label>
               <Select 
-                value={ingredientData.ingredient_id} 
+                value={ingredientData.ingredient_id || 'manual-entry'} 
                 onValueChange={handleIngredientSelect}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select an existing ingredient or leave blank for manual entry" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Manual Entry</SelectItem>
+                  <SelectItem value="manual-entry">Manual Entry</SelectItem>
                   {availableIngredients.map(ingredient => (
                     <SelectItem key={ingredient.id} value={ingredient.id}>
                       {ingredient.name} ({ingredient.weight} {ingredient.unit} - R{ingredient.total_price.toFixed(2)})
