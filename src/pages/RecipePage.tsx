@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Edit, Plus } from 'lucide-react';
+import { Trash2, Edit, Plus, Printer } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
@@ -295,9 +295,114 @@ const RecipePage = () => {
   const selectedRecipe = recipes.find(r => r.id === selectedRecipeId);
   const costPerUnit = selectedRecipe ? totalRecipeCost / selectedRecipe.batch_size : 0;
 
+  // Print function
+  const handlePrint = () => {
+    const printContent = document.getElementById('recipes-print-content');
+    if (!printContent) return;
+
+    const originalContents = document.body.innerHTML;
+    document.body.innerHTML = printContent.innerHTML;
+    
+    // Add print styles
+    const style = document.createElement('style');
+    style.textContent = `
+      @media print {
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+        .recipe-card { page-break-inside: avoid; margin-bottom: 30px; border: 1px solid #ccc; padding: 15px; }
+        .recipe-header { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #333; padding-bottom: 5px; }
+        .recipe-info { margin-bottom: 15px; }
+        .ingredients-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .ingredients-table th, .ingredients-table td { border: 1px solid #ccc; padding: 5px; text-align: left; }
+        .ingredients-table th { background-color: #f5f5f5; font-weight: bold; }
+        .cost-summary { font-weight: bold; font-size: 14px; border-top: 2px solid #333; padding-top: 10px; }
+        .page-break { page-break-before: always; }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    window.print();
+    
+    document.body.innerHTML = originalContents;
+    window.location.reload(); // Reload to restore functionality
+  };
+
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
-      <h1 className="text-2xl font-bold">Recipe Management</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Recipe Management</h1>
+        <Button 
+          onClick={handlePrint}
+          variant="outline"
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          <Printer className="h-4 w-4 mr-2" />
+          Print Recipes
+        </Button>
+      </div>
+
+      {/* Hidden print content */}
+      <div id="recipes-print-content" style={{ display: 'none' }}>
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Recipe List with Costs</h1>
+          <p style={{ fontSize: '14px', color: '#666' }}>Generated on {new Date().toLocaleDateString()}</p>
+        </div>
+        
+        {recipes.map((recipe, index) => {
+          const recipeIngredientsForPrint = recipeIngredients.filter(ing => ing.recipe_id === recipe.id);
+          const recipeTotalCost = recipeIngredientsForPrint.reduce((sum, ingredient) => 
+            sum + (ingredient.calculated_cost || 0), 0
+          );
+          const recipeCostPerUnit = recipe.batch_size > 0 ? recipeTotalCost / recipe.batch_size : 0;
+
+          return (
+            <div key={recipe.id} className={`recipe-card ${index > 0 ? 'page-break' : ''}`}>
+              <div className="recipe-header">
+                {recipe.name}
+              </div>
+              
+              <div className="recipe-info">
+                <p><strong>Description:</strong> {recipe.description || 'N/A'}</p>
+                <p><strong>Batch Size:</strong> {recipe.batch_size} {recipe.unit}</p>
+                <p><strong>Created:</strong> {new Date(recipe.created_at).toLocaleDateString()}</p>
+              </div>
+
+              {recipeIngredientsForPrint.length > 0 ? (
+                <>
+                  <table className="ingredients-table">
+                    <thead>
+                      <tr>
+                        <th>Ingredient</th>
+                        <th>Quantity Used</th>
+                        <th>Pack Info</th>
+                        <th>Cost per Unit</th>
+                        <th>Total Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recipeIngredientsForPrint.map(ingredient => (
+                        <tr key={ingredient.id}>
+                          <td>{ingredient.ingredient_name}</td>
+                          <td>{ingredient.quantity_used} {ingredient.used_unit}</td>
+                          <td>{ingredient.pack_size} {ingredient.pack_unit} @ R{ingredient.pack_price?.toFixed(2)}</td>
+                          <td>R{ingredient.cost_per_unit.toFixed(4)}</td>
+                          <td>R{ingredient.calculated_cost?.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  <div className="cost-summary">
+                    <p>Total Recipe Cost: R{recipeTotalCost.toFixed(2)}</p>
+                    <p>Cost per {recipe.unit}: R{recipeCostPerUnit.toFixed(2)}</p>
+                  </div>
+                </>
+              ) : (
+                <p style={{ fontStyle: 'italic', color: '#666' }}>No ingredients added to this recipe yet.</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
       
       {/* Add Recipe Form */}
       <Card>
