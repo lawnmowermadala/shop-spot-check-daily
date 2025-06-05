@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Trash2, Printer, BarChart2 } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Printer, BarChart2, Edit } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
+import RecipeEditModal from '@/components/RecipeEditModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Types
@@ -86,6 +87,7 @@ const ProductionPage = () => {
   const [showComparison, setShowComparison] = useState(false);
   const [showStaffAnalytics, setShowStaffAnalytics] = useState(false);
   const [comparisonDays, setComparisonDays] = useState(7);
+  const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   
   // Production form state
@@ -991,7 +993,20 @@ const ProductionPage = () => {
                     <div>
                       <h3 className="font-medium">{batch.product_code} - {batch.product_name}</h3>
                       {batch.recipe_name && batch.recipe_name !== 'No Recipe' && (
-                        <p className="text-sm text-blue-600">Recipe: {batch.recipe_name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-blue-600">Recipe: {batch.recipe_name}</p>
+                          {batch.recipe_id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingRecipeId(batch.recipe_id)}
+                              className="h-6 px-2 text-xs"
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Edit Recipe
+                            </Button>
+                          )}
+                        </div>
                       )}
                       <p className="text-sm text-gray-600">
                         {batch.quantity_produced} units • {batch.staff_name}
@@ -1131,6 +1146,13 @@ const ProductionPage = () => {
           )}
         </CardContent>
       </Card>
+      
+      {/* Recipe Edit Modal */}
+      <RecipeEditModal
+        isOpen={!!editingRecipeId}
+        onClose={() => setEditingRecipeId(null)}
+        recipeId={editingRecipeId}
+      />
       
       <Navigation />
     </div>
