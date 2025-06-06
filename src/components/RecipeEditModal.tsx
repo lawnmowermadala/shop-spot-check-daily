@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, Edit, Check, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
@@ -42,6 +41,8 @@ interface RecipeEditModalProps {
 const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) => {
   const queryClient = useQueryClient();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [editingIngredient, setEditingIngredient] = useState<string | null>(null);
+  const [editedIngredient, setEditedIngredient] = useState<Partial<RecipeIngredient>>({});
   const [newIngredient, setNewIngredient] = useState({
     ingredient_name: '',
     quantity: '',
@@ -123,6 +124,34 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
     }
   });
 
+  // Update ingredient mutation
+  const updateIngredientMutation = useMutation({
+    mutationFn: async ({ ingredientId, updates }: { ingredientId: string; updates: Partial<RecipeIngredient> }) => {
+      const calculatedCost = updates.pack_price && updates.pack_size
+        ? (Number(updates.pack_price) / Number(updates.pack_size)) * Number(updates.quantity_used || updates.quantity)
+        : Number(updates.cost_per_unit) * Number(updates.quantity);
+
+      const { error } = await supabase
+        .from('recipe_ingredients')
+        .update({
+          ...updates,
+          calculated_cost: calculatedCost
+        })
+        .eq('id', ingredientId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipe_ingredients', recipeId] });
+      setEditingIngredient(null);
+      setEditedIngredient({});
+      toast.success('Ingredient updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update ingredient: ' + error.message);
+    }
+  });
+
   // Add ingredient mutation
   const addIngredientMutation = useMutation({
     mutationFn: async () => {
@@ -197,6 +226,25 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
 
   const handleAddIngredient = () => {
     addIngredientMutation.mutate();
+  };
+
+  const handleEditIngredient = (ingredient: RecipeIngredient) => {
+    setEditingIngredient(ingredient.id);
+    setEditedIngredient(ingredient);
+  };
+
+  const handleSaveIngredient = () => {
+    if (editingIngredient && editedIngredient) {
+      updateIngredientMutation.mutate({
+        ingredientId: editingIngredient,
+        updates: editedIngredient
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIngredient(null);
+    setEditedIngredient({});
   };
 
   const totalCost = ingredients.reduce((sum, ing) => sum + (ing.calculated_cost || (ing.cost_per_unit * ing.quantity)), 0);
@@ -296,20 +344,99 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
               <TableBody>
                 {ingredients.map((ingredient) => (
                   <TableRow key={ingredient.id}>
-                    <TableCell>{ingredient.ingredient_name}</TableCell>
-                    <TableCell>{ingredient.quantity}</TableCell>
-                    <TableCell>{ingredient.unit}</TableCell>
-                    <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <Input
+                          value={editedIngredient.ingredient_name || ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, ingredient_name: e.target.value })}
+                          className="w-full"
+                        />
+                      ) : (
+                        ingredient.ingredient_name
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <Input
+                          type="number"
+                          value={editedIngredient.quantity || ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, quantity: Number(e.target.value) })}
+                          className="w-20"
+                        />
+                      ) : (
+                        ingredient.quantity
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <select
+                          value={editedIngredient.unit || ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, unit: e.target.value })}
+                          className="w-full p-1 border rounded"
+                        >
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="L">L</option>
+                          <option value="ml">ml</option>
+                          <option value="unit">unit</option>
+                        </select>
+                      ) : (
+                        ingredient.unit
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <Input
+                          type="number"
+                          value={editedIngredient.cost_per_unit || ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, cost_per_unit: Number(e.target.value) })}
+                          className="w-24"
+                        />
+                      ) : (
+                        `R${ingredient.cost_per_unit.toFixed(2)}`
+                      )}
+                    </TableCell>
                     <TableCell>R{(ingredient.calculated_cost || (ingredient.cost_per_unit * ingredient.quantity)).toFixed(2)}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteIngredientMutation.mutate(ingredient.id)}
-                        disabled={deleteIngredientMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
+                      <div className="flex gap-2">
+                        {editingIngredient === ingredient.id ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleSaveIngredient}
+                              disabled={updateIngredientMutation.isPending}
+                            >
+                              <Check className="h-4 w-4 text-green-500" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleCancelEdit}
+                            >
+                              <X className="h-4 w-4 text-gray-500" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditIngredient(ingredient)}
+                            >
+                              <Edit className="h-4 w-4 text-blue-500" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteIngredientMutation.mutate(ingredient.id)}
+                              disabled={deleteIngredientMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
