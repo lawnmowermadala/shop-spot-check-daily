@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import ChecklistItem from '@/components/ChecklistItem';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from "@/components/ui/badge";
+import IncompleteAssignmentsCarousel from '@/components/IncompleteAssignmentsCarousel';
 
 interface Area {
   id: string;
@@ -33,7 +33,7 @@ interface Assignment {
   instructions?: string;
   photo_url?: string | null;
   created_at?: string;
-  isPreviousDay?: boolean; // New flag to track previous day assignments
+  isPreviousDay?: boolean;
 }
 
 const Index = () => {
@@ -44,6 +44,7 @@ const Index = () => {
   const [loadingStaff, setLoadingStaff] = useState(true);
   const [todaysAssignmentCount, setTodaysAssignmentCount] = useState(0);
   const [recentlyAssigned, setRecentlyAssigned] = useState<string[]>([]);
+  const [incompleteAssignments, setIncompleteAssignments] = useState<Assignment[]>([]);
 
   // Fetch staff members
   const fetchStaffMembers = async () => {
@@ -91,15 +92,14 @@ const Index = () => {
       // Filter assignments that are no older than one day
       const oneDayAgo = new Date();
       oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-      oneDayAgo.setHours(0, 0, 0, 0); // Start of the previous day
+      oneDayAgo.setHours(0, 0, 0, 0);
       
       const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0); // Start of today
+      todayStart.setHours(0, 0, 0, 0);
       
       const recentAssignments = allAssignments?.filter(assignment => {
-        if (!assignment.created_at) return true; // Include if no date (shouldn't happen)
+        if (!assignment.created_at) return true;
         const assignmentDate = new Date(assignment.created_at);
-        // Only include assignments that are recent AND not marked as 'done'
         return assignmentDate >= oneDayAgo && assignment.status !== 'done';
       }) || [];
       
@@ -110,6 +110,11 @@ const Index = () => {
         return { ...assignment, isPreviousDay };
       });
 
+      // Filter incomplete assignments (not 'done' or 'completed')
+      const incomplete = processedAssignments.filter(assignment => 
+        assignment.status !== 'done' && assignment.status !== 'completed'
+      );
+
       const { count, error: countError } = await supabase
         .from('assignments')
         .select('*', { count: 'exact', head: true })
@@ -119,7 +124,8 @@ const Index = () => {
       if (countError) throw countError;
 
       setTodaysAssignmentCount(count || 0);
-      setAssignedAreas(processedAssignments); // Show recent assignments with previous day flag
+      setAssignedAreas(processedAssignments);
+      setIncompleteAssignments(incomplete);
     } catch (error) {
       console.error('Error fetching assignments:', error);
       toast({
@@ -215,10 +221,8 @@ const Index = () => {
         photo_url: photoUrl || null
       };
 
-      // Add to recently assigned temporarily
       setRecentlyAssigned(prev => [...prev, areaName]);
       
-      // Remove from recently assigned after 1 second
       setTimeout(() => {
         setRecentlyAssigned(prev => prev.filter(area => area !== areaName));
       }, 1000);
@@ -280,6 +284,11 @@ const Index = () => {
         )}
       </div>
 
+      {/* Add the incomplete assignments carousel */}
+      {incompleteAssignments.length > 0 && (
+        <IncompleteAssignmentsCarousel assignments={incompleteAssignments} />
+      )}
+
       <div className="mb-6 space-y-2">
         <h2 className="text-lg font-semibold">Add New Area</h2>
         <div className="space-y-2">
@@ -333,7 +342,7 @@ const Index = () => {
                     onAssign={(assigneeId, instructions, photoUrl) => 
                       handleAssignment(area.name, assigneeId, instructions, photoUrl)
                     }
-                    isAssigned={false} // Always allow new assignments
+                    isAssigned={false}
                     assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
                     assignmentCount={areaAssignments.length}
                     isRecentlyAssigned={isRecentlyAssigned(area.name)}
