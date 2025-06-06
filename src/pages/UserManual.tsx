@@ -1,15 +1,30 @@
-
 import React from 'react';
 import Navigation from '@/components/Navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Clipboard, Star, Home, BarChart, Building, Users, AlertTriangle, Clock, Image } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Check, Clipboard, Star, Home, BarChart, Building, Users, AlertTriangle, Clock, Image, Printer } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const UserManual = () => {
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="container mx-auto p-4 pb-20 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6 text-center">User Manual</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-center flex-1">User Manual</h1>
+        <Button 
+          onClick={handlePrint}
+          variant="outline"
+          size="sm"
+          className="ml-4 print:hidden"
+        >
+          <Printer className="h-4 w-4 mr-2" />
+          Print Manual
+        </Button>
+      </div>
       
       <Card className="mb-8">
         <CardHeader>
@@ -90,6 +105,18 @@ const UserManual = () => {
                 </p>
               </div>
               
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-800 flex items-center">
+                  <Clock className="h-4 w-4 mr-1" />
+                  Incomplete Assignments Carousel
+                </h4>
+                <p className="text-sm text-blue-700 mt-1">
+                  At the top of the dashboard, you'll see a carousel showing all incomplete assignments with a counter.
+                  Use the navigation arrows to scroll through incomplete tasks one by one. This gives you a quick overview
+                  of what needs attention without having to scroll through the entire list.
+                </p>
+              </div>
+              
               <div>
                 <h4 className="font-medium">Key Dashboard Features</h4>
                 <ul className="mt-2 space-y-3">
@@ -113,6 +140,12 @@ const UserManual = () => {
                       Completed tasks are automatically hidden from the dashboard but remain visible in the Assignments page.
                     </p>
                   </li>
+                  <li className="bg-gray-50 p-3 rounded">
+                    <div className="font-medium">Daily Assignment Counter</div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      View today's total assignment count at the top of the dashboard to track daily workload.
+                    </p>
+                  </li>
                 </ul>
               </div>
               
@@ -125,14 +158,18 @@ const UserManual = () => {
                   </li>
                   <li className="flex items-start">
                     <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">2</span>
-                    <span>Assign each area to staff members at the start of the day</span>
+                    <span>Review incomplete assignments carousel for any pending tasks</span>
                   </li>
                   <li className="flex items-start">
                     <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">3</span>
-                    <span>Staff update assignment status throughout the day</span>
+                    <span>Assign each area to staff members at the start of the day</span>
                   </li>
                   <li className="flex items-start">
                     <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">4</span>
+                    <span>Staff update assignment status throughout the day</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">5</span>
                     <span>Review outstanding and completed assignments</span>
                   </li>
                 </ol>
@@ -488,7 +525,7 @@ const UserManual = () => {
                   <div className="mt-2 space-y-2 text-sm">
                     <div className="flex items-start">
                       <div className="bg-blue-100 text-blue-800 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0 mr-2">AM</div>
-                      <p>Create assignments for the day and assign to staff members during morning briefing</p>
+                      <p>Check incomplete assignments carousel first, then create new assignments for the day during morning briefing</p>
                     </div>
                     <div className="flex items-start">
                       <div className="bg-blue-100 text-blue-800 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0 mr-2">Day</div>
@@ -531,6 +568,10 @@ const UserManual = () => {
                   <p>
                     <strong>Data-Driven Decisions:</strong> Review analytics regularly to identify patterns
                     and make informed improvements.
+                  </p>
+                  <p>
+                    <strong>Incomplete Task Management:</strong> Use the incomplete assignments carousel to quickly
+                    prioritize tasks that need immediate attention.
                   </p>
                 </div>
               </div>
