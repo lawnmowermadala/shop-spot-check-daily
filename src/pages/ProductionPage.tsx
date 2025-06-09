@@ -544,7 +544,7 @@ const ProductionPage = () => {
       
       // Update batch cost after adding ingredient
       if (activeBatchId) {
-        updateBatchCostMutation.mutate(activeBatchId);
+        updateBatchMutation.mutate(activeBatchId);
       }
     },
     onError: (error: Error) => {
@@ -568,7 +568,7 @@ const ProductionPage = () => {
       
       // Update batch cost after deleting ingredient
       if (activeBatchId) {
-        updateBatchCostMutation.mutate(activeBatchId);
+        updateBatchMutation.mutate(activeBatchId);
       }
     },
     onError: (error: Error) => {
