@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Trash2, Printer, BarChart2, Edit } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Printer, BarChart2, Edit, Save, X } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,6 +84,7 @@ const ProductionPage = () => {
   const queryClient = useQueryClient();
   const [date, setDate] = useState<Date>(new Date());
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
+  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [showStaffAnalytics, setShowStaffAnalytics] = useState(false);
   const [comparisonDays, setComparisonDays] = useState(7);
@@ -92,6 +93,15 @@ const ProductionPage = () => {
   
   // Production form state
   const [productionData, setProductionData] = useState({
+    product_id: '',
+    recipe_id: '',
+    quantity_produced: '',
+    staff_id: '',
+    notes: ''
+  });
+
+  // Edit form state
+  const [editData, setEditData] = useState({
     product_id: '',
     recipe_id: '',
     quantity_produced: '',
@@ -325,53 +335,72 @@ const ProductionPage = () => {
     }));
   };
 
-  // Mutation to update batch cost
-  const updateBatchCostMutation = useMutation({
+  // Start editing a batch
+  const startEditBatch = (batch: ProductionBatch) => {
+    setEditingBatchId(batch.id);
+    setEditData({
+      product_id: batch.product_id,
+      recipe_id: batch.recipe_id || '',
+      quantity_produced: batch.quantity_produced.toString(),
+      staff_id: batch.staff_id || '',
+      notes: batch.notes || ''
+    });
+  };
+
+  // Cancel editing
+  const cancelEditBatch = () => {
+    setEditingBatchId(null);
+    setEditData({
+      product_id: '',
+      recipe_id: '',
+      quantity_produced: '',
+      staff_id: '',
+      notes: ''
+    });
+  };
+
+  // Update batch mutation
+  const updateBatchMutation = useMutation({
     mutationFn: async (batchId: string) => {
-      // Fetch all ingredients for the batch
-      const { data: ingredients, error: ingredientsError } = await supabase
-        .from('production_ingredients')
-        .select('*')
-        .eq('batch_id', batchId);
-      
-      if (ingredientsError) throw ingredientsError;
-      
-      // Calculate total ingredient cost
-      const totalIngredientCost = ingredients.reduce(
-        (sum, ingredient) => sum + (ingredient.quantity_used * ingredient.cost_per_unit),
-        0
-      );
-      
-      // Fetch batch to get quantity produced
-      const { data: batch, error: batchError } = await supabase
-        .from('production_batches')
-        .select('quantity_produced')
-        .eq('id', batchId)
-        .single();
-      
-      if (batchError) throw batchError;
-      
-      // Calculate cost per unit
-      const costPerUnit = batch.quantity_produced > 0 
-        ? totalIngredientCost / batch.quantity_produced 
-        : 0;
-      
-      // Update batch with new costs
-      const { error: updateError } = await supabase
+      if (!editData.product_id || !editData.quantity_produced || !editData.staff_id) {
+        throw new Error('Please fill all required fields');
+      }
+
+      // Get staff name from staff_id
+      const selectedStaff = staffMembers.find(s => s.id.toString() === editData.staff_id);
+      if (!selectedStaff) {
+        throw new Error('Selected staff member not found');
+      }
+
+      const { error } = await supabase
         .from('production_batches')
         .update({
-          total_ingredient_cost: totalIngredientCost,
-          cost_per_unit: costPerUnit
+          product_id: editData.product_id,
+          recipe_id: editData.recipe_id || null,
+          quantity_produced: Number(editData.quantity_produced),
+          staff_name: selectedStaff.name,
+          staff_id: editData.staff_id,
+          notes: editData.notes
         })
         .eq('id', batchId);
-      
-      if (updateError) throw updateError;
+
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['production_batches'] });
+      queryClient.invalidateQueries({ queryKey: ['staff_production_stats'] });
+      setEditingBatchId(null);
+      setEditData({
+        product_id: '',
+        recipe_id: '',
+        quantity_produced: '',
+        staff_id: '',
+        notes: ''
+      });
+      toast.success('Production batch updated successfully!');
     },
     onError: (error: Error) => {
-      toast.error('Failed to update batch cost: ' + error.message);
+      toast.error(error.message);
     }
   });
 
@@ -989,65 +1018,172 @@ const ProductionPage = () => {
             <div className="space-y-4">
               {productionBatches.map((batch) => (
                 <div key={batch.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-medium">{batch.product_code} - {batch.product_name}</h3>
-                      {batch.recipe_name && batch.recipe_name !== 'No Recipe' && (
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-blue-600">Recipe: {batch.recipe_name}</p>
-                          {batch.recipe_id && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingRecipeId(batch.recipe_id)}
-                              className="h-6 px-2 text-xs"
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
-                              Edit Recipe
-                            </Button>
-                          )}
+                  {editingBatchId === batch.id ? (
+                    // Edit Mode
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="font-medium text-blue-600">Editing Production Batch</h3>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={cancelEditBatch}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => updateBatchMutation.mutate(batch.id)}
+                            disabled={updateBatchMutation.isPending}
+                          >
+                            <Save className="h-4 w-4 mr-1" />
+                            {updateBatchMutation.isPending ? 'Saving...' : 'Save'}
+                          </Button>
                         </div>
-                      )}
-                      <p className="text-sm text-gray-600">
-                        {batch.quantity_produced} units • {batch.staff_name}
-                      </p>
-                      {batch.total_ingredient_cost && batch.total_ingredient_cost > 0 && (
-                        <p className="text-sm text-green-600">
-                          Total Cost: R{batch.total_ingredient_cost.toFixed(2)} • 
-                          Cost per Unit: R{batch.cost_per_unit?.toFixed(2) || '0.00'}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Product *</label>
+                          <select
+                            value={editData.product_id}
+                            onChange={(e) => setEditData({...editData, product_id: e.target.value})}
+                            className="w-full p-2 border rounded"
+                          >
+                            <option value="">Select a product</option>
+                            {products.map((product) => (
+                              <option key={product.id} value={product.id}>{product.code} - {product.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Recipe (Optional)</label>
+                          <select
+                            value={editData.recipe_id}
+                            onChange={(e) => setEditData({...editData, recipe_id: e.target.value})}
+                            className="w-full p-2 border rounded"
+                          >
+                            <option value="">Select a recipe</option>
+                            {recipes.map((recipe) => (
+                              <option key={recipe.id} value={recipe.id}>
+                                {recipe.name} (Batch: {recipe.batch_size} {recipe.unit})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Staff Member *</label>
+                          <select
+                            value={editData.staff_id}
+                            onChange={(e) => setEditData({...editData, staff_id: e.target.value})}
+                            className="w-full p-2 border rounded"
+                          >
+                            <option value="">Select staff member</option>
+                            {staffMembers.map((staff) => (
+                              <option key={staff.id} value={staff.id.toString()}>
+                                {staff.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Quantity *</label>
+                          <Input
+                            type="number"
+                            value={editData.quantity_produced}
+                            onChange={(e) => setEditData({...editData, quantity_produced: e.target.value})}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Notes</label>
+                        <Input
+                          value={editData.notes}
+                          onChange={(e) => setEditData({...editData, notes: e.target.value})}
+                          placeholder="Optional notes"
+                        />
+                      </div>
+                      
+                      <div className="text-sm text-gray-600">
+                        <strong>Production Date:</strong> {format(new Date(batch.production_date), 'PPP')} (Cannot be changed)
+                      </div>
+                    </div>
+                  ) : (
+                    // View Mode
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium">{batch.product_code} - {batch.product_name}</h3>
+                        {batch.recipe_name && batch.recipe_name !== 'No Recipe' && (
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-blue-600">Recipe: {batch.recipe_name}</p>
+                            {batch.recipe_id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditingRecipeId(batch.recipe_id)}
+                                className="h-6 px-2 text-xs"
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Edit Recipe
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-sm text-gray-600">
+                          {batch.quantity_produced} units • {batch.staff_name}
                         </p>
-                      )}
-                      {batch.notes && (
-                        <p className="text-sm mt-1 text-gray-600">Notes: {batch.notes}</p>
-                      )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        Created: {new Date(batch.created_at).toLocaleTimeString()}
-                      </p>
+                        {batch.total_ingredient_cost && batch.total_ingredient_cost > 0 && (
+                          <p className="text-sm text-green-600">
+                            Total Cost: R{batch.total_ingredient_cost.toFixed(2)} • 
+                            Cost per Unit: R{batch.cost_per_unit?.toFixed(2) || '0.00'}
+                          </p>
+                        )}
+                        {batch.notes && (
+                          <p className="text-sm mt-1 text-gray-600">Notes: {batch.notes}</p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Created: {new Date(batch.created_at).toLocaleTimeString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEditBatch(batch)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setActiveBatchId(activeBatchId === batch.id ? null : batch.id)}
+                        >
+                          {activeBatchId === batch.id ? 'Hide Ingredients' : 'Show Ingredients'}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete this production batch?')) {
+                              deleteBatchMutation.mutate(batch.id);
+                            }
+                          }}
+                          disabled={deleteBatchMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setActiveBatchId(activeBatchId === batch.id ? null : batch.id)}
-                      >
-                        {activeBatchId === batch.id ? 'Hide Ingredients' : 'Show Ingredients'}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this production batch?')) {
-                            deleteBatchMutation.mutate(batch.id);
-                          }
-                        }}
-                        disabled={deleteBatchMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  )}
                   
-                  {activeBatchId === batch.id && (
+                  {activeBatchId === batch.id && editingBatchId !== batch.id && (
                     <div className="mt-4 border-t pt-4">
                       <h4 className="text-sm font-medium mb-2">Ingredients Used</h4>
                       {batchIngredients.length === 0 ? (
