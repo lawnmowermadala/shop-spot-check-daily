@@ -149,7 +149,7 @@ const ProductionForm = ({
           recipe_id: productionData.recipe_id || null,
           quantity_produced: parseInt(productionData.quantity_produced),
           production_date: dateStr,
-          staff_id: productionData.staff_id, // Keep as string, don't parse to int
+          staff_id: productionData.staff_id,
           staff_name: staffMembers.find(s => s.id.toString() === productionData.staff_id)?.name || '',
           notes: productionData.notes || null
         })
@@ -247,7 +247,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select a product..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent items={productItems} searchable={true}>
                 {productItems.map((item) => (
                   <SelectItem key={item.id} value={item.value}>
                     {item.label}
@@ -266,7 +266,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select a recipe..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent items={recipeItems} searchable={true}>
                 <SelectItem value="">No Recipe</SelectItem>
                 {recipeItems.map((item) => (
                   <SelectItem key={item.id} value={item.value}>
@@ -295,7 +295,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select staff member..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent items={staffItems} searchable={true}>
                 {staffItems.map((item) => (
                   <SelectItem key={item.id} value={item.value}>
                     {item.label}
