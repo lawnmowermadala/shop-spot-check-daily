@@ -1,5 +1,5 @@
-
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, User } from 'lucide-react';
@@ -23,6 +23,7 @@ interface IncompleteAssignmentsCarouselProps {
 
 const IncompleteAssignmentsCarousel = ({ assignments }: IncompleteAssignmentsCarouselProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const navigate = useNavigate();
 
   if (assignments.length === 0) {
     return null;
@@ -37,6 +38,12 @@ const IncompleteAssignmentsCarousel = ({ assignments }: IncompleteAssignmentsCar
   };
 
   const currentAssignment = assignments[currentIndex];
+
+  const handleCardClick = () => {
+    if (currentAssignment.id) {
+      navigate(`/assignments?id=${currentAssignment.id}`);
+    }
+  };
 
   return (
     <div className="mb-4">
@@ -67,43 +74,45 @@ const IncompleteAssignmentsCarousel = ({ assignments }: IncompleteAssignmentsCar
         </div>
       </div>
       
-      <Card className={`${currentAssignment.isPreviousDay ? 'border-amber-500 bg-amber-50' : 'border-blue-200 bg-blue-50'}`}>
-        <CardContent className="p-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h4 className="font-semibold text-sm">{currentAssignment.area}</h4>
-                {currentAssignment.isPreviousDay && (
-                  <Badge variant="outline" className="text-xs text-amber-700 bg-amber-100 border-amber-200">
-                    From yesterday
-                  </Badge>
+      <div onClick={handleCardClick} className="cursor-pointer transition-transform duration-200 hover:scale-[1.02]">
+        <Card className={`${currentAssignment.isPreviousDay ? 'border-amber-500 bg-amber-50' : 'border-blue-200 bg-blue-50'}`}>
+          <CardContent className="p-3">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-semibold text-sm">{currentAssignment.area}</h4>
+                  {currentAssignment.isPreviousDay && (
+                    <Badge variant="outline" className="text-xs text-amber-700 bg-amber-100 border-amber-200">
+                      From yesterday
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                  <User className="h-3 w-3" />
+                  <span>{currentAssignment.assignee_name}</span>
+                </div>
+                {currentAssignment.instructions && (
+                  <p className="text-xs text-gray-500 line-clamp-2">
+                    {currentAssignment.instructions}
+                  </p>
                 )}
-              </div>
-              <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
-                <User className="h-3 w-3" />
-                <span>{currentAssignment.assignee_name}</span>
-              </div>
-              {currentAssignment.instructions && (
-                <p className="text-xs text-gray-500 line-clamp-2">
-                  {currentAssignment.instructions}
-                </p>
-              )}
-              <div className="mt-1">
-                <Badge 
-                  variant="secondary" 
-                  className={`text-xs ${
-                    currentAssignment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                    currentAssignment.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 
-                    'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {currentAssignment.status.replace('_', ' ')}
-                </Badge>
+                <div className="mt-1">
+                  <Badge 
+                    variant="secondary" 
+                    className={`text-xs ${
+                      currentAssignment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                      currentAssignment.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 
+                      'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {currentAssignment.status.replace('_', ' ')}
+                  </Badge>
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

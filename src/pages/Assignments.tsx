@@ -1,4 +1,6 @@
+
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from "react-router-dom";
 import { 
   Table, 
   TableBody, 
@@ -48,6 +50,9 @@ const Assignments = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const assignmentRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const fetchAssignments = async () => {
     try {
@@ -69,6 +74,32 @@ const Assignments = () => {
     queryFn: fetchAssignments,
     retry: 1
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const scrollId = params.get('id');
+    if (scrollId) {
+      setFilter('all');
+      setDateRange(undefined);
+      setHighlightedId(scrollId);
+      setExpandedAssignment(scrollId);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (highlightedId && assignments.length > 0) {
+      const targetRef = assignmentRefs.current[highlightedId];
+      if (targetRef) {
+        setTimeout(() => {
+          targetRef.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+          setTimeout(() => setHighlightedId(null), 2500);
+        }, 100);
+      }
+    }
+  }, [highlightedId, assignments]);
 
   useEffect(() => {
     if (error) {
@@ -386,7 +417,11 @@ const Assignments = () => {
                 ) : filteredAssignments.length > 0 ? (
                   filteredAssignments.map((assignment) => (
                     <>
-                      <TableRow key={assignment.id}>
+                      <TableRow 
+                        key={assignment.id}
+                        ref={el => { if(el) assignmentRefs.current[assignment.id] = el; }}
+                        className={highlightedId === assignment.id ? 'bg-blue-100 transition-colors duration-1000' : ''}
+                      >
                         <TableCell className="font-medium">{assignment.area}</TableCell>
                         <TableCell>{assignment.assignee_name}</TableCell>
                         <TableCell>
