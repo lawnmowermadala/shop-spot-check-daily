@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -246,7 +245,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select a product..." />
               </SelectTrigger>
-              <SelectContent items={productItems} searchable={true}>
+              <SelectContent>
                 {productItems.map((item) => (
                   <SelectItem key={item.id} value={item.value}>
                     {item.label}
@@ -265,7 +264,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select a recipe..." />
               </SelectTrigger>
-              <SelectContent items={recipeItems} searchable={true}>
+              <SelectContent>
                 <SelectItem value="">No Recipe</SelectItem>
                 {recipeItems.map((item) => (
                   <SelectItem key={item.id} value={item.value}>
@@ -294,7 +293,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select staff member..." />
               </SelectTrigger>
-              <SelectContent items={staffItems} searchable={true}>
+              <SelectContent>
                 {staffItems.map((item) => (
                   <SelectItem key={item.id} value={item.value}>
                     {item.label}
@@ -335,7 +334,7 @@ const ProductionForm = ({
             Create Production Batch
           </Button>
         </form>
-      </ProductionContent>
+      </CardContent>
     </Card>
   );
 };
