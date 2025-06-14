@@ -370,6 +370,8 @@ export type Database = {
           created_at: string | null
           id: string
           ingredient_name: string
+          pack_price: number | null
+          pack_size: number | null
           quantity_used: number
           unit: string
         }
@@ -379,6 +381,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           ingredient_name: string
+          pack_price?: number | null
+          pack_size?: number | null
           quantity_used: number
           unit: string
         }
@@ -388,6 +392,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           ingredient_name?: string
+          pack_price?: number | null
+          pack_size?: number | null
           quantity_used?: number
           unit?: string
         }

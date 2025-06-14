@@ -39,6 +39,8 @@ interface ProductionIngredient {
   quantity_used: number;
   unit: string;
   cost_per_unit: number;
+  pack_size?: number;
+  pack_price?: number;
   created_at: string;
 }
 
@@ -105,7 +107,9 @@ const ProductionPage = () => {
     ingredient_name: '',
     quantity_used: '',
     unit: 'kg',
-    cost_per_unit: ''
+    cost_per_unit: '',
+    pack_size: '',
+    pack_price: ''
   });
 
   // Edit ingredient form state
@@ -113,7 +117,9 @@ const ProductionPage = () => {
     ingredient_name: '',
     quantity_used: '',
     unit: 'kg',
-    cost_per_unit: ''
+    cost_per_unit: '',
+    pack_size: '',
+    pack_price: ''
   });
 
   // Fetch staff members from staff table - just id and name
@@ -496,7 +502,6 @@ const ProductionPage = () => {
       if (!activeBatchId || !ingredientData.ingredient_name || !ingredientData.quantity_used) {
         throw new Error('Please fill all required fields');
       }
-
       const { data, error } = await supabase
         .from('production_ingredients')
         .insert({
@@ -504,7 +509,9 @@ const ProductionPage = () => {
           ingredient_name: ingredientData.ingredient_name,
           quantity_used: Number(ingredientData.quantity_used),
           unit: ingredientData.unit,
-          cost_per_unit: Number(ingredientData.cost_per_unit) || 0
+          cost_per_unit: Number(ingredientData.cost_per_unit) || 0,
+          pack_size: ingredientData.pack_size ? Number(ingredientData.pack_size) : null,
+          pack_price: ingredientData.pack_price ? Number(ingredientData.pack_price) : null
         })
         .select()
         .single();
@@ -518,11 +525,11 @@ const ProductionPage = () => {
         ingredient_name: '',
         quantity_used: '',
         unit: 'kg',
-        cost_per_unit: ''
+        cost_per_unit: '',
+        pack_size: '',
+        pack_price: ''
       });
       toast.success('Ingredient added successfully!');
-      
-      // Update batch cost after adding ingredient
       if (activeBatchId) {
         updateBatchCostMutation.mutate(activeBatchId);
       }
@@ -545,8 +552,6 @@ const ProductionPage = () => {
     onSuccess: (_, ingredientId) => {
       queryClient.invalidateQueries({ queryKey: ['batch_ingredients'] });
       toast.success('Ingredient removed successfully!');
-      
-      // Update batch cost after deleting ingredient
       if (activeBatchId) {
         updateBatchCostMutation.mutate(activeBatchId);
       }
@@ -565,7 +570,9 @@ const ProductionPage = () => {
           ingredient_name: data.ingredient_name,
           quantity_used: Number(data.quantity_used),
           unit: data.unit,
-          cost_per_unit: Number(data.cost_per_unit) || 0
+          cost_per_unit: Number(data.cost_per_unit) || 0,
+          pack_size: data.pack_size ? Number(data.pack_size) : null,
+          pack_price: data.pack_price ? Number(data.pack_price) : null
         })
         .eq('id', ingredientId);
 
@@ -578,11 +585,11 @@ const ProductionPage = () => {
         ingredient_name: '',
         quantity_used: '',
         unit: 'kg',
-        cost_per_unit: ''
+        cost_per_unit: '',
+        pack_size: '',
+        pack_price: ''
       });
       toast.success('Ingredient updated successfully!');
-      
-      // Update batch cost after editing ingredient
       if (activeBatchId) {
         updateBatchCostMutation.mutate(activeBatchId);
       }
@@ -598,7 +605,9 @@ const ProductionPage = () => {
       ingredient_name: ingredient.ingredient_name,
       quantity_used: ingredient.quantity_used.toString(),
       unit: ingredient.unit,
-      cost_per_unit: ingredient.cost_per_unit.toString()
+      cost_per_unit: ingredient.cost_per_unit.toString(),
+      pack_size: ingredient.pack_size ? ingredient.pack_size.toString() : '',
+      pack_price: ingredient.pack_price ? ingredient.pack_price.toString() : ''
     });
   };
 
@@ -616,7 +625,9 @@ const ProductionPage = () => {
       ingredient_name: '',
       quantity_used: '',
       unit: 'kg',
-      cost_per_unit: ''
+      cost_per_unit: '',
+      pack_size: '',
+      pack_price: ''
     });
   };
 
@@ -1191,6 +1202,30 @@ const ProductionPage = () => {
                                       />
                                     </TableCell>
                                     <TableCell>
+                                      <Input
+                                        type="number"
+                                        value={editIngredientData.pack_size}
+                                        onChange={(e) => setEditIngredientData({
+                                          ...editIngredientData,
+                                          pack_size: e.target.value
+                                        })}
+                                        className="w-24"
+                                        placeholder="Pack Size"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        value={editIngredientData.pack_price}
+                                        onChange={(e) => setEditIngredientData({
+                                          ...editIngredientData,
+                                          pack_price: e.target.value
+                                        })}
+                                        className="w-24"
+                                        placeholder="Pack Price"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
                                       R{(Number(editIngredientData.quantity_used) * Number(editIngredientData.cost_per_unit)).toFixed(2)}
                                     </TableCell>
                                     <TableCell>
@@ -1219,6 +1254,8 @@ const ProductionPage = () => {
                                     <TableCell>{ingredient.quantity_used}</TableCell>
                                     <TableCell>{ingredient.unit}</TableCell>
                                     <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
+                                    <TableCell>{ingredient.pack_size ? ingredient.pack_size : "-"}</TableCell>
+                                    <TableCell>{ingredient.pack_price ? "R"+ingredient.pack_price.toFixed(2) : "-"}</TableCell>
                                     <TableCell>R{(ingredient.quantity_used * ingredient.cost_per_unit).toFixed(2)}</TableCell>
                                     <TableCell>
                                       <div className="flex gap-1">
@@ -1249,7 +1286,7 @@ const ProductionPage = () => {
                       
                       <div className="mt-4 border-t pt-4">
                         <h4 className="text-sm font-medium mb-2">Add New Ingredient</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
                           <div className="md:col-span-2">
                             <Input
                               value={ingredientData.ingredient_name}
@@ -1284,6 +1321,22 @@ const ProductionPage = () => {
                               value={ingredientData.cost_per_unit}
                               onChange={(e) => setIngredientData({...ingredientData, cost_per_unit: e.target.value})}
                               placeholder="Cost per unit"
+                            />
+                          </div>
+                          <div>
+                            <Input
+                              type="number"
+                              value={ingredientData.pack_size}
+                              onChange={(e) => setIngredientData({...ingredientData, pack_size: e.target.value})}
+                              placeholder="Pack Size"
+                            />
+                          </div>
+                          <div>
+                            <Input
+                              type="number"
+                              value={ingredientData.pack_price}
+                              onChange={(e) => setIngredientData({...ingredientData, pack_price: e.target.value})}
+                              placeholder="Pack Price"
                             />
                           </div>
                         </div>
