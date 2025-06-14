@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -148,7 +149,8 @@ const ProductionForm = ({
           recipe_id: productionData.recipe_id || null,
           quantity_produced: parseInt(productionData.quantity_produced),
           production_date: dateStr,
-          staff_id: parseInt(productionData.staff_id),
+          staff_id: productionData.staff_id, // Keep as string, don't parse to int
+          staff_name: staffMembers.find(s => s.id.toString() === productionData.staff_id)?.name || '',
           notes: productionData.notes || null
         })
         .select()
