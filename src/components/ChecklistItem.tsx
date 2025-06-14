@@ -148,20 +148,10 @@ const ChecklistItem = ({
           return; // Stop processing if upload fails!
         } else if (uploadData) {
           // --- Get public URL ---
-          const { data: publicUrlData, error: publicUrlError } = supabase
+          const { data: publicUrlData } = supabase
             .storage
             .from('area_photos')
             .getPublicUrl(filePath);
-
-          if (publicUrlError) {
-            console.error("[CHECKLIST_ITEM] Error getting public URL:", publicUrlError);
-            toast({
-              title: "Photo URL Error",
-              description: publicUrlError.message,
-              variant: "destructive"
-            });
-            return;
-          }
 
           if (publicUrlData && publicUrlData.publicUrl) {
             photoUrl = publicUrlData.publicUrl;
