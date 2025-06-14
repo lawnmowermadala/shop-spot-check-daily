@@ -767,6 +767,48 @@ const ProductionPage = () => {
     printWindow.document.close();
   };
 
+  // Add loading state for recipe fetching to handle async updating
+  const [fetchingDefaultRecipe, setFetchingDefaultRecipe] = useState(false);
+
+  // When user selects a product, automatically fetch default recipe for it
+  const handleProductChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const productId = e.target.value;
+    setProductionData(prev => ({
+      ...prev,
+      product_id: productId,
+      // Reset recipe_id for a new product
+      recipe_id: '' 
+    }));
+
+    if (!productId) return;
+    try {
+      setFetchingDefaultRecipe(true);
+      // Try to find a default recipe for this product
+      const { data: relationData, error: relationError } = await supabase
+        .from('product_recipes')
+        .select('recipe_id')
+        .eq('product_id', productId)
+        .eq('is_default', true)
+        .maybeSingle();
+      setFetchingDefaultRecipe(false);
+
+      if (relationError) {
+        // optionally toast or log, but don't block
+        return;
+      }
+      if (relationData && relationData.recipe_id) {
+        setProductionData(prev => ({
+          ...prev,
+          product_id: productId,
+          recipe_id: relationData.recipe_id
+        }));
+      }
+    } catch {
+      setFetchingDefaultRecipe(false);
+      // fail silently, allow user to pick manually
+    }
+  };
+
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
       {/* Header Section */}
@@ -933,7 +975,7 @@ const ProductionPage = () => {
               <label className="block text-sm font-medium mb-1">Product *</label>
               <select
                 value={productionData.product_id}
-                onChange={(e) => setProductionData({...productionData, product_id: e.target.value})}
+                onChange={handleProductChange}
                 className="w-full p-2 border rounded"
                 required
               >
@@ -950,6 +992,7 @@ const ProductionPage = () => {
                 value={productionData.recipe_id}
                 onChange={(e) => setProductionData({...productionData, recipe_id: e.target.value})}
                 className="w-full p-2 border rounded"
+                disabled={fetchingDefaultRecipe}
               >
                 <option value="">Select a recipe</option>
                 {recipes.map((recipe) => (
@@ -958,6 +1001,9 @@ const ProductionPage = () => {
                   </option>
                 ))}
               </select>
+              {fetchingDefaultRecipe && (
+                <span className="text-xs text-gray-500">Loading default recipe...</span>
+              )}
             </div>
             
             <div>
