@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +41,7 @@ interface ProductionFormProps {
   recipeIngredients: RecipeIngredient[];
   date: Date;
   onBatchCreated: () => void;
+  onRecipeSelected: (recipeId: string | null) => void;
 }
 
 const ProductionForm = ({
@@ -50,7 +50,8 @@ const ProductionForm = ({
   staffMembers,
   recipeIngredients,
   date,
-  onBatchCreated
+  onBatchCreated,
+  onRecipeSelected
 }: ProductionFormProps) => {
   const [fetchingDefaultRecipe, setFetchingDefaultRecipe] = useState(false);
   const [productionData, setProductionData] = useState({
@@ -60,6 +61,11 @@ const ProductionForm = ({
     staff_id: '',
     notes: ''
   });
+
+  // Update parent component when recipe changes
+  useEffect(() => {
+    onRecipeSelected(productionData.recipe_id || null);
+  }, [productionData.recipe_id, onRecipeSelected]);
 
   const handleProductChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const productId = e.target.value;
@@ -113,6 +119,11 @@ const ProductionForm = ({
       console.error('Error fetching default recipe:', error);
       setFetchingDefaultRecipe(false);
     }
+  };
+
+  const handleRecipeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const recipeId = e.target.value;
+    setProductionData({...productionData, recipe_id: recipeId});
   };
 
   const calculateRecipeTotalCost = () => {
@@ -243,7 +254,7 @@ const ProductionForm = ({
             </label>
             <select
               value={productionData.recipe_id}
-              onChange={(e) => setProductionData({...productionData, recipe_id: e.target.value})}
+              onChange={handleRecipeChange}
               className="w-full p-2 border rounded"
               disabled={fetchingDefaultRecipe}
             >

@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -18,6 +17,7 @@ const ProductionPage = () => {
   const [showStaffAnalytics, setShowStaffAnalytics] = useState(false);
   const [comparisonDays, setComparisonDays] = useState(7);
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -32,7 +32,7 @@ const ProductionPage = () => {
     deleteBatchMutation,
     updateBatchCostMutation,
     queryClient
-  } = useProductionData(date, comparisonDays, activeBatchId, null);
+  } = useProductionData(date, comparisonDays, activeBatchId, selectedRecipeId);
 
   const {
     addIngredientMutation,
@@ -164,6 +164,7 @@ const ProductionPage = () => {
         recipeIngredients={recipeIngredients}
         date={date}
         onBatchCreated={handleBatchCreated}
+        onRecipeSelected={setSelectedRecipeId}
       />
 
       <Card className="mb-6">

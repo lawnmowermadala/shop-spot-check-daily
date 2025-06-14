@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
@@ -71,7 +70,7 @@ interface StaffProductionStats {
   total_units: number;
 }
 
-export const useProductionData = (date: Date, comparisonDays: number, activeBatchId: string | null, recipeId: string | null) => {
+export const useProductionData = (date: Date, comparisonDays: number, activeBatchId: string | null, selectedRecipeId: string | null) => {
   const queryClient = useQueryClient();
 
   // Fetch staff members
@@ -102,21 +101,21 @@ export const useProductionData = (date: Date, comparisonDays: number, activeBatc
     }
   });
 
-  // Fetch recipe ingredients
+  // Fetch recipe ingredients - updated to use selectedRecipeId
   const { data: recipeIngredients = [] } = useQuery<RecipeIngredient[]>({
-    queryKey: ['recipe_ingredients', recipeId],
+    queryKey: ['recipe_ingredients', selectedRecipeId],
     queryFn: async () => {
-      if (!recipeId) return [];
+      if (!selectedRecipeId) return [];
       
       const { data, error } = await supabase
         .from('recipe_ingredients')
         .select('*')
-        .eq('recipe_id', recipeId);
+        .eq('recipe_id', selectedRecipeId);
       
       if (error) throw error;
       return data;
     },
-    enabled: !!recipeId
+    enabled: !!selectedRecipeId
   });
 
   // Fetch products
