@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,6 +63,9 @@ const ProductionForm = ({
 
   const handleProductChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const productId = e.target.value;
+    console.log('Product selected:', productId);
+    
+    // Reset recipe selection first
     setProductionData(prev => ({
       ...prev,
       product_id: productId,
@@ -73,6 +76,8 @@ const ProductionForm = ({
     
     try {
       setFetchingDefaultRecipe(true);
+      console.log('Fetching default recipe for product:', productId);
+      
       const { data: relationData, error: relationError } = await supabase
         .from('product_recipes')
         .select('recipe_id')
@@ -80,27 +85,32 @@ const ProductionForm = ({
         .eq('is_default', true)
         .maybeSingle();
       
+      console.log('Product recipe relation:', relationData, relationError);
+      
       if (relationError) {
-        console.log('No default recipe found or error:', relationError);
+        console.log('Error fetching default recipe:', relationError);
         setFetchingDefaultRecipe(false);
         return;
       }
       
       if (relationData && relationData.recipe_id) {
-        setTimeout(() => {
-          setProductionData(prev => ({
-            ...prev,
-            product_id: productId,
-            recipe_id: relationData.recipe_id
-          }));
-          setFetchingDefaultRecipe(false);
-          toast.success('Default recipe automatically selected!');
-        }, 100);
+        console.log('Default recipe found:', relationData.recipe_id);
+        
+        // Update state with the default recipe
+        setProductionData(prev => ({
+          ...prev,
+          product_id: productId,
+          recipe_id: relationData.recipe_id
+        }));
+        
+        toast.success('Default recipe automatically selected!');
       } else {
-        setFetchingDefaultRecipe(false);
+        console.log('No default recipe found for this product');
       }
+      
+      setFetchingDefaultRecipe(false);
     } catch (error) {
-      console.log('Error fetching default recipe:', error);
+      console.error('Error fetching default recipe:', error);
       setFetchingDefaultRecipe(false);
     }
   };
@@ -229,7 +239,7 @@ const ProductionForm = ({
           <div>
             <label className="block text-sm font-medium mb-1">
               Recipe (Optional)
-              {fetchingDefaultRecipe && <span className="ml-2 text-xs text-blue-600">Loading...</span>}
+              {fetchingDefaultRecipe && <span className="ml-2 text-xs text-blue-600">Loading default recipe...</span>}
             </label>
             <select
               value={productionData.recipe_id}
