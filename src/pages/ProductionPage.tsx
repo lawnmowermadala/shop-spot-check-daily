@@ -89,6 +89,7 @@ const ProductionPage = () => {
   const [showStaffAnalytics, setShowStaffAnalytics] = useState(false);
   const [comparisonDays, setComparisonDays] = useState(7);
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
+  const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   
   // Production form state
@@ -111,6 +112,14 @@ const ProductionPage = () => {
   
   // Ingredient form state
   const [ingredientData, setIngredientData] = useState({
+    ingredient_name: '',
+    quantity_used: '',
+    unit: 'kg',
+    cost_per_unit: ''
+  });
+
+  // Edit ingredient form state
+  const [editIngredientData, setEditIngredientData] = useState({
     ingredient_name: '',
     quantity_used: '',
     unit: 'kg',
@@ -567,6 +576,49 @@ const ProductionPage = () => {
       toast.success('Ingredient removed successfully!');
       
       // Update batch cost after deleting ingredient
+      if (activeBatchId) {
+        updateBatchMutation.mutate(activeBatchId);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    }
+  });
+
+  // Update ingredient mutation
+  const updateIngredientMutation = useMutation({
+    mutationFn: async (ingredientId: string) => {
+      // Validate
+      if (
+        !editIngredientData.ingredient_name ||
+        editIngredientData.quantity_used === '' ||
+        editIngredientData.unit === '' ||
+        editIngredientData.cost_per_unit === ''
+      ) {
+        throw new Error('All fields are required to edit an ingredient.');
+      }
+      const { error } = await supabase
+        .from('production_ingredients')
+        .update({
+          ingredient_name: editIngredientData.ingredient_name,
+          quantity_used: Number(editIngredientData.quantity_used),
+          unit: editIngredientData.unit,
+          cost_per_unit: Number(editIngredientData.cost_per_unit)
+        })
+        .eq('id', ingredientId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batch_ingredients'] });
+      setEditingIngredientId(null);
+      setEditIngredientData({
+        ingredient_name: '',
+        quantity_used: '',
+        unit: 'kg',
+        cost_per_unit: ''
+      });
+      toast.success('Ingredient updated successfully!');
+      // Optionally: update batch cost after editing ingredient
       if (activeBatchId) {
         updateBatchMutation.mutate(activeBatchId);
       }
@@ -1203,21 +1255,106 @@ const ProductionPage = () => {
                           <TableBody>
                             {batchIngredients.map((ingredient) => (
                               <TableRow key={ingredient.id}>
-                                <TableCell>{ingredient.ingredient_name}</TableCell>
-                                <TableCell>{ingredient.quantity_used}</TableCell>
-                                <TableCell>{ingredient.unit}</TableCell>
-                                <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
-                                <TableCell>R{(ingredient.quantity_used * ingredient.cost_per_unit).toFixed(2)}</TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => deleteIngredientMutation.mutate(ingredient.id)}
-                                    disabled={deleteIngredientMutation.isPending}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </TableCell>
+                                {editingIngredientId === ingredient.id ? (
+                                  <>
+                                    <TableCell>
+                                      <Input
+                                        value={editIngredientData.ingredient_name}
+                                        onChange={(e) => setEditIngredientData({...editIngredientData, ingredient_name: e.target.value})}
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={editIngredientData.quantity_used}
+                                        onChange={(e) => setEditIngredientData({...editIngredientData, quantity_used: e.target.value})}
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <select
+                                        value={editIngredientData.unit}
+                                        onChange={(e) => setEditIngredientData({...editIngredientData, unit: e.target.value})}
+                                        className="w-full p-2 border rounded"
+                                      >
+                                        <option value="kg">kg</option>
+                                        <option value="g">g</option>
+                                        <option value="L">L</option>
+                                        <option value="ml">ml</option>
+                                        <option value="unit">unit</option>
+                                      </select>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={editIngredientData.cost_per_unit}
+                                        onChange={(e) => setEditIngredientData({...editIngredientData, cost_per_unit: e.target.value})}
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      R{(Number(editIngredientData.quantity_used || 0) * Number(editIngredientData.cost_per_unit || 0)).toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => updateIngredientMutation.mutate(ingredient.id)}
+                                        disabled={updateIngredientMutation.isPending}
+                                      >
+                                        Save
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setEditingIngredientId(null);
+                                          setEditIngredientData({
+                                            ingredient_name: '',
+                                            quantity_used: '',
+                                            unit: 'kg',
+                                            cost_per_unit: ''
+                                          });
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </TableCell>
+                                  </>
+                                ) : (
+                                  <>
+                                    <TableCell>{ingredient.ingredient_name}</TableCell>
+                                    <TableCell>{ingredient.quantity_used}</TableCell>
+                                    <TableCell>{ingredient.unit}</TableCell>
+                                    <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
+                                    <TableCell>R{(ingredient.quantity_used * ingredient.cost_per_unit).toFixed(2)}</TableCell>
+                                    <TableCell className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setEditingIngredientId(ingredient.id);
+                                          setEditIngredientData({
+                                            ingredient_name: ingredient.ingredient_name,
+                                            quantity_used: ingredient.quantity_used.toString(),
+                                            unit: ingredient.unit,
+                                            cost_per_unit: ingredient.cost_per_unit.toString()
+                                          });
+                                        }}
+                                        disabled={editingIngredientId !== null}
+                                      >
+                                        Edit
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => deleteIngredientMutation.mutate(ingredient.id)}
+                                        disabled={deleteIngredientMutation.isPending || editingIngredientId !== null}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    </TableCell>
+                                  </>
+                                )}
                               </TableRow>
                             ))}
                           </TableBody>
