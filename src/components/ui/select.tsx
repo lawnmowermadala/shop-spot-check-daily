@@ -1,6 +1,7 @@
+
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
-import { Check, ChevronDown, ChevronUp } from "lucide-react"
+import { Check, ChevronDown, ChevronUp, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -73,6 +74,18 @@ const SelectContent = React.forwardRef<
   }
 >(({ className, children, position = "popper", items, searchable = true, ...props }, ref) => {
   const [search, setSearch] = React.useState("");
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  
+  // Focus search input when content opens
+  React.useEffect(() => {
+    if (searchable && items && searchInputRef.current) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [searchable, items]);
+
   // If children is an array of <SelectItem> you cannot filter it directly, but
   // for custom list, users can pass items prop and we'll filter.
   let filteredChildren = children;
@@ -81,7 +94,8 @@ const SelectContent = React.forwardRef<
       .filter(
         (item) =>
           item.label?.toLowerCase().includes(search.toLowerCase()) ||
-          item.code?.toLowerCase().includes(search.toLowerCase())
+          item.code?.toLowerCase().includes(search.toLowerCase()) ||
+          item.name?.toLowerCase().includes(search.toLowerCase())
       )
       .map((item) => (
         <SelectItem key={item.id ?? item.value} value={item.value}>
@@ -89,6 +103,7 @@ const SelectContent = React.forwardRef<
         </SelectItem>
       ));
   }
+  
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -104,15 +119,22 @@ const SelectContent = React.forwardRef<
       >
         {/* Add search input if searchable and items provided */}
         {searchable && items && (
-          <div className="sticky top-0 bg-popover z-50 p-2">
-            <input
-              type="text"
-              placeholder="Search by name or code..."
-              className="w-full p-2 border rounded text-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-            />
+          <div className="sticky top-0 bg-popover z-50 p-3 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search by name or code..."
+                className="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  // Prevent closing the select when typing
+                  e.stopPropagation();
+                }}
+              />
+            </div>
           </div>
         )}
         <SelectScrollUpButton />
