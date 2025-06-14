@@ -4,7 +4,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, User } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
 
 interface Assignment {
   id?: string;
@@ -24,7 +23,6 @@ interface IncompleteAssignmentsCarouselProps {
 
 const IncompleteAssignmentsCarousel = ({ assignments }: IncompleteAssignmentsCarouselProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const navigate = useNavigate();
 
   if (assignments.length === 0) {
     return null;
@@ -39,12 +37,6 @@ const IncompleteAssignmentsCarousel = ({ assignments }: IncompleteAssignmentsCar
   };
 
   const currentAssignment = assignments[currentIndex];
-
-  const handleCardClick = () => {
-    if (currentAssignment && currentAssignment.id) {
-      navigate(`/assignments?id=${currentAssignment.id}`);
-    }
-  };
 
   return (
     <div className="mb-4">
@@ -75,13 +67,7 @@ const IncompleteAssignmentsCarousel = ({ assignments }: IncompleteAssignmentsCar
         </div>
       </div>
       
-      <Card 
-        className={`${currentAssignment.isPreviousDay ? 'border-amber-500 bg-amber-50' : 'border-blue-200 bg-blue-50'} cursor-pointer transition-shadow hover:shadow-lg`}
-        onClick={handleCardClick}
-        tabIndex={0}
-        role="button"
-        aria-label="See assignment"
-        >
+      <Card className={`${currentAssignment.isPreviousDay ? 'border-amber-500 bg-amber-50' : 'border-blue-200 bg-blue-50'}`}>
         <CardContent className="p-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -123,4 +109,3 @@ const IncompleteAssignmentsCarousel = ({ assignments }: IncompleteAssignmentsCar
 };
 
 export default IncompleteAssignmentsCarousel;
-

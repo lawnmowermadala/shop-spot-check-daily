@@ -1,232 +1,523 @@
-
-// Only import hooks once
 import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { CheckCheck, User, X } from 'lucide-react';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { useLocation } from "react-router-dom";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { DateRange } from "react-day-picker";
+import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
-interface Assignment {
-  id?: string;
+type Assignment = {
+  id: string;
   area: string;
-  assignee_id: number;
   assignee_name: string;
-  status: string;
+  assignee_id: number;
+  status: 'pending' | 'needs-check' | 'in-progress' | 'done' | 'incomplete';
+  created_at: string;
   instructions?: string;
-  photo_url?: string | null;
-  created_at?: string;
-  isPreviousDay?: boolean;
+  photo_url?: string;
 }
 
+const statusIcons = {
+  'pending': <AlertTriangle className="h-5 w-5 text-orange-500" />,
+  'needs-check': <CirclePlay className="h-5 w-5 text-yellow-500" />,
+  'in-progress': <Clock className="h-5 w-5 text-blue-500" />,
+  'done': <Check className="h-5 w-5 text-green-500" />,
+  'incomplete': <X className="h-5 w-5 text-red-500" />
+};
+
 const Assignments = () => {
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const location = useLocation();
-  const assignmentRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [filter, setFilter] = useState<'all' | 'pending' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const fetchAssignments = async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('assignments')
         .select('*')
         .order('created_at', { ascending: false });
-
+      
       if (error) throw error;
-
-      setAssignments(data || []);
+      return data as Assignment[];
     } catch (error) {
-      console.error('Error fetching assignments:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load assignments",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
+      console.error('Failed to fetch assignments:', error);
+      throw error;
     }
   };
 
+  const { data: assignments = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['assignments'],
+    queryFn: fetchAssignments,
+    retry: 1
+  });
+
   useEffect(() => {
-    fetchAssignments();
-  }, []);
-
-  const handleComplete = async (assignmentId: string | undefined) => {
-    if (!assignmentId) {
+    if (error) {
       toast({
-        title: "Error",
-        description: "Invalid assignment ID",
-        variant: "destructive"
+        title: "Error Loading Assignments",
+        description: error.message || "Please check your connection and try again.",
+        variant: "destructive",
+        action: (
+          <Button variant="ghost" size="sm" onClick={() => refetch()}>
+            Retry
+          </Button>
+        )
       });
-      return;
     }
+  }, [error, refetch]);
 
+  const updateAssignmentStatus = async (id: string, status: Assignment['status']) => {
     try {
       const { error } = await supabase
         .from('assignments')
-        .update({ status: 'done' })
-        .eq('id', assignmentId);
-
+        .update({ status })
+        .eq('id', id);
+      
       if (error) throw error;
-
+      
+      await refetch();
+      
       toast({
-        title: "Success",
-        description: "Assignment marked as complete!",
+        title: "Status Updated",
+        description: `Assignment marked as ${status.replace('-', ' ')}`,
       });
-
-      fetchAssignments();
-    } catch (error) {
-      console.error('Error completing assignment:', error);
+    } catch (err) {
+      console.error('Error updating status:', err);
       toast({
-        title: "Error",
-        description: "Failed to complete assignment",
+        title: "Update Failed",
+        description: "Couldn't update status. Please try again.",
         variant: "destructive"
       });
     }
   };
 
-  const handleDelete = async (assignmentId: string | undefined) => {
-    if (!assignmentId) {
-      toast({
-        title: "Error",
-        description: "Invalid assignment ID",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const clearAssignment = async (id: string) => {
     try {
+      // First check if the assignment can be cleared (only pending status)
+      const { data, error: fetchError } = await supabase
+        .from('assignments')
+        .select('status')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      if (data.status !== 'pending') {
+        toast({
+          title: "Cannot Clear Assignment",
+          description: "Only pending assignments can be cleared. Assignments that have been started, completed or marked as incomplete cannot be deleted.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const { error } = await supabase
         .from('assignments')
         .delete()
-        .eq('id', assignmentId);
-
+        .eq('id', id);
+      
       if (error) throw error;
-
+      
+      await refetch();
+      
       toast({
-        title: "Success",
-        description: "Assignment deleted successfully!",
+        title: "Assignment Cleared",
+        description: "The pending assignment has been removed",
       });
-
-      fetchAssignments();
-    } catch (error) {
-      console.error('Error deleting assignment:', error);
+    } catch (err) {
+      console.error('Error clearing assignment:', err);
       toast({
-        title: "Error",
-        description: "Failed to delete assignment",
+        title: "Clear Failed",
+        description: "Couldn't clear assignment. Please try again.",
         variant: "destructive"
       });
     }
   };
 
-  // NEW: Try focus/scroll to assignment if 'id' param in URL
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const scrollId = params.get('id');
-    if (scrollId && assignmentRefs.current[scrollId]) {
-      assignmentRefs.current[scrollId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      assignmentRefs.current[scrollId]?.focus?.();
+  const isWithinDateRange = (assignment: Assignment): boolean => {
+    if (!dateRange || !dateRange.from) return true;
+    
+    const assignmentDate = new Date(assignment.created_at);
+    const start = dateRange.from ? startOfDay(dateRange.from) : null;
+    const end = dateRange.to ? endOfDay(dateRange.to) : (start ? endOfDay(start) : null);
+    
+    if (!start) return true;
+    
+    if (end) {
+      return isWithinInterval(assignmentDate, { start, end });
     }
-  }, [location.search, assignments]);
+    
+    // If only start date is selected, match only that day
+    const startDay = startOfDay(start);
+    const endDay = endOfDay(start);
+    return isWithinInterval(assignmentDate, { start: startDay, end: endDay });
+  };
+  
+  // Apply all filters (status and date)
+  const filteredAssignments = assignments
+    .filter(assignment => filter === 'all' || assignment.status === filter)
+    .filter(isWithinDateRange);
+
+  const toggleExpandAssignment = (id: string) => {
+    setExpandedAssignment(expandedAssignment === id ? null : id);
+  };
+
+  const handlePrint = () => {
+    const content = printRef.current;
+    
+    if (!content) return;
+    
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    
+    if (!printWindow) {
+      toast({
+        title: "Print Error",
+        description: "Unable to open print window. Please check your browser settings.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Create date range text for header
+    let dateRangeText = 'All Dates';
+    if (dateRange?.from) {
+      dateRangeText = dateRange.to 
+        ? `${format(dateRange.from, 'MMM dd, yyyy')} to ${format(dateRange.to, 'MMM dd, yyyy')}` 
+        : format(dateRange.from, 'MMM dd, yyyy');
+    }
+    
+    // Create status filter text
+    const statusText = filter === 'all' ? 'All Statuses' : `Status: ${filter.replace('-', ' ')}`;
+    
+    // Create HTML content for printing
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Assignments Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; }
+            h3 { color: #666; margin-bottom: 20px; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .print-header { display: flex; justify-content: space-between; align-items: center; }
+            .print-info { margin: 8px 0; }
+            .instructions { padding: 8px; background-color: #f9f9f9; border-top: 1px dotted #ddd; }
+            .photo-container { max-width: 300px; margin-top: 8px; }
+            .photo-container img { width: 100%; height: auto; border: 1px solid #ddd; }
+            @media print {
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-header">
+            <h1>Assignments Report</h1>
+            <div>
+              <button class="no-print" onclick="window.print()">Print</button>
+              <button class="no-print" onclick="window.close()">Close</button>
+            </div>
+          </div>
+          <div class="print-info">Date Range: ${dateRangeText}</div>
+          <div class="print-info">Filter: ${statusText}</div>
+          <div class="print-info">Total: ${filteredAssignments.length} assignments</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Assigned To</th>
+                <th>Status</th>
+                <th>Assigned Date</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredAssignments.map(assignment => `
+                <tr>
+                  <td>${assignment.area}</td>
+                  <td>${assignment.assignee_name}</td>
+                  <td>${assignment.status.replace('-', ' ')}</td>
+                  <td>${new Date(assignment.created_at).toLocaleDateString()}</td>
+                  <td>
+                    ${assignment.instructions ? 
+                      `<div class="instructions">
+                        <strong>Instructions:</strong><br>
+                        ${assignment.instructions}
+                      </div>` : 
+                      'No instructions provided'}
+
+                    ${assignment.photo_url ? 
+                      `<div class="photo-container">
+                        <img src="${assignment.photo_url}" alt="Assignment photo" />
+                      </div>` : 
+                      ''}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    
+    // Give time for content to load before printing
+    setTimeout(() => {
+      printWindow.focus();
+    }, 500);
+  };
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6 text-center">Assignments</h1>
+    <div className="container mx-auto p-4 pb-20">
+      <h1 className="text-2xl font-bold mb-6">Job Assignments</h1>
       
-      {loading ? (
-        <div className="text-center py-4">Loading assignments...</div>
-      ) : (
-        <div className="space-y-4">
-          {assignments.length > 0 ? (
-            assignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                ref={el => {
-                  if (assignment.id) assignmentRefs.current[assignment.id] = el;
-                }}
-                tabIndex={-1}
-                className="outline-none"
-              >
-                <Card className="border-blue-200 bg-blue-50">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-lg text-blue-600">{assignment.area}</h3>
-                        <p className="text-gray-600 text-sm">
-                          Assigned to: {assignment.assignee_name}
-                        </p>
-                        {assignment.instructions && (
-                          <p className="text-gray-500 text-sm mt-1">
-                            Instructions: {assignment.instructions}
-                          </p>
-                        )}
-                        {assignment.photo_url && (
-                          <div className="mt-2">
-                            <img
-                              src={assignment.photo_url}
-                              alt="Assignment"
-                              className="rounded-md object-cover w-full max-h-[150px]"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <Button 
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleComplete(assignment.id)}
-                          className="mb-2"
-                        >
-                          <CheckCheck className="h-4 w-4 mr-2" />
-                          Complete
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm">
-                              <X className="h-4 w-4 mr-2" />
-                              Delete
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the assignment from our servers.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(assignment.id)}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-4 text-gray-500">
-              No assignments found.
-            </div>
-          )}
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant={filter === 'all' ? 'default' : 'outline'} 
+            onClick={() => setFilter('all')}
+            size="sm"
+          >
+            All
+          </Button>
+          <Button 
+            variant={filter === 'pending' ? 'default' : 'outline'} 
+            onClick={() => setFilter('pending')}
+            size="sm"
+          >
+            Pending
+          </Button>
+          <Button 
+            variant={filter === 'needs-check' ? 'default' : 'outline'} 
+            onClick={() => setFilter('needs-check')}
+            size="sm"
+          >
+            Needs Check
+          </Button>
+          <Button 
+            variant={filter === 'in-progress' ? 'default' : 'outline'} 
+            onClick={() => setFilter('in-progress')}
+            size="sm"
+          >
+            In Progress
+          </Button>
+          <Button 
+            variant={filter === 'done' ? 'default' : 'outline'} 
+            onClick={() => setFilter('done')}
+            size="sm"
+          >
+            Completed
+          </Button>
+          <Button 
+            variant={filter === 'incomplete' ? 'default' : 'outline'} 
+            onClick={() => setFilter('incomplete')}
+            size="sm"
+          >
+            Incomplete
+          </Button>
         </div>
-      )}
+        
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="w-full md:w-auto">
+            <DateRangePicker 
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+              className="max-w-sm"
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={handlePrint}
+            className="ml-auto"
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Print List
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Assignments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div ref={printRef} className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Area</TableHead>
+                  <TableHead>Assigned To</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Assigned Date</TableHead>
+                  <TableHead>Instructions</TableHead>
+                  <TableHead>Photo</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-6">
+                      Loading assignments...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredAssignments.length > 0 ? (
+                  filteredAssignments.map((assignment) => (
+                    <>
+                      <TableRow key={assignment.id}>
+                        <TableCell className="font-medium">{assignment.area}</TableCell>
+                        <TableCell>{assignment.assignee_name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {statusIcons[assignment.status]}
+                            <span className="capitalize">
+                              {assignment.status.replace('-', ' ')}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(assignment.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          {assignment.instructions ? (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => toggleExpandAssignment(
+                                expandedAssignment === assignment.id ? null : assignment.id)}
+                              className="flex items-center gap-1 text-sm"
+                            >
+                              <FileText className="h-4 w-4" />
+                              {expandedAssignment === assignment.id ? "Hide" : "View"} Instructions
+                            </Button>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No instructions</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {assignment.photo_url ? (
+                            <div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(assignment.photo_url, '_blank')}
+                                className="flex items-center gap-1 text-sm"
+                              >
+                                <ImageIcon className="h-4 w-4" />
+                                View Photo
+                              </Button>
+                              <div className="mt-2">
+                                <img
+                                  src={assignment.photo_url}
+                                  alt="Assignment photo"
+                                  className="rounded-md object-cover w-24 h-16 border"
+                                  style={{ maxWidth: "120px", maxHeight: "64px" }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No photo</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {assignment.status !== 'in-progress' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => updateAssignmentStatus(assignment.id, 'in-progress')}
+                              >
+                                Start
+                              </Button>
+                            )}
+                            {assignment.status !== 'done' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => updateAssignmentStatus(assignment.id, 'done')}
+                                className="bg-green-50 hover:bg-green-100 text-green-600"
+                              >
+                                Complete
+                              </Button>
+                            )}
+                            {assignment.status !== 'incomplete' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => updateAssignmentStatus(assignment.id, 'incomplete')}
+                                className="bg-red-50 hover:bg-red-100 text-red-600"
+                              >
+                                Incomplete
+                              </Button>
+                            )}
+                            {assignment.status === 'pending' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => clearAssignment(assignment.id)}
+                                className="bg-gray-50 hover:bg-gray-100 text-gray-600"
+                              >
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {expandedAssignment === assignment.id && assignment.instructions && (
+                        <TableRow className="bg-gray-50">
+                          <TableCell colSpan={7} className="py-2">
+                            <div className="p-3 text-sm border-l-2 border-gray-300">
+                              {assignment.instructions}
+                            </div>
+                            {assignment.photo_url && (
+                              <div className="mt-3 max-w-md">
+                                <img
+                                  src={assignment.photo_url}
+                                  alt="Assignment photo"
+                                  className="rounded-md object-cover w-full h-full border"
+                                  style={{ maxWidth: "300px", maxHeight: "200px" }}
+                                />
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                      {assignments.length === 0 ? "No assignments found" : "No assignments match this filter"}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
       
       <Navigation />
     </div>
