@@ -776,11 +776,11 @@ const ProductionPage = () => {
     setProductionData(prev => ({
       ...prev,
       product_id: productId,
-      // Reset recipe_id for a new product
-      recipe_id: '' 
+      recipe_id: '' // Reset recipe first
     }));
 
     if (!productId) return;
+    
     try {
       setFetchingDefaultRecipe(true);
       // Try to find a default recipe for this product
@@ -790,22 +790,30 @@ const ProductionPage = () => {
         .eq('product_id', productId)
         .eq('is_default', true)
         .maybeSingle();
-      setFetchingDefaultRecipe(false);
-
+      
       if (relationError) {
-        // optionally toast or log, but don't block
+        console.log('No default recipe found or error:', relationError);
+        setFetchingDefaultRecipe(false);
         return;
       }
+      
       if (relationData && relationData.recipe_id) {
-        setProductionData(prev => ({
-          ...prev,
-          product_id: productId,
-          recipe_id: relationData.recipe_id
-        }));
+        // Set the recipe after a small delay to ensure UI updates properly
+        setTimeout(() => {
+          setProductionData(prev => ({
+            ...prev,
+            product_id: productId,
+            recipe_id: relationData.recipe_id
+          }));
+          setFetchingDefaultRecipe(false);
+          toast.success('Default recipe automatically selected!');
+        }, 100);
+      } else {
+        setFetchingDefaultRecipe(false);
       }
-    } catch {
+    } catch (error) {
+      console.log('Error fetching default recipe:', error);
       setFetchingDefaultRecipe(false);
-      // fail silently, allow user to pick manually
     }
   };
 
@@ -987,7 +995,10 @@ const ProductionPage = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Recipe (Optional)</label>
+              <label className="block text-sm font-medium mb-1">
+                Recipe (Optional)
+                {fetchingDefaultRecipe && <span className="ml-2 text-xs text-blue-600">Loading...</span>}
+              </label>
               <select
                 value={productionData.recipe_id}
                 onChange={(e) => setProductionData({...productionData, recipe_id: e.target.value})}
@@ -1001,8 +1012,18 @@ const ProductionPage = () => {
                   </option>
                 ))}
               </select>
-              {fetchingDefaultRecipe && (
-                <span className="text-xs text-gray-500">Loading default recipe...</span>
+              {productionData.recipe_id && (
+                <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                  ✓ Recipe selected
+                  <button 
+                    type="button"
+                    onClick={() => setProductionData({...productionData, recipe_id: ''})}
+                    className="text-red-500 hover:text-red-700 ml-2"
+                    title="Clear recipe selection"
+                  >
+                    ✕ Clear
+                  </button>
+                </div>
               )}
             </div>
             
