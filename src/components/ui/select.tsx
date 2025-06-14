@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp, Search } from "lucide-react"
@@ -66,6 +65,8 @@ const SelectScrollDownButton = React.forwardRef<
 SelectScrollDownButton.displayName =
   SelectPrimitive.ScrollDownButton.displayName
 
+const isMobile = () => typeof window !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
@@ -80,13 +81,16 @@ const SelectContent = React.forwardRef<
 
   React.useEffect(() => {
     if (showSearch && searchInputRef.current) {
-      const timer = setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 120);
-      return () => clearTimeout(timer);
+      // Only focus on mobile devices
+      if (isMobile()) {
+        const timer = setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 120);
+        return () => clearTimeout(timer);
+      }
     }
   }, [showSearch]);
-  
+
   const filteredItems = React.useMemo(() => {
     if (!showSearch) return null;
     return items
@@ -118,15 +122,19 @@ const SelectContent = React.forwardRef<
         {showSearch && (
           <div className="flex-shrink-0 bg-popover border-b px-4 py-2">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
               <input
                 ref={searchInputRef}
-                type="text"
+                type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Type to search..."
-                className="w-full pl-9 pr-2 py-2 rounded bg-background border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary"
                 onKeyDown={(e) => e.stopPropagation()}
+                inputMode="text"
+                autoComplete="off"
+                // Autofocus only on mobile (programmatically)
+                autoFocus={isMobile()}
               />
             </div>
           </div>
