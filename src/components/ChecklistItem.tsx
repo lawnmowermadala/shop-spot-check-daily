@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -125,26 +124,38 @@ const ChecklistItem = ({
     try {
       let photoUrl = null;
       
-      // Upload photo if available
+      // Upload photo if available (to public bucket!) and store as public URL
       if (photoFile) {
         const fileExt = photoFile.name.split('.').pop();
-        const filePath = `${area}/${Date.now()}.${fileExt}`;
-        
-        // Try to upload to Supabase Storage if it exists
-        try {
-          const { data: uploadData, error: uploadError } = await supabase
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2,8)}.${fileExt}`;
+        const filePath = `${area}/${fileName}`;
+
+        // Upload to Supabase Storage (public bucket)
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from('area_photos')
+          .upload(filePath, photoFile, { upsert: false });
+
+        if (uploadError) {
+          console.error('Photo upload error:', uploadError);
+          toast({
+            title: "Photo Upload Failed",
+            description: uploadError.message,
+            variant: "destructive"
+          });
+        } else if (uploadData) {
+          // Get the public URL for the photo
+          const { data: publicUrlData } = supabase
             .storage
             .from('area_photos')
-            .upload(filePath, photoFile);
-          
-          if (uploadError) {
-            console.error('Photo upload error:', uploadError);
-          } else if (uploadData) {
-            photoUrl = filePath;
+            .getPublicUrl(filePath);
+
+          if (publicUrlData && publicUrlData.publicUrl) {
+            photoUrl = publicUrlData.publicUrl;
+          } else {
+            // fallback: save filePath, but public bucket means this will be the same as public URL structure
+            photoUrl = `https://jvxgcxqutakvulcombjn.supabase.co/storage/v1/object/public/area_photos/${filePath}`;
           }
-        } catch (storageError) {
-          // If storage bucket doesn't exist, just continue without the photo
-          console.log('Storage bucket may not exist:', storageError);
         }
       }
       

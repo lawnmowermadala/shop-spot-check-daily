@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { 
   Table, 
@@ -49,7 +48,6 @@ const Assignments = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
-  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
 
   const fetchAssignments = async () => {
     try {
@@ -86,36 +84,6 @@ const Assignments = () => {
       });
     }
   }, [error, refetch]);
-
-  useEffect(() => {
-    // Fetch photo URLs for assignments that have them
-    const fetchPhotos = async () => {
-      const urls: Record<string, string> = {};
-      
-      for (const assignment of assignments) {
-        if (assignment.photo_url) {
-          try {
-            const { data, error } = await supabase
-              .storage
-              .from('area_photos')
-              .createSignedUrl(assignment.photo_url, 3600); // URL valid for 1 hour
-            
-            if (data && !error) {
-              urls[assignment.id] = data.signedUrl;
-            }
-          } catch (err) {
-            console.error('Error fetching photo URL:', err);
-          }
-        }
-      }
-      
-      setPhotoUrls(urls);
-    };
-    
-    if (assignments.length > 0) {
-      fetchPhotos();
-    }
-  }, [assignments]);
 
   const updateAssignmentStatus = async (id: string, status: Assignment['status']) => {
     try {
@@ -299,9 +267,9 @@ const Assignments = () => {
                       </div>` : 
                       'No instructions provided'}
 
-                    ${assignment.photo_url && photoUrls[assignment.id] ? 
+                    ${assignment.photo_url ? 
                       `<div class="photo-container">
-                        <img src="${photoUrls[assignment.id]}" alt="Assignment photo" />
+                        <img src="${assignment.photo_url}" alt="Assignment photo" />
                       </div>` : 
                       ''}
                   </td>
@@ -437,7 +405,8 @@ const Assignments = () => {
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              onClick={() => toggleExpandAssignment(assignment.id)}
+                              onClick={() => toggleExpandAssignment(
+                                expandedAssignment === assignment.id ? null : assignment.id)}
                               className="flex items-center gap-1 text-sm"
                             >
                               <FileText className="h-4 w-4" />
@@ -453,9 +422,7 @@ const Assignments = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                if (photoUrls[assignment.id]) {
-                                  window.open(photoUrls[assignment.id], '_blank');
-                                }
+                                window.open(assignment.photo_url, '_blank');
                               }}
                               className="flex items-center gap-1 text-sm"
                             >
@@ -516,15 +483,14 @@ const Assignments = () => {
                             <div className="p-3 text-sm border-l-2 border-gray-300">
                               {assignment.instructions}
                             </div>
-                            {assignment.photo_url && photoUrls[assignment.id] && (
+                            {assignment.photo_url && (
                               <div className="mt-3 max-w-md">
-                                <AspectRatio ratio={4/3} className="bg-muted">
-                                  <img
-                                    src={photoUrls[assignment.id]}
-                                    alt="Assignment photo"
-                                    className="rounded-md object-cover w-full h-full"
-                                  />
-                                </AspectRatio>
+                                <img
+                                  src={assignment.photo_url}
+                                  alt="Assignment photo"
+                                  className="rounded-md object-cover w-full h-full"
+                                  style={{ maxWidth: "300px", maxHeight: "200px" }}
+                                />
                               </div>
                             )}
                           </TableCell>
