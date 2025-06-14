@@ -418,17 +418,25 @@ const Assignments = () => {
                         </TableCell>
                         <TableCell>
                           {assignment.photo_url ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                window.open(assignment.photo_url, '_blank');
-                              }}
-                              className="flex items-center gap-1 text-sm"
-                            >
-                              <ImageIcon className="h-4 w-4" />
-                              View Photo
-                            </Button>
+                            <div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(assignment.photo_url, '_blank')}
+                                className="flex items-center gap-1 text-sm"
+                              >
+                                <ImageIcon className="h-4 w-4" />
+                                View Photo
+                              </Button>
+                              <div className="mt-2">
+                                <img
+                                  src={assignment.photo_url}
+                                  alt="Assignment photo"
+                                  className="rounded-md object-cover w-24 h-16 border"
+                                  style={{ maxWidth: "120px", maxHeight: "64px" }}
+                                />
+                              </div>
+                            </div>
                           ) : (
                             <span className="text-gray-400 text-sm">No photo</span>
                           )}
@@ -488,7 +496,7 @@ const Assignments = () => {
                                 <img
                                   src={assignment.photo_url}
                                   alt="Assignment photo"
-                                  className="rounded-md object-cover w-full h-full"
+                                  className="rounded-md object-cover w-full h-full border"
                                   style={{ maxWidth: "300px", maxHeight: "200px" }}
                                 />
                               </div>

@@ -122,12 +122,11 @@ const ChecklistItem = ({
     }
     
     try {
-      let photoUrl = null;
+      let photoUrl: string | null = null;
       
-      // Upload photo if available (to public bucket!) and store as public URL
       if (photoFile) {
         const fileExt = photoFile.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2,8)}.${fileExt}`;
+        const fileName = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${fileExt}`;
         const filePath = `${area}/${fileName}`;
 
         // Upload to Supabase Storage (public bucket)
@@ -144,7 +143,7 @@ const ChecklistItem = ({
             variant: "destructive"
           });
         } else if (uploadData) {
-          // Get the public URL for the photo
+          // Always get the public URL from Supabase SDK after upload
           const { data: publicUrlData } = supabase
             .storage
             .from('area_photos')
@@ -153,15 +152,14 @@ const ChecklistItem = ({
           if (publicUrlData && publicUrlData.publicUrl) {
             photoUrl = publicUrlData.publicUrl;
           } else {
-            // fallback: save filePath, but public bucket means this will be the same as public URL structure
-            photoUrl = `https://jvxgcxqutakvulcombjn.supabase.co/storage/v1/object/public/area_photos/${filePath}`;
+            photoUrl = null; // fallback: don't save wrong URL
           }
         }
       }
-      
+
       // Assign the area
-      onAssign(selectedAssigneeId, instructions, photoUrl);
-      
+      onAssign(selectedAssigneeId, instructions, photoUrl || undefined);
+
       // Clear form
       setSelectedAssigneeId("");
       setInstructions("");
@@ -217,6 +215,18 @@ const ChecklistItem = ({
             </Button>
           )}
         </div>
+        
+        {/* Show photo preview (if any) after assigning */}
+        {photoPreview && !showAssignForm && (
+          <div className="my-2">
+            <img
+              src={photoPreview}
+              alt="Assignment preview"
+              className="rounded-md object-cover w-full max-h-[160px] border"
+              style={{ maxWidth: "250px" }}
+            />
+          </div>
+        )}
         
         {showAssignForm && (
           <div className="mt-4 space-y-4">
