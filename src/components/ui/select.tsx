@@ -112,48 +112,68 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Content
         ref={ref}
         className={cn(
-          "relative z-[1050] max-h-96 min-w-[10rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2",
+          // Set up size and layout
+          "relative z-[1050] min-w-[16rem] max-h-[60vh] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2",
+          // focus ring on active
           "focus-within:ring-2 focus-within:ring-primary",
           className
         )}
         position={position}
+        style={{ maxWidth: "95vw", width: "100%", minWidth: "11rem" }}
         {...props}
       >
-        {/* Sticky search input, only visible when dropdown open */}
+        {/* Super-sticky search input at the top of the dropdown */}
         {searchable && items && (
-          <div className="sticky top-0 bg-background z-10 p-3 border-b flex items-center">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Type to search..."
-              className="w-full pl-10 pr-4 py-3 rounded-md border text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
-              style={{
-                // Make it tap-friendly on mobile
-                minHeight: '2.5rem',
-                fontSize: '1.05rem',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-              }}
-              value={search}
-              autoFocus
-              enterKeyHint="done"
-              autoComplete="off"
-              inputMode="text"
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                // Prevent closing the select when typing
-                e.stopPropagation();
-              }}
-            />
+          <div
+            className="sticky top-0 left-0 right-0 z-20 bg-popover border-b px-3 py-2 flex items-center"
+            style={{
+              minHeight: "3.5rem",
+              boxShadow: "0 2px 8px 0 rgba(0,0,0,0.01)",
+              background: "var(--popover)"
+            }}
+          >
+            <div className="relative w-full">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none"
+                aria-hidden="true"
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Type to search..."
+                className="w-full pl-10 pr-2 py-2 rounded bg-background border text-base focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
+                style={{
+                  minHeight: "2.4rem",
+                  fontSize: "1.05rem",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.03)"
+                }}
+                autoFocus
+                enterKeyHint="done"
+                autoComplete="off"
+                inputMode="text"
+                onKeyDown={(e) => {
+                  // Prevent closing the select when typing
+                  e.stopPropagation();
+                }}
+              />
+            </div>
           </div>
         )}
+        {/* Up/down buttons stay below input */}
         <SelectScrollUpButton />
+
+        {/* Viewport: make dropdown scrollable, exclude search area from scroll */}
         <SelectPrimitive.Viewport
           className={cn(
-            "p-1",
+            "overflow-y-auto p-1",
             position === "popper" &&
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
           )}
+          style={{
+            maxHeight: "calc(60vh - 3.5rem)" // subtract search bar height so list will not cover the search!
+          }}
         >
           {filteredChildren}
         </SelectPrimitive.Viewport>
