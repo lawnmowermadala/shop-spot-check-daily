@@ -129,35 +129,56 @@ const ChecklistItem = ({
         const fileName = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${fileExt}`;
         const filePath = `${area}/${fileName}`;
 
-        // Upload to Supabase Storage (public bucket)
+        // --- DEBUG: Add log to confirm bucket ---
+        console.log("[CHECKLIST_ITEM] uploading to bucket: 'area_photos', path:", filePath);
+
+        // --- Upload to Supabase Storage (public bucket) ---
         const { data: uploadData, error: uploadError } = await supabase
           .storage
           .from('area_photos')
           .upload(filePath, photoFile, { upsert: false });
 
         if (uploadError) {
-          console.error('Photo upload error:', uploadError);
+          console.error("[CHECKLIST_ITEM] Photo upload error:", uploadError);
           toast({
             title: "Photo Upload Failed",
-            description: uploadError.message,
+            description: uploadError.message + " (are you sure the 'area_photos' bucket exists and is public?)",
             variant: "destructive"
           });
+          return; // Stop processing if upload fails!
         } else if (uploadData) {
-          // Always get the public URL from Supabase SDK after upload
-          const { data: publicUrlData } = supabase
+          // --- Get public URL ---
+          const { data: publicUrlData, error: publicUrlError } = supabase
             .storage
             .from('area_photos')
             .getPublicUrl(filePath);
 
+          if (publicUrlError) {
+            console.error("[CHECKLIST_ITEM] Error getting public URL:", publicUrlError);
+            toast({
+              title: "Photo URL Error",
+              description: publicUrlError.message,
+              variant: "destructive"
+            });
+            return;
+          }
+
           if (publicUrlData && publicUrlData.publicUrl) {
             photoUrl = publicUrlData.publicUrl;
+            console.log("[CHECKLIST_ITEM] Got photo public URL:", photoUrl);
           } else {
-            photoUrl = null; // fallback: don't save wrong URL
+            photoUrl = null;
+            toast({
+              title: "Photo Upload Error",
+              description: "File uploaded but missing public URL.",
+              variant: "destructive"
+            });
+            return;
           }
         }
       }
 
-      // Assign the area
+      // Assign the area (photoUrl may be null/undefined)
       onAssign(selectedAssigneeId, instructions, photoUrl || undefined);
 
       // Clear form
@@ -166,11 +187,15 @@ const ChecklistItem = ({
       setPhotoFile(null);
       setPhotoPreview(null);
       setShowAssignForm(false);
-    } catch (error) {
-      console.error('Error during assignment:', error);
+      toast({
+        title: "Assignment created",
+        description: photoUrl ? "Photo uploaded and attached." : "No photo attached."
+      });
+    } catch (error: any) {
+      console.error('[CHECKLIST_ITEM] Error during assignment:', error);
       toast({
         title: "Error",
-        description: "Failed to assign area. Please try again.",
+        description: "Failed to assign area: " + (error?.message || "Unknown error"),
         variant: "destructive"
       });
     }
