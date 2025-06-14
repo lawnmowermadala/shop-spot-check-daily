@@ -72,7 +72,7 @@ const SelectContent = React.forwardRef<
     searchable?: boolean;
   }
 >(({ className, children, position = "popper", items, searchable = true, ...props }, ref) => {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = React.useState("");
   // If children is an array of <SelectItem> you cannot filter it directly, but
   // for custom list, users can pass items prop and we'll filter.
   let filteredChildren = children;
