@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp, Search } from "lucide-react"
@@ -71,11 +72,11 @@ const SelectContent = React.forwardRef<
     items?: { id?: string; code?: string; name?: string; value: string; label: string }[];
     searchable?: boolean;
   }
->(({ className, children, position = "popper", items, searchable = false, ...props }, ref) => {
+>(({ className, children, position = "popper", items, searchable = true, ...props }, ref) => {
   const [search, setSearch] = React.useState("");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
-  const showSearch = searchable && items;
+  const showSearch = searchable && items && items.length > 0;
 
   React.useEffect(() => {
     if (showSearch && searchInputRef.current) {
