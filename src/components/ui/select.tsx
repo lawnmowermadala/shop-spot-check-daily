@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp, Search } from "lucide-react"
@@ -113,6 +112,7 @@ const SelectContent = React.forwardRef<
         ref={ref}
         className={cn(
           "relative z-[1050] min-w-[16rem] max-h-[75vh] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95",
+          "flex flex-col", // Use flexbox for layout
           "focus-within:ring-2 focus-within:ring-primary",
           className
         )}
@@ -129,7 +129,7 @@ const SelectContent = React.forwardRef<
       >
         {searchable && items && (
           <div
-            className="sticky top-0 left-0 right-0 z-20 bg-popover border-b px-4 py-2 flex items-center"
+            className="flex-shrink-0 bg-popover border-b px-4 py-2 flex items-center" // Part of flex layout
             style={{
               minHeight: "3.2rem",
               background: "var(--popover, #fff)",
@@ -167,12 +167,11 @@ const SelectContent = React.forwardRef<
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport
           className={cn(
-            "overflow-y-auto p-1",
+            "p-1 flex-grow overflow-y-auto", // Let viewport grow and scroll
             position === "popper" &&
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
           )}
           style={{
-            maxHeight: "calc(75vh - 3.2rem)", // keeps options scroll and search bar fixed
             minHeight: "4rem",
           }}
         >

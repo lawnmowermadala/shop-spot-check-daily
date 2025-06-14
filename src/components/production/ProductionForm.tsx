@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -220,12 +219,15 @@ const ProductionForm = ({
     name: product.name
   }));
 
-  const recipeItems = recipes.map(recipe => ({
-    id: recipe.id,
-    value: recipe.id,
-    label: `${recipe.name} (${recipe.batch_size} ${recipe.unit})`,
-    name: recipe.name
-  }));
+  const recipeItems = [
+    { id: 'no-recipe', value: '', label: 'No Recipe', name: 'No Recipe' },
+    ...recipes.map(recipe => ({
+      id: recipe.id,
+      value: recipe.id,
+      label: `${recipe.name} (${recipe.batch_size} ${recipe.unit})`,
+      name: recipe.name
+    }))
+  ];
 
   const staffItems = staffMembers.map(staff => ({
     id: staff.id.toString(),
@@ -247,13 +249,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select a product..." />
               </SelectTrigger>
-              <SelectContent items={productItems} searchable={true}>
-                {productItems.map((item) => (
-                  <SelectItem key={item.id} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectContent items={productItems} searchable={true} />
             </Select>
           </div>
 
@@ -266,14 +262,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select a recipe..." />
               </SelectTrigger>
-              <SelectContent items={recipeItems} searchable={true}>
-                <SelectItem value="">No Recipe</SelectItem>
-                {recipeItems.map((item) => (
-                  <SelectItem key={item.id} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectContent items={recipeItems} searchable={true} />
             </Select>
           </div>
 
@@ -295,13 +284,7 @@ const ProductionForm = ({
               <SelectTrigger>
                 <SelectValue placeholder="Select staff member..." />
               </SelectTrigger>
-              <SelectContent items={staffItems} searchable={true}>
-                {staffItems.map((item) => (
-                  <SelectItem key={item.id} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectContent items={staffItems} searchable={true} />
             </Select>
           </div>
 
