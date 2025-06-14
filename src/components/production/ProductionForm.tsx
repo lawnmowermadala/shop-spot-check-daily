@@ -211,14 +211,6 @@ const ProductionForm = ({
   };
 
   // Prepare items for searchable selects
-  const productItems = products.map(product => ({
-    id: product.id,
-    value: product.id,
-    label: `${product.code} - ${product.name}`,
-    code: product.code,
-    name: product.name
-  }));
-
   const recipeItems = [
     { id: 'no-recipe', value: '', label: 'No Recipe', name: 'No Recipe' },
     ...recipes.map(recipe => ({
@@ -243,14 +235,17 @@ const ProductionForm = ({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Replaced Product Select with a simple text Input so you can type freely */}
           <div>
             <Label htmlFor="product">Product *</Label>
-            <Select value={productionData.product_id} onValueChange={handleProductChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a product..." />
-              </SelectTrigger>
-              <SelectContent items={productItems} searchable={true} />
-            </Select>
+            <Input
+              id="product"
+              value={productionData.product_id}
+              onChange={(e) => setProductionData({ ...productionData, product_id: e.target.value })}
+              placeholder="Type product name or code"
+              required
+            />
           </div>
 
           <div>
