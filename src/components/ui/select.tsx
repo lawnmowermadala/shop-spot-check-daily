@@ -112,29 +112,32 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Content
         ref={ref}
         className={cn(
-          // Set up size and layout
-          "relative z-[1050] min-w-[16rem] max-h-[60vh] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2",
-          // focus ring on active
+          "relative z-[1050] min-w-[16rem] max-h-[75vh] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95",
           "focus-within:ring-2 focus-within:ring-primary",
           className
         )}
         position={position}
-        style={{ maxWidth: "95vw", width: "100%", minWidth: "11rem" }}
+        style={{
+          maxWidth: "98vw",
+          width: "100%",
+          minWidth: "11rem",
+          // fixes on mobile to stop filling the whole screen
+          left: 0,
+          right: 0,
+        }}
         {...props}
       >
-        {/* Super-sticky search input at the top of the dropdown */}
         {searchable && items && (
           <div
-            className="sticky top-0 left-0 right-0 z-20 bg-popover border-b px-3 py-2 flex items-center"
+            className="sticky top-0 left-0 right-0 z-20 bg-popover border-b px-4 py-2 flex items-center"
             style={{
-              minHeight: "3.5rem",
-              boxShadow: "0 2px 8px 0 rgba(0,0,0,0.01)",
-              background: "var(--popover)"
+              minHeight: "3.2rem",
+              background: "var(--popover, #fff)",
             }}
           >
             <div className="relative w-full">
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none"
+                className="absolute left-2 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none"
                 aria-hidden="true"
               />
               <input
@@ -143,11 +146,11 @@ const SelectContent = React.forwardRef<
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Type to search..."
-                className="w-full pl-10 pr-2 py-2 rounded bg-background border text-base focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
+                className="w-full pl-9 pr-2 py-2 rounded bg-background border text-base focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
                 style={{
                   minHeight: "2.4rem",
                   fontSize: "1.05rem",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.03)"
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
                 }}
                 autoFocus
                 enterKeyHint="done"
@@ -161,10 +164,7 @@ const SelectContent = React.forwardRef<
             </div>
           </div>
         )}
-        {/* Up/down buttons stay below input */}
         <SelectScrollUpButton />
-
-        {/* Viewport: make dropdown scrollable, exclude search area from scroll */}
         <SelectPrimitive.Viewport
           className={cn(
             "overflow-y-auto p-1",
@@ -172,7 +172,8 @@ const SelectContent = React.forwardRef<
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
           )}
           style={{
-            maxHeight: "calc(60vh - 3.5rem)" // subtract search bar height so list will not cover the search!
+            maxHeight: "calc(75vh - 3.2rem)", // keeps options scroll and search bar fixed
+            minHeight: "4rem",
           }}
         >
           {filteredChildren}
