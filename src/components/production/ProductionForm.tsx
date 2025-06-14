@@ -1,17 +1,14 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus } from 'lucide-react';
-import { toast } from '@/components/ui/sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-
-interface Product {
-  id: string;
-  name: string;
-  code: string;
-}
+import { toast } from '@/components/ui/sonner';
+import { format } from 'date-fns';
+import { Loader2 } from 'lucide-react';
 
 interface Recipe {
   id: string;
@@ -27,6 +24,12 @@ interface RecipeIngredient {
   quantity: number;
   unit: string;
   cost_per_unit: number;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  code: string;
 }
 
 interface StaffMember {
@@ -67,51 +70,48 @@ const ProductionForm = ({
     onRecipeSelected(productionData.recipe_id || null);
   }, [productionData.recipe_id, onRecipeSelected]);
 
-  const handleProductChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const productId = e.target.value;
-    console.log('Product selected:', productId);
+  const handleProductChange = async (productId: string) => {
+    setProductionData({...productionData, product_id: productId, recipe_id: ''});
     
-    // Reset recipe selection first
-    setProductionData(prev => ({
-      ...prev,
-      product_id: productId,
-      recipe_id: ''
-    }));
-
     if (!productId) return;
     
+    setFetchingDefaultRecipe(true);
+    console.log('Fetching default recipe for product:', productId);
+    
     try {
-      setFetchingDefaultRecipe(true);
-      console.log('Fetching default recipe for product:', productId);
-      
-      const { data: relationData, error: relationError } = await supabase
-        .from('product_recipes')
-        .select('recipe_id')
+      const { data: batches, error } = await supabase
+        .from('production_batches')
+        .select('recipe_id, recipes(name)')
         .eq('product_id', productId)
-        .eq('is_default', true)
-        .maybeSingle();
-      
-      console.log('Product recipe relation:', relationData, relationError);
-      
-      if (relationError) {
-        console.log('Error fetching default recipe:', relationError);
+        .not('recipe_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching production batches:', error);
         setFetchingDefaultRecipe(false);
         return;
       }
-      
-      if (relationData && relationData.recipe_id) {
-        console.log('Default recipe found:', relationData.recipe_id);
+
+      console.log('Found batches:', batches);
+
+      if (batches && batches.length > 0) {
+        const recipeCounts = batches.reduce((acc: Record<string, number>, batch) => {
+          if (batch.recipe_id) {
+            acc[batch.recipe_id] = (acc[batch.recipe_id] || 0) + 1;
+          }
+          return acc;
+        }, {});
+
+        const mostUsedRecipeId = Object.entries(recipeCounts)
+          .sort(([,a], [,b]) => b - a)[0][0];
+
+        console.log('Most used recipe ID:', mostUsedRecipeId);
         
-        // Update state with the default recipe
-        setProductionData(prev => ({
-          ...prev,
-          product_id: productId,
-          recipe_id: relationData.recipe_id
-        }));
-        
-        toast.success('Default recipe automatically selected!');
+        setProductionData(prev => ({...prev, recipe_id: mostUsedRecipeId}));
+        toast.success('Default recipe selected based on production history');
       } else {
-        console.log('No default recipe found for this product');
+        console.log('No previous batches found for this product');
       }
       
       setFetchingDefaultRecipe(false);
@@ -121,95 +121,81 @@ const ProductionForm = ({
     }
   };
 
-  const handleRecipeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const recipeId = e.target.value;
+  const handleRecipeChange = (recipeId: string) => {
     setProductionData({...productionData, recipe_id: recipeId});
   };
 
   const calculateRecipeTotalCost = () => {
-    if (!recipeIngredients.length) return 0;
     return recipeIngredients.reduce((total, ingredient) => {
-      return total + (ingredient.cost_per_unit * ingredient.quantity);
+      return total + (ingredient.quantity * ingredient.cost_per_unit);
     }, 0);
   };
 
-  const calculateProductionCostPerUnit = () => {
-    const totalRecipeCost = calculateRecipeTotalCost();
-    const quantity = Number(productionData.quantity_produced) || 0;
-    return quantity > 0 ? totalRecipeCost / quantity : 0;
-  };
-
-  const calculateScaledIngredientCosts = () => {
-    if (!productionData.recipe_id || !productionData.quantity_produced || !recipeIngredients.length) {
-      return [];
-    }
-
-    const selectedRecipe = recipes.find(r => r.id === productionData.recipe_id);
-    if (!selectedRecipe || selectedRecipe.batch_size <= 0) return [];
-
-    const scalingFactor = Number(productionData.quantity_produced) / selectedRecipe.batch_size;
-
-    return recipeIngredients.map(ingredient => ({
-      ...ingredient,
-      scaled_quantity: ingredient.quantity * scalingFactor,
-      scaled_cost: ingredient.cost_per_unit * ingredient.quantity * scalingFactor,
-      used_unit: ingredient.unit
-    }));
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!productionData.product_id || !productionData.quantity_produced || !productionData.staff_id) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-
-    const selectedStaff = staffMembers.find(s => s.id.toString() === productionData.staff_id);
-    if (!selectedStaff) {
-      toast.error('Selected staff member not found');
+      toast.error('Please fill in all required fields');
       return;
     }
 
     try {
-      const dateStr = date.toISOString().split('T')[0];
-      const totalRecipeCost = productionData.recipe_id ? calculateRecipeTotalCost() : 0;
-      const costPerUnit = productionData.recipe_id ? calculateProductionCostPerUnit() : 0;
-
-      const { data, error } = await supabase
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      const { data: batchData, error: batchError } = await supabase
         .from('production_batches')
         .insert({
           product_id: productionData.product_id,
           recipe_id: productionData.recipe_id || null,
-          quantity_produced: Number(productionData.quantity_produced),
+          quantity_produced: parseInt(productionData.quantity_produced),
           production_date: dateStr,
-          staff_name: selectedStaff.name,
-          staff_id: productionData.staff_id,
-          notes: productionData.notes,
-          total_ingredient_cost: totalRecipeCost,
-          cost_per_unit: costPerUnit
+          staff_id: parseInt(productionData.staff_id),
+          notes: productionData.notes || null
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (batchError) throw batchError;
 
       if (productionData.recipe_id && recipeIngredients.length > 0) {
-        const scaledIngredients = calculateScaledIngredientCosts();
+        const scaleFactor = parseInt(productionData.quantity_produced) / 
+          (recipes.find(r => r.id === productionData.recipe_id)?.batch_size || 1);
+
+        const ingredientPromises = recipeIngredients.map(ingredient => 
+          supabase
+            .from('production_ingredients')
+            .insert({
+              batch_id: batchData.id,
+              ingredient_name: ingredient.ingredient_name,
+              quantity_used: ingredient.quantity * scaleFactor,
+              unit: ingredient.unit,
+              cost_per_unit: ingredient.cost_per_unit
+            })
+        );
+
+        const results = await Promise.all(ingredientPromises);
         
-        const ingredientInserts = scaledIngredients.map(ingredient => ({
-          batch_id: data.id,
-          ingredient_name: ingredient.ingredient_name,
-          quantity_used: ingredient.scaled_quantity,
-          unit: ingredient.used_unit || ingredient.unit,
-          cost_per_unit: ingredient.cost_per_unit
-        }));
+        for (const result of results) {
+          if (result.error) throw result.error;
+        }
 
-        const { error: ingredientError } = await supabase
-          .from('production_ingredients')
-          .insert(ingredientInserts);
+        const totalIngredientCost = recipeIngredients.reduce(
+          (sum, ingredient) => sum + (ingredient.quantity * scaleFactor * ingredient.cost_per_unit),
+          0
+        );
 
-        if (ingredientError) throw ingredientError;
+        const costPerUnit = totalIngredientCost / parseInt(productionData.quantity_produced);
+
+        await supabase
+          .from('production_batches')
+          .update({
+            total_ingredient_cost: totalIngredientCost,
+            cost_per_unit: costPerUnit
+          })
+          .eq('id', batchData.id);
       }
 
+      toast.success('Production batch created successfully!');
       setProductionData({
         product_id: '',
         recipe_id: '',
@@ -217,167 +203,139 @@ const ProductionForm = ({
         staff_id: '',
         notes: ''
       });
-      
-      toast.success('Production batch created successfully!');
       onBatchCreated();
     } catch (error: any) {
-      toast.error(error.message);
+      console.error('Error creating production batch:', error);
+      toast.error('Failed to create production batch: ' + error.message);
     }
   };
 
+  // Prepare items for searchable selects
+  const productItems = products.map(product => ({
+    id: product.id,
+    value: product.id,
+    label: `${product.code} - ${product.name}`,
+    code: product.code,
+    name: product.name
+  }));
+
+  const recipeItems = recipes.map(recipe => ({
+    id: recipe.id,
+    value: recipe.id,
+    label: `${recipe.name} (${recipe.batch_size} ${recipe.unit})`,
+    name: recipe.name
+  }));
+
+  const staffItems = staffMembers.map(staff => ({
+    id: staff.id.toString(),
+    value: staff.id.toString(),
+    label: staff.name,
+    name: staff.name
+  }));
+
   return (
-    <Card className="mb-6">
+    <Card>
       <CardHeader>
-        <CardTitle>Add Production Batch</CardTitle>
+        <CardTitle>Create Production Batch</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Product *</label>
-            <select
-              value={productionData.product_id}
-              onChange={handleProductChange}
-              className="w-full p-2 border rounded"
-              required
-            >
-              <option value="">Select a product</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>{product.code} - {product.name}</option>
-              ))}
-            </select>
+            <Label htmlFor="product">Product *</Label>
+            <Select value={productionData.product_id} onValueChange={handleProductChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a product..." />
+              </SelectTrigger>
+              <SelectContent items={productItems} searchable={true}>
+                {productItems.map((item) => (
+                  <SelectItem key={item.id} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <Label htmlFor="recipe">
               Recipe (Optional)
-              {fetchingDefaultRecipe && <span className="ml-2 text-xs text-blue-600">Loading default recipe...</span>}
-            </label>
-            <select
-              value={productionData.recipe_id}
-              onChange={handleRecipeChange}
-              className="w-full p-2 border rounded"
-              disabled={fetchingDefaultRecipe}
-            >
-              <option value="">Select a recipe</option>
-              {recipes.map((recipe) => (
-                <option key={recipe.id} value={recipe.id}>
-                  {recipe.name} (Batch: {recipe.batch_size} {recipe.unit})
-                </option>
-              ))}
-            </select>
-            {productionData.recipe_id && (
-              <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
-                ✓ Recipe selected
-                <button 
-                  type="button"
-                  onClick={() => setProductionData({...productionData, recipe_id: ''})}
-                  className="text-red-500 hover:text-red-700 ml-2"
-                  title="Clear recipe selection"
-                >
-                  ✕ Clear
-                </button>
-              </div>
-            )}
+              {fetchingDefaultRecipe && <Loader2 className="inline ml-2 h-4 w-4 animate-spin" />}
+            </Label>
+            <Select value={productionData.recipe_id} onValueChange={handleRecipeChange} disabled={fetchingDefaultRecipe}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a recipe..." />
+              </SelectTrigger>
+              <SelectContent items={recipeItems} searchable={true}>
+                <SelectItem value="">No Recipe</SelectItem>
+                {recipeItems.map((item) => (
+                  <SelectItem key={item.id} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium mb-1">Staff Member *</label>
-            <select
-              value={productionData.staff_id}
-              onChange={(e) => setProductionData({...productionData, staff_id: e.target.value})}
-              className="w-full p-2 border rounded"
-              required
-            >
-              <option value="">Select staff member</option>
-              {staffMembers.map((staff) => (
-                <option key={staff.id} value={staff.id.toString()}>
-                  {staff.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1">Quantity *</label>
+            <Label htmlFor="quantity">Quantity Produced *</Label>
             <Input
+              id="quantity"
               type="number"
+              min="1"
               value={productionData.quantity_produced}
               onChange={(e) => setProductionData({...productionData, quantity_produced: e.target.value})}
-              placeholder="0"
               required
             />
           </div>
-        </div>
-        
-        <div className="mt-4">
-          <label className="block text-sm font-medium mb-1">Notes</label>
-          <Input
-            value={productionData.notes}
-            onChange={(e) => setProductionData({...productionData, notes: e.target.value})}
-            placeholder="Optional notes"
-          />
-        </div>
 
-        {/* Recipe Cost Preview */}
-        {productionData.recipe_id && productionData.quantity_produced && recipeIngredients.length > 0 && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium mb-2">Cost Preview (Based on Recipe)</h4>
-            
-            <div className="mb-4">
-              <h5 className="text-sm font-medium mb-2">Scaled Ingredients for Production:</h5>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ingredient</TableHead>
-                    <TableHead>Recipe Qty</TableHead>
-                    <TableHead>Scaled Qty</TableHead>
-                    <TableHead>Unit Cost</TableHead>
-                    <TableHead>Total Cost</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {calculateScaledIngredientCosts().map((ingredient, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{ingredient.ingredient_name}</TableCell>
-                      <TableCell>{ingredient.quantity} {ingredient.used_unit || ingredient.unit}</TableCell>
-                      <TableCell>{ingredient.scaled_quantity.toFixed(2)} {ingredient.used_unit || ingredient.unit}</TableCell>
-                      <TableCell>R{ingredient.cost_per_unit.toFixed(2)}</TableCell>
-                      <TableCell>R{ingredient.scaled_cost.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Recipe Batch Size:</span>
-                <div className="font-medium">
-                  {recipes.find(r => r.id === productionData.recipe_id)?.batch_size} {recipes.find(r => r.id === productionData.recipe_id)?.unit}
-                </div>
-              </div>
-              <div>
-                <span className="text-gray-600">Total Ingredient Cost:</span>
-                <div className="font-medium text-lg">R{(calculateScaledIngredientCosts().reduce((sum, i) => sum + i.scaled_cost, 0)).toFixed(2)}</div>
-              </div>
-              <div>
-                <span className="text-gray-600">Cost Per Unit:</span>
-                <div className="font-medium text-lg">R{calculateProductionCostPerUnit().toFixed(2)}</div>
-              </div>
-            </div>
+          <div>
+            <Label htmlFor="staff">Staff Member *</Label>
+            <Select value={productionData.staff_id} onValueChange={(value) => setProductionData({...productionData, staff_id: value})}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select staff member..." />
+              </SelectTrigger>
+              <SelectContent items={staffItems} searchable={true}>
+                {staffItems.map((item) => (
+                  <SelectItem key={item.id} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        )}
-        
-        <div className="mt-4">
-          <Button 
-            onClick={handleSubmit}
-            disabled={!productionData.product_id || !productionData.quantity_produced || !productionData.staff_id}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Batch
+
+          <div>
+            <Label htmlFor="notes">Notes</Label>
+            <Input
+              id="notes"
+              value={productionData.notes}
+              onChange={(e) => setProductionData({...productionData, notes: e.target.value})}
+              placeholder="Optional notes..."
+            />
+          </div>
+
+          {productionData.recipe_id && recipeIngredients.length > 0 && (
+            <div className="bg-gray-50 p-4 rounded">
+              <h4 className="font-medium mb-2">Recipe Ingredients Preview</h4>
+              <p className="text-sm text-gray-600 mb-2">
+                Total recipe cost: R{calculateRecipeTotalCost().toFixed(2)}
+              </p>
+              <div className="space-y-1 text-sm">
+                {recipeIngredients.map(ingredient => (
+                  <div key={ingredient.id} className="flex justify-between">
+                    <span>{ingredient.ingredient_name}</span>
+                    <span>{ingredient.quantity} {ingredient.unit}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Button type="submit" className="w-full">
+            Create Production Batch
           </Button>
-        </div>
-      </CardContent>
+        </form>
+      </ProductionContent>
     </Card>
   );
 };
