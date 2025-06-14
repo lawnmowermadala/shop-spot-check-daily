@@ -69,25 +69,28 @@ SelectScrollDownButton.displayName =
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
-    items?: { id?: string; code?: string; name?: string; value: string; label: string }[]; // for list search
+    items?: { id?: string; code?: string; name?: string; value: string; label: string }[];
     searchable?: boolean;
   }
 >(({ className, children, position = "popper", items, searchable = true, ...props }, ref) => {
   const [search, setSearch] = React.useState("");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
-  
+
   // Focus search input when content opens
   React.useEffect(() => {
     if (searchable && items && searchInputRef.current) {
       const timer = setTimeout(() => {
         searchInputRef.current?.focus();
-      }, 100);
+      }, 120);
       return () => clearTimeout(timer);
     }
   }, [searchable, items]);
 
-  // If children is an array of <SelectItem> you cannot filter it directly, but
-  // for custom list, users can pass items prop and we'll filter.
+  // For accessibility: clear search query when list closes
+  React.useEffect(() => {
+    if (!items) setSearch("");
+  }, [items]);
+
   let filteredChildren = children;
   if (items && Array.isArray(items) && searchable) {
     filteredChildren = items
@@ -103,38 +106,45 @@ const SelectContent = React.forwardRef<
         </SelectItem>
       ));
   }
-  
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         ref={ref}
         className={cn(
-          "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-          position === "popper" &&
-            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+          "relative z-[1050] max-h-96 min-w-[10rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2",
+          "focus-within:ring-2 focus-within:ring-primary",
           className
         )}
         position={position}
         {...props}
       >
-        {/* Add search input if searchable and items provided */}
+        {/* Sticky search input, only visible when dropdown open */}
         {searchable && items && (
-          <div className="sticky top-0 bg-popover z-50 p-3 border-b">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search by name or code..."
-                className="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  // Prevent closing the select when typing
-                  e.stopPropagation();
-                }}
-              />
-            </div>
+          <div className="sticky top-0 bg-background z-10 p-3 border-b flex items-center">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Type to search..."
+              className="w-full pl-10 pr-4 py-3 rounded-md border text-base bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
+              style={{
+                // Make it tap-friendly on mobile
+                minHeight: '2.5rem',
+                fontSize: '1.05rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+              }}
+              value={search}
+              autoFocus
+              enterKeyHint="done"
+              autoComplete="off"
+              inputMode="text"
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                // Prevent closing the select when typing
+                e.stopPropagation();
+              }}
+            />
           </div>
         )}
         <SelectScrollUpButton />
