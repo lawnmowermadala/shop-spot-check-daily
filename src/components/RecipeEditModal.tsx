@@ -337,6 +337,11 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Cost/Unit</TableHead>
+                  <TableHead>Pack Size</TableHead>
+                  <TableHead>Pack Price</TableHead>
+                  <TableHead>Pack Unit</TableHead>
+                  <TableHead>Used Unit</TableHead>
+                  <TableHead>Quantity Used</TableHead>
                   <TableHead>Total Cost</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -396,7 +401,84 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
                         `R${ingredient.cost_per_unit.toFixed(2)}`
                       )}
                     </TableCell>
-                    <TableCell>R{(ingredient.calculated_cost || (ingredient.cost_per_unit * ingredient.quantity)).toFixed(2)}</TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <Input
+                          type="number"
+                          value={editedIngredient.pack_size ?? ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, pack_size: e.target.value === '' ? null : Number(e.target.value) })}
+                          placeholder="Pack size"
+                          className="w-24"
+                        />
+                      ) : (
+                        ingredient.pack_size !== undefined && ingredient.pack_size !== null ? ingredient.pack_size : "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <Input
+                          type="number"
+                          value={editedIngredient.pack_price ?? ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, pack_price: e.target.value === '' ? null : Number(e.target.value) })}
+                          placeholder="Pack price"
+                          className="w-24"
+                        />
+                      ) : (
+                        ingredient.pack_price !== undefined && ingredient.pack_price !== null ? `R${ingredient.pack_price}` : "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <select
+                          value={editedIngredient.pack_unit ?? ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, pack_unit: e.target.value })}
+                          className="w-full p-1 border rounded"
+                        >
+                          <option value="">-</option>
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="L">L</option>
+                          <option value="ml">ml</option>
+                          <option value="unit">unit</option>
+                        </select>
+                      ) : (
+                        ingredient.pack_unit || "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <select
+                          value={editedIngredient.used_unit ?? ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, used_unit: e.target.value })}
+                          className="w-full p-1 border rounded"
+                        >
+                          <option value="">-</option>
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="L">L</option>
+                          <option value="ml">ml</option>
+                          <option value="unit">unit</option>
+                        </select>
+                      ) : (
+                        ingredient.used_unit || "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingIngredient === ingredient.id ? (
+                        <Input
+                          type="number"
+                          value={editedIngredient.quantity_used ?? ''}
+                          onChange={(e) => setEditedIngredient({ ...editedIngredient, quantity_used: e.target.value === '' ? null : Number(e.target.value) })}
+                          placeholder="Qty used"
+                          className="w-20"
+                        />
+                      ) : (
+                        ingredient.quantity_used !== undefined && ingredient.quantity_used !== null ? ingredient.quantity_used : "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      R{(ingredient.calculated_cost || (ingredient.cost_per_unit * ingredient.quantity)).toFixed(2)}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         {editingIngredient === ingredient.id ? (
