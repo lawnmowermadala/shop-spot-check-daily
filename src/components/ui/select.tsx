@@ -71,28 +71,24 @@ const SelectContent = React.forwardRef<
     items?: { id?: string; code?: string; name?: string; value: string; label: string }[];
     searchable?: boolean;
   }
->(({ className, children, position = "popper", items, searchable = true, ...props }, ref) => {
+>(({ className, children, position = "popper", items, searchable = false, ...props }, ref) => {
   const [search, setSearch] = React.useState("");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Focus search input when content opens
+  const showSearch = searchable && items;
+
   React.useEffect(() => {
-    if (searchable && items && searchInputRef.current) {
+    if (showSearch && searchInputRef.current) {
       const timer = setTimeout(() => {
         searchInputRef.current?.focus();
       }, 120);
       return () => clearTimeout(timer);
     }
-  }, [searchable, items]);
-
-  // For accessibility: clear search query when list closes
-  React.useEffect(() => {
-    if (!items) setSearch("");
-  }, [items]);
-
-  let filteredChildren = children;
-  if (items && Array.isArray(items) && searchable) {
-    filteredChildren = items
+  }, [showSearch]);
+  
+  const filteredItems = React.useMemo(() => {
+    if (!showSearch) return null;
+    return items
       .filter(
         (item) =>
           item.label?.toLowerCase().includes(search.toLowerCase()) ||
@@ -104,7 +100,7 @@ const SelectContent = React.forwardRef<
           {item.label}
         </SelectItem>
       ));
-  }
+  }, [items, search, showSearch]);
 
   return (
     <SelectPrimitive.Portal>
@@ -112,54 +108,24 @@ const SelectContent = React.forwardRef<
         ref={ref}
         className={cn(
           "relative z-[1050] min-w-[16rem] max-h-[75vh] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95",
-          "flex flex-col", // Use flexbox for layout
-          "focus-within:ring-2 focus-within:ring-primary",
+          "flex flex-col",
           className
         )}
         position={position}
-        style={{
-          maxWidth: "98vw",
-          width: "100%",
-          minWidth: "11rem",
-          // fixes on mobile to stop filling the whole screen
-          left: 0,
-          right: 0,
-        }}
         {...props}
       >
-        {searchable && items && (
-          <div
-            className="flex-shrink-0 bg-popover border-b px-4 py-2 flex items-center" // Part of flex layout
-            style={{
-              minHeight: "3.2rem",
-              background: "var(--popover, #fff)",
-            }}
-          >
-            <div className="relative w-full">
-              <Search
-                className="absolute left-2 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none"
-                aria-hidden="true"
-              />
+        {showSearch && (
+          <div className="flex-shrink-0 bg-popover border-b px-4 py-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Type to search..."
-                className="w-full pl-9 pr-2 py-2 rounded bg-background border text-base focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
-                style={{
-                  minHeight: "2.4rem",
-                  fontSize: "1.05rem",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-                }}
-                autoFocus
-                enterKeyHint="done"
-                autoComplete="off"
-                inputMode="text"
-                onKeyDown={(e) => {
-                  // Prevent closing the select when typing
-                  e.stopPropagation();
-                }}
+                className="w-full pl-9 pr-2 py-2 rounded bg-background border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                onKeyDown={(e) => e.stopPropagation()}
               />
             </div>
           </div>
@@ -167,15 +133,12 @@ const SelectContent = React.forwardRef<
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport
           className={cn(
-            "p-1 flex-grow overflow-y-auto", // Let viewport grow and scroll
+            "p-1 flex-grow overflow-y-auto",
             position === "popper" &&
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
           )}
-          style={{
-            minHeight: "4rem",
-          }}
         >
-          {filteredChildren}
+          {showSearch ? filteredItems : children}
         </SelectPrimitive.Viewport>
         <SelectScrollDownButton />
       </SelectPrimitive.Content>
