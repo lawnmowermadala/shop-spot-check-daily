@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navigation from "@/components/Navigation";
@@ -56,6 +55,7 @@ interface StaffMember {
 }
 
 interface StaffPerformance {
+  id: string;
   name: string;
   averageRating: number;
   totalRatings: number;
@@ -127,12 +127,12 @@ const Analytics = () => {
     mutationFn: async () => {
       if (!staffToRate) throw new Error('No staff member selected');
       
-      const overall = (
+      const overall = Math.round((
         ratingForm.product_knowledge + 
         ratingForm.customer_service + 
         ratingForm.job_performance + 
         ratingForm.teamwork
-      ) / 4;
+      ) / 4);
 
       const { error } = await supabase
         .from('ratings')
@@ -170,14 +170,15 @@ const Analytics = () => {
 
   // Mutation for awarding self initiative
   const awardSelfInitiative = useMutation({
-    mutationFn: async (staffName: string) => {
+    mutationFn: async (staff: { id: string; name: string }) => {
       const { error } = await supabase
         .from('assignments')
         .insert({
-          assignee_name: staffName,
+          assignee_id: parseInt(staff.id, 10),
+          assignee_name: staff.name,
           area: 'Special Recognition',
           status: 'completed',
-          instructions: `[SELF INITIATIVE MERIT AWARD] ${staffName} demonstrated exceptional initiative on ${format(new Date(), 'PP')}`,
+          instructions: `[SELF INITIATIVE MERIT AWARD] ${staff.name} demonstrated exceptional initiative on ${format(new Date(), 'PP')}`,
           created_at: new Date().toISOString()
         });
 
@@ -217,9 +218,9 @@ const Analytics = () => {
     setRatingMode(true);
   };
 
-  const handleAwardInitiative = (staffName: string) => {
-    if (confirm(`Grant ${staffName} a Self-Initiative Award?`)) {
-      awardSelfInitiative.mutate(staffName);
+  const handleAwardInitiative = (staff: {id: string, name: string}) => {
+    if (confirm(`Grant ${staff.name} a Self-Initiative Award?`)) {
+      awardSelfInitiative.mutate(staff);
     }
   };
 
@@ -296,9 +297,10 @@ const Analytics = () => {
 
   // Process staff ratings (sorted best to worst) and include self-initiative counts
   const staffPerformance: StaffPerformance[] = Object.entries(
-    filteredRatings.reduce((acc: Record<string, { name: string; overall: number; count: number }>, rating) => {
+    filteredRatings.reduce((acc: Record<string, { id: string, name: string; overall: number; count: number }>, rating) => {
       if (!acc[rating.staff_name]) {
         acc[rating.staff_name] = {
+          id: rating.staff_id,
           name: rating.staff_name,
           overall: 0,
           count: 0
@@ -318,6 +320,7 @@ const Analytics = () => {
     const mostCommonArea = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
     return {
+      id: data.id,
       name: data.name,
       averageRating: Number((data.overall / data.count).toFixed(1)),
       totalRatings: data.count,
@@ -735,7 +738,7 @@ const Analytics = () => {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleAwardInitiative(staff.name)}
+                                    onClick={() => handleAwardInitiative(staff)}
                                     className="h-8 w-8 p-0"
                                   >
                                     <Award className="h-4 w-4 text-amber-500" />
@@ -833,7 +836,18 @@ const Analytics = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleAwardInitiative(staffName)}
+                                onClick={() => {
+                                  const staffMember = staffMembers.find(s => s.name === staffName);
+                                  if (staffMember) {
+                                    handleAwardInitiative({ name: staffMember.name, id: staffMember.id.toString() });
+                                  } else {
+                                    toast({
+                                      title: "Error",
+                                      description: `Could not find staff member: ${staffName}`,
+                                      variant: "destructive"
+                                    });
+                                  }
+                                }}
                                 className="h-8 w-8 p-0"
                               >
                                 <Plus className="h-4 w-4 text-amber-600" />
