@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Search } from "lucide-react";
@@ -41,22 +42,32 @@ export const SelectContent = React.forwardRef<
     const showSearch = searchable && items && items.length > 0;
     const isMobile = isMobileDevice();
 
-    // When dropdown is opened, focus input for typing—works for all devices
+    // Focus the input when dropdown opens, with extra delay for mobile so keyboard appears
     React.useEffect(() => {
-      // avoid duplicate focus/scroll on reopen by using visible check
       if (
-        showSearch && 
-        searchInputRef.current && 
+        showSearch &&
+        searchInputRef.current &&
         typeof window !== "undefined"
       ) {
-        // Ensure input is visible before focusing
-        requestAnimationFrame(() => {
-          searchInputRef.current?.focus();
-          if (isMobile) {
-            // Ensure it's not covered, scroll to input if needed
+        let timer: number | null = null;
+        if (isMobile) {
+          // Slight delay for mobile to ensure dropdown is open and interactive
+          timer = window.setTimeout(() => {
+            searchInputRef.current?.focus();
+            // Scroll into view in case of soft keyboard overlap
             searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 350); // 350ms is usually enough after animation ends
+        } else {
+          // Desktop is instant
+          requestAnimationFrame(() => {
+            searchInputRef.current?.focus();
+          });
+        }
+        return () => {
+          if (timer) {
+            clearTimeout(timer);
           }
-        });
+        };
       }
     }, [showSearch, isMobile]);
 
@@ -115,6 +126,7 @@ export const SelectContent = React.forwardRef<
                   aria-label="Search"
                   tabIndex={0}
                   // No autoFocus, always use useEffect!
+                  // Never disable or hide!
                 />
               </div>
             </div>
@@ -136,3 +148,4 @@ export const SelectContent = React.forwardRef<
   }
 );
 SelectContent.displayName = "SelectContent";
+
