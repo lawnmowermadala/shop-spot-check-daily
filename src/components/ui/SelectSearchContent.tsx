@@ -9,11 +9,6 @@ import {
   SelectItem,
 } from "./SelectBase";
 
-// Simple mobile device detection (could be improved for edge cases)
-const isMobileDevice = () =>
-  typeof window !== "undefined" &&
-  /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
-
 interface SelectSearchContentProps
   extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> {
   items?: { 
@@ -40,21 +35,16 @@ export const SelectContent = React.forwardRef<
     const searchInputRef = React.useRef<HTMLInputElement>(null);
 
     const showSearch = searchable && items && items.length > 0;
-    const isMobile = isMobileDevice();
 
-    // Focus the input on open with a timer for reliability
+    // Focus the input on open
     React.useEffect(() => {
       if (showSearch && searchInputRef.current) {
         const timer = setTimeout(() => {
-          // Always focus, to make the keyboard pop on mobile
           searchInputRef.current?.focus();
-          if (isMobile) {
-            searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }, 90);
+        }, 100);
         return () => clearTimeout(timer);
       }
-    }, [showSearch, isMobile]);
+    }, [showSearch]);
 
     const filteredItems = React.useMemo(() => {
       if (!showSearch) return null;
@@ -70,7 +60,7 @@ export const SelectContent = React.forwardRef<
             item.label?.toLowerCase(),
             item.code?.toLowerCase(),
             item.name?.toLowerCase(),
-            item.searchTerms
+            item.searchTerms?.toLowerCase()
           ].filter(Boolean).join(' ');
           
           console.log('Item searchable text:', searchableText);
@@ -112,19 +102,14 @@ export const SelectContent = React.forwardRef<
                 <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
                 <input
                   ref={searchInputRef}
-                  type="search"
-                  inputMode="text"
+                  type="text"
                   autoComplete="off"
-                  autoFocus={isMobile ? true : undefined}
                   value={search}
                   onChange={handleSearchChange}
                   placeholder="Type to filter..."
-                  className={
-                    cn(
-                      "w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary",
-                      isMobile && "min-h-[40px] text-lg" // Slightly bigger for touch
-                    )
-                  }
+                  className={cn(
+                    "w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary"
+                  )}
                   onKeyDown={(e) => e.stopPropagation()}
                   aria-label="Search"
                 />
