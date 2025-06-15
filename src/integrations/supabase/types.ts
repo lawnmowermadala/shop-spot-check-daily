@@ -470,6 +470,7 @@ export type Database = {
           job_performance: number
           overall: number
           product_knowledge: number
+          punctuality: number
           rating_date: string
           staff_id: string
           staff_name: string
@@ -483,6 +484,7 @@ export type Database = {
           job_performance: number
           overall: number
           product_knowledge: number
+          punctuality?: number
           rating_date?: string
           staff_id: string
           staff_name: string
@@ -496,6 +498,7 @@ export type Database = {
           job_performance?: number
           overall?: number
           product_knowledge?: number
+          punctuality?: number
           rating_date?: string
           staff_id?: string
           staff_name?: string

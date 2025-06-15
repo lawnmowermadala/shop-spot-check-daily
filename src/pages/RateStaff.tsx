@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, Award, ThumbsUp, HeadphonesIcon, Users } from 'lucide-react';
+import { Star, Award, ThumbsUp, HeadphonesIcon, Users, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,6 +40,7 @@ const ratingSchema = z.object({
   jobPerformance: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Job Performance rating is required." }).max(5),
   customerService: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Customer Service rating is required." }).max(5),
   teamwork: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Teamwork rating is required." }).max(5),
+  punctuality: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Punctuality rating is required." }).max(5),
   comment: z.string().optional(),
 });
 
@@ -74,6 +76,7 @@ const RateStaff = () => {
       jobPerformance: 0,
       customerService: 0,
       teamwork: 0,
+      punctuality: 0,
       comment: '',
     },
   });
@@ -188,6 +191,7 @@ const RateStaff = () => {
   job_performance: data.jobPerformance,
   customer_service: data.customerService,
   teamwork: data.teamwork,
+  punctuality: data.punctuality,
   comment: data.comment || null,
   rating_date: new Date().toISOString()
 };
@@ -291,6 +295,11 @@ const RateStaff = () => {
                   label="Teamwork" 
                   icon={<Users className="h-5 w-5 text-orange-500" />} 
                   name="teamwork" 
+                />
+                <RatingInput 
+                  label="Punctuality" 
+                  icon={<Clock className="h-5 w-5 text-red-500" />} 
+                  name="punctuality" 
                 />
               </div>
               
