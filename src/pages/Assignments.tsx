@@ -15,7 +15,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb, AlertCircle } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -51,6 +51,8 @@ const Assignments = () => {
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
   const [completionMode, setCompletionMode] = useState<{ [key: string]: boolean }>({});
   const [selfInitiativeReward, setSelfInitiativeReward] = useState<{ [key: string]: boolean }>({});
+  const [incompleteMode, setIncompleteMode] = useState<{ [key: string]: boolean }>({});
+  const [demeritAssignment, setDemeritAssignment] = useState<{ [key: string]: boolean }>({});
   const printRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const assignmentRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
@@ -134,6 +136,15 @@ const Assignments = () => {
         }
       }
 
+      // If marking as incomplete and demerit is selected, add the flag
+      if (status === 'incomplete' && demeritAssignment[id]) {
+        if (!updatedInstructions.includes('[DEMERIT ASSIGNED]')) {
+          updatedInstructions = updatedInstructions 
+            ? `${updatedInstructions}\n\n[DEMERIT ASSIGNED] - Task not completed according to instructions.`
+            : '[DEMERIT ASSIGNED] - Task not completed according to instructions.';
+        }
+      }
+
       const { error } = await supabase
         .from('assignments')
         .update({ 
@@ -149,14 +160,19 @@ const Assignments = () => {
       // Reset states
       setCompletionMode(prev => ({ ...prev, [id]: false }));
       setSelfInitiativeReward(prev => ({ ...prev, [id]: false }));
+      setIncompleteMode(prev => ({ ...prev, [id]: false }));
+      setDemeritAssignment(prev => ({ ...prev, [id]: false }));
       
-      const toastTitle = status === 'done' && selfInitiativeReward[id] 
-        ? "Task Completed with Merit Award!" 
-        : "Status Updated";
-        
-      const toastDescription = status === 'done' && selfInitiativeReward[id]
-        ? `${assignment.assignee_name} has been awarded a Self Initiative Merit for exceptional performance!`
-        : `Assignment marked as ${status.replace('-', ' ')}`;
+      let toastTitle = "Status Updated";
+      let toastDescription = `Assignment marked as ${status.replace('-', ' ')}`;
+      
+      if (status === 'done' && selfInitiativeReward[id]) {
+        toastTitle = "Task Completed with Merit Award!";
+        toastDescription = `${assignment.assignee_name} has been awarded a Self Initiative Merit for exceptional performance!`;
+      } else if (status === 'incomplete' && demeritAssignment[id]) {
+        toastTitle = "Task Marked Incomplete with Demerit";
+        toastDescription = `${assignment.assignee_name} has been assigned a demerit for not following instructions.`;
+      }
       
       toast({
         title: toastTitle,
@@ -572,14 +588,57 @@ const Assignments = () => {
                               </>
                             )}
                             {assignment.status !== 'incomplete' && (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => updateAssignmentStatus(assignment.id, 'incomplete')}
-                                className="bg-red-50 hover:bg-red-100 text-red-600"
-                              >
-                                Incomplete
-                              </Button>
+                              <>
+                                {incompleteMode[assignment.id] ? (
+                                  <div className="flex flex-col gap-2 p-2 border rounded bg-red-50">
+                                    <div className="flex items-center gap-2">
+                                      <Checkbox
+                                        id={`demerit-${assignment.id}`}
+                                        checked={demeritAssignment[assignment.id] || false}
+                                        onCheckedChange={(checked) => 
+                                          setDemeritAssignment(prev => ({ ...prev, [assignment.id]: checked as boolean }))
+                                        }
+                                      />
+                                      <label 
+                                        htmlFor={`demerit-${assignment.id}`}
+                                        className="text-sm flex items-center gap-1 text-red-700"
+                                      >
+                                        <AlertCircle className="h-4 w-4" />
+                                        Assign Demerit
+                                      </label>
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <Button 
+                                        variant="default" 
+                                        size="sm"
+                                        onClick={() => updateAssignmentStatus(assignment.id, 'incomplete')}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Confirm Incomplete
+                                      </Button>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => {
+                                          setIncompleteMode(prev => ({ ...prev, [assignment.id]: false }));
+                                          setDemeritAssignment(prev => ({ ...prev, [assignment.id]: false }));
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => setIncompleteMode(prev => ({ ...prev, [assignment.id]: true }))}
+                                    className="bg-red-50 hover:bg-red-100 text-red-600"
+                                  >
+                                    Incomplete
+                                  </Button>
+                                )}
+                              </>
                             )}
                             {assignment.status === 'pending' && (
                               <Button 
