@@ -134,12 +134,14 @@ const Analytics = () => {
     mutationFn: async () => {
       if (!staffToRate) throw new Error('No staff member selected');
       
-      // Ensure all fields are integers
-      const product_knowledge = Math.round(ratingForm.product_knowledge);
-      const customer_service = Math.round(ratingForm.customer_service);
-      const job_performance = Math.round(ratingForm.job_performance);
-      const teamwork = Math.round(ratingForm.teamwork);
-      const punctuality = Math.round(ratingForm.punctuality);
+      // Convert each form value (1-10) to 1-5
+      const scale5 = (val: number) => Math.max(1, Math.min(5, Math.ceil(val / 2)));
+
+      const product_knowledge = scale5(ratingForm.product_knowledge);
+      const customer_service = scale5(ratingForm.customer_service);
+      const job_performance = scale5(ratingForm.job_performance);
+      const teamwork = scale5(ratingForm.teamwork);
+      const punctuality = scale5(ratingForm.punctuality);
 
       // Calculate average, round, clamp overall to [1,5]
       const avg = (
