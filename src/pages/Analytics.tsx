@@ -132,14 +132,20 @@ const Analytics = () => {
     mutationFn: async () => {
       if (!staffToRate) throw new Error('No staff member selected');
       
-      // Ensure overall is an integer to match the DB
+      // Ensure all fields are integers
+      const product_knowledge = Math.round(ratingForm.product_knowledge);
+      const customer_service = Math.round(ratingForm.customer_service);
+      const job_performance = Math.round(ratingForm.job_performance);
+      const teamwork = Math.round(ratingForm.teamwork);
+      const punctuality = Math.round(ratingForm.punctuality);
+
       const overall = Math.round(
         (
-          ratingForm.product_knowledge + 
-          ratingForm.customer_service + 
-          ratingForm.job_performance + 
-          ratingForm.teamwork +
-          ratingForm.punctuality
+          product_knowledge + 
+          customer_service + 
+          job_performance + 
+          teamwork +
+          punctuality
         ) / 5
       );
 
@@ -148,12 +154,12 @@ const Analytics = () => {
         .insert({
           staff_id: staffToRate.id.toString(),
           staff_name: staffToRate.name,
-          overall, // This is now an integer
-          product_knowledge: ratingForm.product_knowledge,
-          customer_service: ratingForm.customer_service,
-          job_performance: ratingForm.job_performance,
-          teamwork: ratingForm.teamwork,
-          punctuality: ratingForm.punctuality,
+          overall,
+          product_knowledge,
+          customer_service,
+          job_performance,
+          teamwork,
+          punctuality,
           comment: ratingForm.comment,
           rating_date: new Date().toISOString()
         });
