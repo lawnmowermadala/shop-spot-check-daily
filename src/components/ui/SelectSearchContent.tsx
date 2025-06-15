@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Search } from "lucide-react";
@@ -41,51 +42,13 @@ export const SelectContent = React.forwardRef<
     const showSearch = searchable && items && items.length > 0;
     const isMobile = isMobileDevice();
 
-    // Focus input when dropdown opens; extra care for mobile
-    React.useEffect(() => {
-      if (
-        showSearch &&
-        searchInputRef.current &&
-        typeof window !== "undefined"
-      ) {
-        let timer: number | null = null;
-
-        // Log for debugging
-        console.log("[SelectContent] Attempting to focus input", {
-          isMobile,
-          input: searchInputRef.current
-        });
-
-        if (isMobile) {
-          timer = window.setTimeout(() => {
-            if (searchInputRef.current) {
-              // Sometimes .focus() alone is not enough, try also .click()
-              searchInputRef.current.focus();
-              searchInputRef.current.click();
-              // Log the activeElement to ensure focus
-              console.log("[SelectContent] Mobile focus attempt", {
-                afterFocus: document.activeElement,
-                rect: searchInputRef.current.getBoundingClientRect(),
-              });
-              // Soft scroll into view
-              searchInputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-          }, 600); // Slightly longer for mobile animations (~0.5s)
-        } else {
-          // Desktop
-          requestAnimationFrame(() => {
-            if (searchInputRef.current) {
-              searchInputRef.current.focus();
-            }
-          });
-        }
-        return () => {
-          if (timer) {
-            clearTimeout(timer);
-          }
-        };
+    const handleOpenAutoFocus = (e: Event) => {
+      if (showSearch) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        console.log("[SelectContent] onOpenAutoFocus: search input focused.");
       }
-    }, [showSearch, isMobile]);
+    };
 
     const filteredItems = React.useMemo(() => {
       if (!showSearch) return null;
@@ -120,6 +83,7 @@ export const SelectContent = React.forwardRef<
             className
           )}
           position={position}
+          onOpenAutoFocus={handleOpenAutoFocus}
           {...props}
         >
           {showSearch && (
@@ -137,7 +101,6 @@ export const SelectContent = React.forwardRef<
                     "w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary",
                     isMobile && "min-h-[40px] text-lg"
                   )}
-                  // Removed tabIndex to reduce interference
                   onKeyDown={(e) => e.stopPropagation()}
                   aria-label="Search"
                 />
@@ -161,3 +124,4 @@ export const SelectContent = React.forwardRef<
   }
 );
 SelectContent.displayName = "SelectContent";
+
