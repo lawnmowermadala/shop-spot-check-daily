@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Search } from "lucide-react";
@@ -42,39 +41,36 @@ export const SelectContent = React.forwardRef<
     const showSearch = searchable && items && items.length > 0;
     const isMobile = isMobileDevice();
 
-    // Focus the input on open with mobile considerations
+    // When dropdown is opened, focus input for typing—works for all devices
     React.useEffect(() => {
-      if (showSearch && searchInputRef.current) {
-        const timer = setTimeout(() => {
+      // avoid duplicate focus/scroll on reopen by using visible check
+      if (
+        showSearch && 
+        searchInputRef.current && 
+        typeof window !== "undefined"
+      ) {
+        // Ensure input is visible before focusing
+        requestAnimationFrame(() => {
           searchInputRef.current?.focus();
           if (isMobile) {
+            // Ensure it's not covered, scroll to input if needed
             searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
           }
-        }, 100);
-        return () => clearTimeout(timer);
+        });
       }
     }, [showSearch, isMobile]);
 
     const filteredItems = React.useMemo(() => {
       if (!showSearch) return null;
-      
-      console.log('Search term:', search);
-      console.log('Items to filter:', items);
-      
       const searchLower = search.toLowerCase();
-      const filtered = items
+      return items
         .filter((item) => {
-          // Enhanced filtering - check all possible search fields
           const searchableText = [
             item.label?.toLowerCase(),
             item.code?.toLowerCase(),
             item.name?.toLowerCase(),
-            item.searchTerms?.toLowerCase()
-          ].filter(Boolean).join(' ');
-          
-          console.log('Item searchable text:', searchableText);
-          console.log('Search matches:', searchableText.includes(searchLower));
-          
+            item.searchTerms?.toLowerCase(),
+          ].filter(Boolean).join(" ");
           return searchableText.includes(searchLower);
         })
         .map((item) => (
@@ -82,15 +78,10 @@ export const SelectContent = React.forwardRef<
             {item.label}
           </SelectItem>
         ));
-      
-      console.log('Filtered items count:', filtered.length);
-      return filtered;
     }, [items, search, showSearch]);
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      console.log('Search input changed to:', value);
-      setSearch(value);
+      setSearch(e.target.value);
     };
 
     return (
@@ -98,7 +89,6 @@ export const SelectContent = React.forwardRef<
         <SelectPrimitive.Content
           ref={ref}
           className={cn(
-            // High z-index and popover
             "relative z-[1150] min-w-[16rem] max-h-[75vh] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 flex flex-col",
             className
           )}
@@ -106,24 +96,25 @@ export const SelectContent = React.forwardRef<
           {...props}
         >
           {showSearch && (
-            <div className="flex-shrink-0 bg-popover border-b px-4 py-2">
+            <div className="flex-shrink-0 bg-popover border-b px-4 py-2 z-50">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
                 <input
                   ref={searchInputRef}
-                  type="search"
+                  type="text"
                   inputMode="text"
                   autoComplete="off"
-                  autoFocus={isMobile ? true : undefined}
                   value={search}
                   onChange={handleSearchChange}
                   placeholder="Type to filter..."
                   className={cn(
                     "w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary",
-                    isMobile && "min-h-[40px] text-lg" // Bigger for touch on mobile
+                    isMobile && "min-h-[40px] text-lg"
                   )}
                   onKeyDown={(e) => e.stopPropagation()}
                   aria-label="Search"
+                  tabIndex={0}
+                  // No autoFocus, always use useEffect!
                 />
               </div>
             </div>
