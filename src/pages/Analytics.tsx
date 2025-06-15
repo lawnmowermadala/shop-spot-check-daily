@@ -131,7 +131,6 @@ const Analytics = () => {
   const addRating = useMutation({
     mutationFn: async () => {
       if (!staffToRate) throw new Error('No staff member selected');
-      
       // Ensure all fields are integers
       const product_knowledge = Math.round(ratingForm.product_knowledge);
       const customer_service = Math.round(ratingForm.customer_service);
@@ -139,15 +138,15 @@ const Analytics = () => {
       const teamwork = Math.round(ratingForm.teamwork);
       const punctuality = Math.round(ratingForm.punctuality);
 
-      const overall = Math.round(
-        (
-          product_knowledge + 
-          customer_service + 
-          job_performance + 
-          teamwork +
-          punctuality
-        ) / 5
-      );
+      // Calculate average, round, clamp overall to [1,5]
+      const avg = (
+        product_knowledge +
+        customer_service +
+        job_performance +
+        teamwork +
+        punctuality
+      ) / 5;
+      const overall = Math.max(1, Math.min(5, Math.round(avg)));
 
       const { error } = await supabase
         .from('ratings')
