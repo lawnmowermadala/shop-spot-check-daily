@@ -34,11 +34,11 @@ import Navigation from '@/components/Navigation';
 
 const ratingSchema = z.object({
   staffId: z.string().min(1, { message: "Please select a staff member" }),
-  overall: z.number().min(1).max(5),
-  productKnowledge: z.number().min(1).max(5),
-  jobPerformance: z.number().min(1).max(5),
-  customerService: z.number().min(1).max(5),
-  teamwork: z.number().min(1).max(5),
+  overall: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Overall rating is required." }).max(5),
+  productKnowledge: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Product Knowledge rating is required." }).max(5),
+  jobPerformance: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Job Performance rating is required." }).max(5),
+  customerService: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Customer Service rating is required." }).max(5),
+  teamwork: z.number().int({ message: "Rating must be a whole number." }).min(1, { message: "Teamwork rating is required." }).max(5),
   comment: z.string().optional(),
 });
 
