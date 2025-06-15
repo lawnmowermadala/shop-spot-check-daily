@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Search } from "lucide-react";
@@ -42,7 +41,7 @@ export const SelectContent = React.forwardRef<
     const showSearch = searchable && items && items.length > 0;
     const isMobile = isMobileDevice();
 
-    // Focus the input when dropdown opens, with extra delay for mobile so keyboard appears
+    // Focus input when dropdown opens; extra care for mobile
     React.useEffect(() => {
       if (
         showSearch &&
@@ -50,17 +49,34 @@ export const SelectContent = React.forwardRef<
         typeof window !== "undefined"
       ) {
         let timer: number | null = null;
+
+        // Log for debugging
+        console.log("[SelectContent] Attempting to focus input", {
+          isMobile,
+          input: searchInputRef.current
+        });
+
         if (isMobile) {
-          // Slight delay for mobile to ensure dropdown is open and interactive
           timer = window.setTimeout(() => {
-            searchInputRef.current?.focus();
-            // Scroll into view in case of soft keyboard overlap
-            searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }, 350); // 350ms is usually enough after animation ends
+            if (searchInputRef.current) {
+              // Sometimes .focus() alone is not enough, try also .click()
+              searchInputRef.current.focus();
+              searchInputRef.current.click();
+              // Log the activeElement to ensure focus
+              console.log("[SelectContent] Mobile focus attempt", {
+                afterFocus: document.activeElement,
+                rect: searchInputRef.current.getBoundingClientRect(),
+              });
+              // Soft scroll into view
+              searchInputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }, 600); // Slightly longer for mobile animations (~0.5s)
         } else {
-          // Desktop is instant
+          // Desktop
           requestAnimationFrame(() => {
-            searchInputRef.current?.focus();
+            if (searchInputRef.current) {
+              searchInputRef.current.focus();
+            }
           });
         }
         return () => {
@@ -113,7 +129,6 @@ export const SelectContent = React.forwardRef<
                 <input
                   ref={searchInputRef}
                   type="text"
-                  inputMode="text"
                   autoComplete="off"
                   value={search}
                   onChange={handleSearchChange}
@@ -122,11 +137,9 @@ export const SelectContent = React.forwardRef<
                     "w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary",
                     isMobile && "min-h-[40px] text-lg"
                   )}
+                  // Removed tabIndex to reduce interference
                   onKeyDown={(e) => e.stopPropagation()}
                   aria-label="Search"
-                  tabIndex={0}
-                  // No autoFocus, always use useEffect!
-                  // Never disable or hide!
                 />
               </div>
             </div>
@@ -148,4 +161,3 @@ export const SelectContent = React.forwardRef<
   }
 );
 SelectContent.displayName = "SelectContent";
-
