@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ const ChecklistItem = ({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [localAssignees, setLocalAssignees] = useState<Array<{ id: string; name: string }>>([]);
+  const [showSelfInitiative, setShowSelfInitiative] = useState(false);
   
   // Fetch staff members directly from Supabase
   useEffect(() => {
@@ -72,19 +74,13 @@ const ChecklistItem = ({
         console.log('Fetched staff members in ChecklistItem:', data);
         
         if (data && data.length > 0) {
-          // Convert id to string for compatibility with the component and add Self Initiative
+          // Convert id to string for compatibility with the component
           const staffWithStringIds = data.map(staff => ({
             id: staff.id.toString(),
             name: staff.name
           }));
           
-          // Add "Self Initiative" as first option
-          const staffWithSelfInitiative = [
-            { id: '-1', name: 'Self Initiative' },
-            ...staffWithStringIds
-          ];
-          
-          setLocalAssignees(staffWithSelfInitiative);
+          setLocalAssignees(staffWithStringIds);
         } else if (assignees && assignees.length > 0) {
           // Convert assignees with number ids to string ids for the local state
           const assigneesWithStringIds = assignees.map(assignee => ({
@@ -92,18 +88,11 @@ const ChecklistItem = ({
             name: assignee.name
           }));
           
-          // Add "Self Initiative" as first option
-          const assigneesWithSelfInitiative = [
-            { id: '-1', name: 'Self Initiative' },
-            ...assigneesWithStringIds
-          ];
-          
-          setLocalAssignees(assigneesWithSelfInitiative);
-          console.log('Using prop assignees instead:', assigneesWithSelfInitiative);
+          setLocalAssignees(assigneesWithStringIds);
+          console.log('Using prop assignees instead:', assigneesWithStringIds);
         } else {
-          // Even if no staff, add Self Initiative option
-          setLocalAssignees([{ id: '-1', name: 'Self Initiative' }]);
-          console.log('No staff members available, added Self Initiative only');
+          setLocalAssignees([]);
+          console.log('No staff members available');
         }
       } catch (err) {
         console.error('Exception fetching staff:', err);
@@ -184,8 +173,13 @@ const ChecklistItem = ({
         }
       }
 
+      // Create the assignment with self-initiative flag if applicable
+      const finalInstructions = showSelfInitiative 
+        ? `${instructions} [SELF INITIATIVE MERIT AWARD]`
+        : instructions;
+
       // Assign the area (photoUrl may be null/undefined)
-      onAssign(selectedAssigneeId, instructions, photoUrl || undefined);
+      onAssign(selectedAssigneeId, finalInstructions, photoUrl || undefined);
 
       // Clear form
       setSelectedAssigneeId("");
@@ -193,11 +187,12 @@ const ChecklistItem = ({
       setPhotoFile(null);
       setPhotoPreview(null);
       setShowAssignForm(false);
+      setShowSelfInitiative(false);
       
       // Show different toast message for Self Initiative
       const selectedAssignee = localAssignees.find(a => a.id === selectedAssigneeId);
-      const toastMessage = selectedAssignee?.name === 'Self Initiative' 
-        ? "Task marked as self-initiative!" 
+      const toastMessage = showSelfInitiative 
+        ? `Self-initiative merit awarded to ${selectedAssignee?.name}!` 
         : "Assignment created";
       
       toast({
@@ -284,14 +279,7 @@ const ChecklistItem = ({
                   {localAssignees && localAssignees.length > 0 ? (
                     localAssignees.map(assignee => (
                       <SelectItem key={assignee.id} value={assignee.id}>
-                        <div className="flex items-center gap-2">
-                          {assignee.name === 'Self Initiative' && (
-                            <Lightbulb className="h-4 w-4 text-amber-500" />
-                          )}
-                          <span className={assignee.name === 'Self Initiative' ? 'text-amber-600 font-medium' : ''}>
-                            {assignee.name}
-                          </span>
-                        </div>
+                        {assignee.name}
                       </SelectItem>
                     ))
                   ) : (
@@ -299,6 +287,23 @@ const ChecklistItem = ({
                   )}
                 </SelectContent>
               </Select>
+            </div>
+            
+            {/* Self Initiative Toggle */}
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <input
+                type="checkbox"
+                id="self-initiative"
+                checked={showSelfInitiative}
+                onChange={(e) => setShowSelfInitiative(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="self-initiative" className="flex items-center gap-2 text-sm cursor-pointer">
+                <Lightbulb className="h-4 w-4 text-amber-500" />
+                <span className="text-amber-700 font-medium">
+                  Award Self Initiative Merit (staff took initiative on this task)
+                </span>
+              </label>
             </div>
             
             <Textarea 
@@ -345,7 +350,7 @@ const ChecklistItem = ({
             )}
             
             <Button className="w-full" onClick={handleAssign}>
-              Assign Area
+              {showSelfInitiative ? 'Award Self Initiative Merit' : 'Assign Area'}
             </Button>
           </div>
         )}
