@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navigation from "@/components/Navigation";
@@ -9,7 +10,7 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { format, isAfter, isBefore, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Printer, Trophy, AlertTriangle, Lightbulb, Filter, User, Star, Award } from 'lucide-react';
+import { Printer, Trophy, AlertTriangle, Lightbulb, Filter, User, Star, Award, Plus } from 'lucide-react';
 import {
   Select,
   SelectContent,
