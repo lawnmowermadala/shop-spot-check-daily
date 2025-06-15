@@ -132,20 +132,23 @@ const Analytics = () => {
     mutationFn: async () => {
       if (!staffToRate) throw new Error('No staff member selected');
       
-      const overall = (
-        ratingForm.product_knowledge + 
-        ratingForm.customer_service + 
-        ratingForm.job_performance + 
-        ratingForm.teamwork +
-        ratingForm.punctuality
-      ) / 5;
+      // Ensure overall is an integer to match the DB
+      const overall = Math.round(
+        (
+          ratingForm.product_knowledge + 
+          ratingForm.customer_service + 
+          ratingForm.job_performance + 
+          ratingForm.teamwork +
+          ratingForm.punctuality
+        ) / 5
+      );
 
       const { error } = await supabase
         .from('ratings')
         .insert({
           staff_id: staffToRate.id.toString(),
           staff_name: staffToRate.name,
-          overall,
+          overall, // This is now an integer
           product_knowledge: ratingForm.product_knowledge,
           customer_service: ratingForm.customer_service,
           job_performance: ratingForm.job_performance,
