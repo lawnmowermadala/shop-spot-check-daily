@@ -7,9 +7,9 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
-import { format, isAfter, isBefore, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format, isAfter, isBefore, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Printer, Trophy, AlertTriangle, Lightbulb, Filter, User, Star, Award, Clock, Calendar, CalendarDays } from 'lucide-react';
+import { Printer, Trophy, AlertTriangle, Lightbulb, Filter, User, Star, Award } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -21,7 +21,6 @@ import { Input } from "@/components/ui/input";
 import { Search } from 'lucide-react';
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { Plus } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -34,7 +33,6 @@ interface Rating {
   customer_service: number;
   job_performance: number;
   teamwork: number;
-  punctuality: number;
   comment?: string;
   rating_date: string;
   created_at: string;
@@ -62,7 +60,6 @@ interface StaffPerformance {
   totalRatings: number;
   selfInitiativeCount: number;
   area?: string;
-  punctuality?: number;
 }
 
 interface AreaCompletionData {
@@ -80,8 +77,6 @@ const Analytics = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [ratingMode, setRatingMode] = useState(false);
   const [staffToRate, setStaffToRate] = useState<StaffMember | null>(null);
-  const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'year'>('week');
-  const [bestStaff, setBestStaff] = useState<{week?: string, month?: string, year?: string}>({});
 
   // Rating form state
   const [ratingForm, setRatingForm] = useState({
@@ -89,7 +84,6 @@ const Analytics = () => {
     customer_service: 5,
     job_performance: 5,
     teamwork: 5,
-    punctuality: 5,
     comment: ''
   });
 
@@ -136,9 +130,8 @@ const Analytics = () => {
         ratingForm.product_knowledge + 
         ratingForm.customer_service + 
         ratingForm.job_performance + 
-        ratingForm.teamwork +
-        ratingForm.punctuality
-      ) / 5;
+        ratingForm.teamwork
+      ) / 4;
 
       const { error } = await supabase
         .from('ratings')
@@ -150,7 +143,6 @@ const Analytics = () => {
           customer_service: ratingForm.customer_service,
           job_performance: ratingForm.job_performance,
           teamwork: ratingForm.teamwork,
-          punctuality: ratingForm.punctuality,
           comment: ratingForm.comment,
           rating_date: new Date().toISOString()
         });
@@ -207,41 +199,12 @@ const Analytics = () => {
     }
   });
 
-  // Mutation for naming best staff
-  const nameBestStaff = useMutation({
-    mutationFn: async ({ staffName, period }: { staffName: string, period: 'week' | 'month' | 'year' }) => {
-      // In a real app, you would save this to your database
-      // For this example, we'll just update local state
-      setBestStaff(prev => ({
-        ...prev,
-        [period]: staffName
-      }));
-      
-      return { success: true };
-    },
-    onSuccess: (_, variables) => {
-      toast({
-        title: "Success",
-        description: `${variables.staffName} named best staff of the ${variables.period}!`,
-        variant: "default"
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
   const resetRatingForm = () => {
     setRatingForm({
       product_knowledge: 5,
       customer_service: 5,
       job_performance: 5,
       teamwork: 5,
-      punctuality: 5,
       comment: ''
     });
     setStaffToRate(null);
@@ -256,12 +219,6 @@ const Analytics = () => {
   const handleAwardInitiative = (staffName: string) => {
     if (confirm(`Grant ${staffName} a Self-Initiative Award?`)) {
       awardSelfInitiative.mutate(staffName);
-    }
-  };
-
-  const handleNameBestStaff = (staffName: string) => {
-    if (confirm(`Name ${staffName} as the best staff of the ${timePeriod}?`)) {
-      nameBestStaff.mutate({ staffName, period: timePeriod });
     }
   };
 
@@ -338,22 +295,15 @@ const Analytics = () => {
 
   // Process staff ratings (sorted best to worst) and include self-initiative counts
   const staffPerformance: StaffPerformance[] = Object.entries(
-    filteredRatings.reduce((acc: Record<string, { 
-      name: string; 
-      overall: number; 
-      punctuality: number;
-      count: number 
-    }>, rating) => {
+    filteredRatings.reduce((acc: Record<string, { name: string; overall: number; count: number }>, rating) => {
       if (!acc[rating.staff_name]) {
         acc[rating.staff_name] = {
           name: rating.staff_name,
           overall: 0,
-          punctuality: 0,
           count: 0
         };
       }
       acc[rating.staff_name].overall += rating.overall;
-      acc[rating.staff_name].punctuality += rating.punctuality;
       acc[rating.staff_name].count += 1;
       return acc;
     }, {})
@@ -369,7 +319,6 @@ const Analytics = () => {
     return {
       name: data.name,
       averageRating: Number((data.overall / data.count).toFixed(1)),
-      punctuality: Number((data.punctuality / data.count).toFixed(1)),
       totalRatings: data.count,
       selfInitiativeCount: selfInitiativeCounts[data.name] || 0,
       area: mostCommonArea
@@ -401,48 +350,6 @@ const Analytics = () => {
   // Get bottom 3 performing areas (neglected)
   const neglectedAreas = areaCompletion.slice(-3).reverse();
 
-  // Get best staff for different time periods
-  const getBestStaffForPeriod = (period: 'week' | 'month' | 'year') => {
-    let startDate: Date;
-    let endDate: Date = new Date();
-    
-    switch (period) {
-      case 'week':
-        startDate = startOfWeek(new Date());
-        break;
-      case 'month':
-        startDate = startOfMonth(new Date());
-        break;
-      case 'year':
-        startDate = startOfYear(new Date());
-        break;
-      default:
-        startDate = startOfWeek(new Date());
-    }
-    
-    const periodRatings = ratings.filter(rating => {
-      const ratingDate = parseISO(rating.rating_date);
-      return isAfter(ratingDate, startDate) && isBefore(ratingDate, endDate);
-    });
-    
-    if (periodRatings.length === 0) return null;
-    
-    const staffScores = periodRatings.reduce((acc: Record<string, { sum: number; count: number }>, rating) => {
-      if (!acc[rating.staff_name]) {
-        acc[rating.staff_name] = { sum: 0, count: 0 };
-      }
-      acc[rating.staff_name].sum += rating.overall;
-      acc[rating.staff_name].count += 1;
-      return acc;
-    }, {});
-    
-    const [bestStaffName, _] = Object.entries(staffScores)
-      .map(([name, { sum, count }]) => [name, sum / count] as [string, number])
-      .sort((a, b) => b[1] - a[1])[0];
-    
-    return bestStaffName;
-  };
-
   const isLoading = ratingsLoading || assignmentsLoading || staffLoading;
 
   const handlePrint = () => {
@@ -466,7 +373,6 @@ const Analytics = () => {
               .neglected-area { background-color: #ffebeb; }
               .self-initiative { background-color: #fef3c7; }
               .filter-info { background-color: #f5f5f5; padding: 10px; margin-bottom: 15px; border-radius: 4px; }
-              .best-staff { background-color: #e6f3ff; padding: 10px; margin: 10px 0; border-left: 4px solid #3498db; }
             </style>
           </head>
           <body>
@@ -486,21 +392,13 @@ const Analytics = () => {
               ${searchTerm ? `Search Term: ${searchTerm}<br>` : ''}
             </div>
 
-            <div class="best-staff">
-              <h3>Best Staff Recognition</h3>
-              <p><strong>This Week:</strong> ${bestStaff.week || 'Not selected yet'}</p>
-              <p><strong>This Month:</strong> ${bestStaff.month || 'Not selected yet'}</p>
-              <p><strong>This Year:</strong> ${bestStaff.year || 'Not selected yet'}</p>
-            </div>
-
             <h2>Employee Performance</h2>
             <table>
               <thead>
                 <tr>
                   <th>Rank</th>
                   <th>Employee</th>
-                  <th>Avg Rating</th>
-                  <th>Punctuality</th>
+                  <th>Average Rating</th>
                   <th>Total Ratings</th>
                   <th>Self Initiative Awards</th>
                   <th>Primary Area</th>
@@ -512,7 +410,6 @@ const Analytics = () => {
                     <td>${index + 1}</td>
                     <td>${staff.name}</td>
                     <td>${staff.averageRating}</td>
-                    <td>${staff.punctuality}</td>
                     <td>${staff.totalRatings}</td>
                     <td>${staff.selfInitiativeCount}</td>
                     <td>${staff.area || 'N/A'}</td>
@@ -672,19 +569,6 @@ const Analytics = () => {
                         step={1}
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Punctuality: {ratingForm.punctuality}/10
-                      </label>
-                      <Slider
-                        value={[ratingForm.punctuality]}
-                        onValueChange={(value) => setRatingForm({...ratingForm, punctuality: value[0]})}
-                        min={1}
-                        max={10}
-                        step={1}
-                      />
-                    </div>
                   </div>
                 )}
               </div>
@@ -789,87 +673,6 @@ const Analytics = () => {
             </CardContent>
           </Card>
 
-          {/* Best Staff Recognition */}
-          <Card className="mb-6">
-            <CardHeader className="bg-blue-50">
-              <div className="flex justify-between items-center">
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="text-yellow-500" />
-                  Best Staff Recognition
-                </CardTitle>
-                <div className="flex gap-2">
-                  <Select value={timePeriod} onValueChange={(value: 'week' | 'month' | 'year') => setTimePeriod(value)}>
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder="Period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="week">This Week</SelectItem>
-                      <SelectItem value="month">This Month</SelectItem>
-                      <SelectItem value="year">This Year</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="border rounded-lg p-4 bg-blue-50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-5 w-5 text-blue-500" />
-                    <h3 className="font-medium">Best of the Week</h3>
-                  </div>
-                  <p className="text-2xl font-bold">{bestStaff.week || 'Not selected'}</p>
-                  {staffPerformance.length > 0 && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => handleNameBestStaff(staffPerformance[0].name)}
-                    >
-                      Select Current Best
-                    </Button>
-                  )}
-                </div>
-
-                <div className="border rounded-lg p-4 bg-blue-50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CalendarDays className="h-5 w-5 text-blue-500" />
-                    <h3 className="font-medium">Best of the Month</h3>
-                  </div>
-                  <p className="text-2xl font-bold">{bestStaff.month || 'Not selected'}</p>
-                  {staffPerformance.length > 0 && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => handleNameBestStaff(staffPerformance[0].name)}
-                    >
-                      Select Current Best
-                    </Button>
-                  )}
-                </div>
-
-                <div className="border rounded-lg p-4 bg-blue-50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Award className="h-5 w-5 text-blue-500" />
-                    <h3 className="font-medium">Best of the Year</h3>
-                  </div>
-                  <p className="text-2xl font-bold">{bestStaff.year || 'Not selected'}</p>
-                  {staffPerformance.length > 0 && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => handleNameBestStaff(staffPerformance[0].name)}
-                    >
-                      Select Current Best
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {isLoading ? (
             <div className="text-center py-10">Loading performance data...</div>
           ) : (
@@ -890,12 +693,6 @@ const Analytics = () => {
                           <th className="text-left p-3">Rank</th>
                           <th className="text-left p-3">Employee</th>
                           <th className="text-left p-3">Avg Rating</th>
-                          <th className="text-left p-3">
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-4 w-4 text-blue-500" />
-                              Punctuality
-                            </div>
-                          </th>
                           <th className="text-left p-3">Ratings</th>
                           <th className="text-left p-3 flex items-center gap-1">
                             <Lightbulb className="h-4 w-4 text-amber-500" />
@@ -918,7 +715,6 @@ const Analytics = () => {
                                 )}
                               </td>
                               <td className="p-3">{staff.averageRating}</td>
-                              <td className="p-3">{staff.punctuality}</td>
                               <td className="p-3">{staff.totalRatings}</td>
                               <td className="p-3">
                                 <span className={`font-semibold ${staff.selfInitiativeCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
@@ -949,7 +745,7 @@ const Analytics = () => {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={7} className="text-center py-4 text-gray-500">
+                            <td colSpan={6} className="text-center py-4 text-gray-500">
                               No staff performance data found with current filters
                             </td>
                           </tr>
