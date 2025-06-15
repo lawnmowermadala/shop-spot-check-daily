@@ -178,9 +178,16 @@ const Analytics = () => {
   // Mutation for awarding self initiative
   const awardSelfInitiative = useMutation({
     mutationFn: async (staffName: string) => {
+      // Find the staff member to get their ID
+      const staffMember = staffMembers.find(staff => staff.name === staffName);
+      if (!staffMember) {
+        throw new Error(`Staff member "${staffName}" not found`);
+      }
+
       const { error } = await supabase
         .from('assignments')
         .insert({
+          assignee_id: staffMember.id,
           assignee_name: staffName,
           area: 'Special Recognition',
           status: 'completed',
