@@ -42,13 +42,16 @@ export const SelectContent = React.forwardRef<
     const showSearch = searchable && items && items.length > 0;
     const isMobile = isMobileDevice();
 
-    const handleOpenAutoFocus = (e: Event) => {
+    React.useEffect(() => {
       if (showSearch) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        console.log("[SelectContent] onOpenAutoFocus: search input focused.");
+        // A short delay is needed to allow the component to be rendered and animated
+        // before we can focus it, which helps trigger the mobile keyboard.
+        const timer = setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 100);
+        return () => clearTimeout(timer);
       }
-    };
+    }, [showSearch]);
 
     const filteredItems = React.useMemo(() => {
       if (!showSearch) return null;
@@ -83,7 +86,6 @@ export const SelectContent = React.forwardRef<
             className
           )}
           position={position}
-          onOpenAutoFocus={handleOpenAutoFocus}
           {...props}
         >
           {showSearch && (
@@ -124,4 +126,3 @@ export const SelectContent = React.forwardRef<
   }
 );
 SelectContent.displayName = "SelectContent";
-
