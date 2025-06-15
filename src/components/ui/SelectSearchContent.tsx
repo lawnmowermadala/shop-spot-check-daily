@@ -58,8 +58,12 @@ export const SelectContent = React.forwardRef<
 
     const filteredItems = React.useMemo(() => {
       if (!showSearch) return null;
+      
+      console.log('Search term:', search);
+      console.log('Items to filter:', items);
+      
       const searchLower = search.toLowerCase();
-      return items
+      const filtered = items
         .filter((item) => {
           // Enhanced filtering - check all possible search fields
           const searchableText = [
@@ -69,6 +73,9 @@ export const SelectContent = React.forwardRef<
             item.searchTerms
           ].filter(Boolean).join(' ');
           
+          console.log('Item searchable text:', searchableText);
+          console.log('Search matches:', searchableText.includes(searchLower));
+          
           return searchableText.includes(searchLower);
         })
         .map((item) => (
@@ -76,7 +83,16 @@ export const SelectContent = React.forwardRef<
             {item.label}
           </SelectItem>
         ));
+      
+      console.log('Filtered items count:', filtered.length);
+      return filtered;
     }, [items, search, showSearch]);
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      console.log('Search input changed to:', value);
+      setSearch(value);
+    };
 
     return (
       <SelectPrimitive.Portal>
@@ -101,7 +117,7 @@ export const SelectContent = React.forwardRef<
                   autoComplete="off"
                   autoFocus={isMobile ? true : undefined}
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={handleSearchChange}
                   placeholder="Type to filter..."
                   className={
                     cn(
