@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navigation from "@/components/Navigation";
@@ -10,11 +9,19 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { format, isAfter, isBefore, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Printer, Trophy, AlertTriangle, Lightbulb } from 'lucide-react';
+import { Printer, Trophy, AlertTriangle, Lightbulb, Filter, User } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Search } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-// Define types for our data structures
 interface Rating {
   id: number;
   staff_id: string;
@@ -45,6 +52,7 @@ interface StaffPerformance {
   averageRating: number;
   totalRatings: number;
   selfInitiativeCount: number;
+  area?: string;
 }
 
 interface AreaCompletionData {
@@ -57,10 +65,13 @@ const Analytics = () => {
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date()
   });
+  const [selectedStaff, setSelectedStaff] = useState<string>('all');
+  const [selectedArea, setSelectedArea] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch ratings data
   const { data: ratings = [], isLoading: ratingsLoading, error: ratingsError } = useQuery({
-    queryKey: ['ratings-analytics', dateRange],
+    queryKey: ['ratings-analytics'],
     queryFn: async () => {
       const { data, error } = await supabase.from('ratings').select('*');
       if (error) throw error;
@@ -70,11 +81,25 @@ const Analytics = () => {
 
   // Fetch assignments data
   const { data: assignments = [], isLoading: assignmentsLoading, error: assignmentsError } = useQuery({
-    queryKey: ['assignments-analytics', dateRange],
+    queryKey: ['assignments-analytics'],
     queryFn: async () => {
       const { data, error } = await supabase.from('assignments').select('*');
       if (error) throw error;
       return data as Assignment[] || [];
+    }
+  });
+
+  // Fetch staff members
+  const { data: staffMembers = [] } = useQuery({
+    queryKey: ['staff-members'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('id, name')
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      return data;
     }
   });
 
@@ -88,28 +113,58 @@ const Analytics = () => {
     }
   }, [ratingsError, assignmentsError]);
 
-  // Filter data by date range
-  const filterByDate = <T extends { [key: string]: any }>(items: T[], dateField: string): T[] => {
-    if (!dateRange?.from && !dateRange?.to) return items;
+  // Filter data by date range and selections
+  const filterData = <T extends { [key: string]: any }>(items: T[], dateField: string): T[] => {
+    let filtered = [...items];
     
-    return items.filter(item => {
-      const itemDate = parseISO(item[dateField]);
-      if (!itemDate) return false;
-      
-      if (dateRange?.from && dateRange?.to) {
-        return isAfter(itemDate, startOfDay(dateRange.from)) && 
-               isBefore(itemDate, endOfDay(dateRange.to));
-      }
-      
-      if (dateRange?.from) return isAfter(itemDate, startOfDay(dateRange.from));
-      if (dateRange?.to) return isBefore(itemDate, endOfDay(dateRange.to));
-      
-      return true;
-    });
+    // Filter by date range
+    if (dateRange?.from || dateRange?.to) {
+      filtered = filtered.filter(item => {
+        const itemDate = parseISO(item[dateField]);
+        if (!itemDate) return false;
+        
+        if (dateRange?.from && dateRange?.to) {
+          return isAfter(itemDate, startOfDay(dateRange.from)) && 
+                isBefore(itemDate, endOfDay(dateRange.to));
+        }
+        
+        if (dateRange?.from) return isAfter(itemDate, startOfDay(dateRange.from));
+        if (dateRange?.to) return isBefore(itemDate, endOfDay(dateRange.to));
+        
+        return true;
+      });
+    }
+
+    // Filter by selected staff
+    if (selectedStaff !== 'all') {
+      filtered = filtered.filter(item => 
+        item.staff_name === selectedStaff || item.assignee_name === selectedStaff
+      );
+    }
+
+    // Filter by selected area
+    if (selectedArea !== 'all') {
+      filtered = filtered.filter(item => item.area === selectedArea);
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.staff_name?.toLowerCase().includes(term) || 
+        item.assignee_name?.toLowerCase().includes(term) ||
+        item.area?.toLowerCase().includes(term)
+      );
+    }
+
+    return filtered;
   };
 
-  const filteredRatings = filterByDate(ratings, 'rating_date');
-  const filteredAssignments = filterByDate(assignments, 'created_at');
+  const filteredRatings = filterData(ratings, 'rating_date');
+  const filteredAssignments = filterData(assignments, 'created_at');
+
+  // Get unique areas from assignments
+  const uniqueAreas = [...new Set(assignments.map(a => a.area))].sort();
 
   // Count self-initiative awards by staff member
   const selfInitiativeCounts = filteredAssignments.reduce((acc: Record<string, number>, assignment) => {
@@ -133,12 +188,23 @@ const Analytics = () => {
       acc[rating.staff_name].count += 1;
       return acc;
     }, {})
-  ).map(([_, data]) => ({
-    name: data.name,
-    averageRating: Number((data.overall / data.count).toFixed(1)),
-    totalRatings: data.count,
-    selfInitiativeCount: selfInitiativeCounts[data.name] || 0
-  }))
+  ).map(([_, data]) => {
+    // Find the most common area for this staff member
+    const staffAssignments = filteredAssignments.filter(a => a.assignee_name === data.name);
+    const areaCounts = staffAssignments.reduce((acc: Record<string, number>, assignment) => {
+      acc[assignment.area] = (acc[assignment.area] || 0) + 1;
+      return acc;
+    }, {});
+    const mostCommonArea = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    return {
+      name: data.name,
+      averageRating: Number((data.overall / data.count).toFixed(1)),
+      totalRatings: data.count,
+      selfInitiativeCount: selfInitiativeCounts[data.name] || 0,
+      area: mostCommonArea
+    };
+  })
   .sort((a, b) => {
     // Sort by self-initiative count first, then by average rating
     if (a.selfInitiativeCount !== b.selfInitiativeCount) {
@@ -187,6 +253,7 @@ const Analytics = () => {
               .top-area { background-color: #e6f3ff; }
               .neglected-area { background-color: #ffebeb; }
               .self-initiative { background-color: #fef3c7; }
+              .filter-info { background-color: #f5f5f5; padding: 10px; margin-bottom: 15px; border-radius: 4px; }
             </style>
           </head>
           <body>
@@ -199,7 +266,14 @@ const Analytics = () => {
               </div>
             </div>
 
-            <h2>Employee of the Month Candidates</h2>
+            <div class="filter-info">
+              <strong>Filters Applied:</strong><br>
+              ${selectedStaff !== 'all' ? `Staff: ${selectedStaff}<br>` : ''}
+              ${selectedArea !== 'all' ? `Area: ${selectedArea}<br>` : ''}
+              ${searchTerm ? `Search Term: ${searchTerm}<br>` : ''}
+            </div>
+
+            <h2>Employee Performance</h2>
             <table>
               <thead>
                 <tr>
@@ -208,16 +282,18 @@ const Analytics = () => {
                   <th>Average Rating</th>
                   <th>Total Ratings</th>
                   <th>Self Initiative Awards</th>
+                  <th>Primary Area</th>
                 </tr>
               </thead>
               <tbody>
-                ${staffPerformance.slice(0, 5).map((staff, index) => `
+                ${staffPerformance.map((staff, index) => `
                   <tr class="${index === 0 ? 'top-performer' : ''} ${staff.selfInitiativeCount > 0 ? 'self-initiative' : ''}">
                     <td>${index + 1}</td>
                     <td>${staff.name}</td>
                     <td>${staff.averageRating}</td>
                     <td>${staff.totalRatings}</td>
                     <td>${staff.selfInitiativeCount}</td>
+                    <td>${staff.area || 'N/A'}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -276,22 +352,74 @@ const Analytics = () => {
         </Button>
       </div>
 
+      {/* Filters Section */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Date Range Filter</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <DateRangePicker 
-            dateRange={dateRange} 
-            onDateRangeChange={setDateRange} 
-            className="w-full max-w-sm" 
-          />
-          <div className="text-sm text-muted-foreground mt-2">
-            {dateRange?.from && dateRange?.to ? (
-              <p>Showing data from {format(dateRange.from, 'PP')} to {format(dateRange.to, 'PP')}</p>
-            ) : (
-              <p>Select a date range to filter data</p>
-            )}
+        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Date Range</label>
+            <DateRangePicker 
+              dateRange={dateRange} 
+              onDateRangeChange={setDateRange} 
+              className="w-full" 
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Staff Member</label>
+            <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select staff member">
+                  {selectedStaff === 'all' ? 'All Staff' : selectedStaff}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Staff</SelectItem>
+                {staffMembers.map(staff => (
+                  <SelectItem key={staff.id} value={staff.name}>
+                    {staff.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Area</label>
+            <Select value={selectedArea} onValueChange={setSelectedArea}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select area">
+                  {selectedArea === 'all' ? 'All Areas' : selectedArea}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Areas</SelectItem>
+                {uniqueAreas.map(area => (
+                  <SelectItem key={area} value={area}>
+                    {area}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Search</label>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search staff or areas..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -305,7 +433,7 @@ const Analytics = () => {
             <CardHeader className="bg-green-50">
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="text-yellow-500" />
-                Employee of the Month Candidates
+                Employee Performance
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -321,29 +449,39 @@ const Analytics = () => {
                         <Lightbulb className="h-4 w-4 text-amber-500" />
                         Self Initiative
                       </th>
+                      <th className="text-left p-3">Primary Area</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {staffPerformance.slice(0, 5).map((staff, index) => (
-                      <tr key={staff.name} className="border-b hover:bg-gray-50">
-                        <td className="p-3">{index + 1}</td>
-                        <td className="p-3 font-medium">
-                          {staff.name}
-                          {staff.selfInitiativeCount > 0 && (
-                            <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                              Initiative Star
+                    {staffPerformance.length > 0 ? (
+                      staffPerformance.map((staff, index) => (
+                        <tr key={staff.name} className="border-b hover:bg-gray-50">
+                          <td className="p-3">{index + 1}</td>
+                          <td className="p-3 font-medium">
+                            {staff.name}
+                            {staff.selfInitiativeCount > 0 && (
+                              <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                                Initiative Star
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">{staff.averageRating}</td>
+                          <td className="p-3">{staff.totalRatings}</td>
+                          <td className="p-3">
+                            <span className={`font-semibold ${staff.selfInitiativeCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                              {staff.selfInitiativeCount}
                             </span>
-                          )}
-                        </td>
-                        <td className="p-3">{staff.averageRating}</td>
-                        <td className="p-3">{staff.totalRatings}</td>
-                        <td className="p-3">
-                          <span className={`font-semibold ${staff.selfInitiativeCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
-                            {staff.selfInitiativeCount}
-                          </span>
+                          </td>
+                          <td className="p-3">{staff.area || 'N/A'}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="text-center py-4 text-gray-500">
+                          No staff performance data found with current filters
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -356,16 +494,22 @@ const Analytics = () => {
               <CardTitle>Top Performing Areas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topAreas}>
-                    <XAxis dataKey="area" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#0088FE" name="Completed Tasks" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              {topAreas.length > 0 ? (
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={topAreas}>
+                      <XAxis dataKey="area" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#0088FE" name="Completed Tasks" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  No area performance data found with current filters
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -378,16 +522,22 @@ const Analytics = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={neglectedAreas}>
-                    <XAxis dataKey="area" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#FF8042" name="Completed Tasks" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              {neglectedAreas.length > 0 ? (
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={neglectedAreas}>
+                      <XAxis dataKey="area" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#FF8042" name="Completed Tasks" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  No neglected areas found with current filters
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -401,20 +551,20 @@ const Analytics = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {Object.entries(selfInitiativeCounts)
-                  .sort(([,a], [,b]) => b - a)
-                  .slice(0, 5)
-                  .map(([staffName, count]) => (
-                    <div key={staffName} className="flex justify-between items-center p-2 bg-amber-100 rounded">
-                      <span className="font-medium">{staffName}</span>
-                      <span className="bg-amber-200 text-amber-800 px-2 py-1 rounded text-sm font-semibold">
-                        {count} award{count !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  ))}
-                {Object.keys(selfInitiativeCounts).length === 0 && (
+                {Object.entries(selfInitiativeCounts).length > 0 ? (
+                  Object.entries(selfInitiativeCounts)
+                    .sort(([,a], [,b]) => b - a)
+                    .map(([staffName, count]) => (
+                      <div key={staffName} className="flex justify-between items-center p-2 bg-amber-100 rounded">
+                        <span className="font-medium">{staffName}</span>
+                        <span className="bg-amber-200 text-amber-800 px-2 py-1 rounded text-sm font-semibold">
+                          {count} award{count !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    ))
+                ) : (
                   <div className="text-center text-gray-500 py-4">
-                    No self-initiative awards recorded in this period
+                    No self-initiative awards recorded with current filters
                   </div>
                 )}
               </div>
