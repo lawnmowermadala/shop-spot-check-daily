@@ -16,7 +16,14 @@ const isMobileDevice = () =>
 
 interface SelectSearchContentProps
   extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> {
-  items?: { id?: string; code?: string; name?: string; value: string; label: string }[];
+  items?: { 
+    id?: string; 
+    code?: string; 
+    name?: string; 
+    value: string; 
+    label: string;
+    searchTerms?: string;
+  }[];
   searchable?: boolean;
   position?: "popper" | "item-aligned";
 }
@@ -51,12 +58,19 @@ export const SelectContent = React.forwardRef<
 
     const filteredItems = React.useMemo(() => {
       if (!showSearch) return null;
+      const searchLower = search.toLowerCase();
       return items
-        .filter((item) =>
-          (item.label?.toLowerCase().includes(search.toLowerCase()) ||
-            item.code?.toLowerCase().includes(search.toLowerCase()) ||
-            item.name?.toLowerCase().includes(search.toLowerCase()))
-        )
+        .filter((item) => {
+          // Enhanced filtering - check all possible search fields
+          const searchableText = [
+            item.label?.toLowerCase(),
+            item.code?.toLowerCase(),
+            item.name?.toLowerCase(),
+            item.searchTerms
+          ].filter(Boolean).join(' ');
+          
+          return searchableText.includes(searchLower);
+        })
         .map((item) => (
           <SelectItem key={item.id ?? item.value} value={item.value}>
             {item.label}
@@ -80,8 +94,6 @@ export const SelectContent = React.forwardRef<
             <div className="flex-shrink-0 bg-popover border-b px-4 py-2">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
-                {/* The key: type="search", inputMode="text", autoFocus for mobile, and always visible on mobile devices.
-                    This guarantees the keyboard pops up! */}
                 <input
                   ref={searchInputRef}
                   type="search"
@@ -90,7 +102,7 @@ export const SelectContent = React.forwardRef<
                   autoFocus={isMobile ? true : undefined}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Type to search..."
+                  placeholder="Type to filter..."
                   className={
                     cn(
                       "w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary",
@@ -120,4 +132,3 @@ export const SelectContent = React.forwardRef<
   }
 );
 SelectContent.displayName = "SelectContent";
-

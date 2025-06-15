@@ -210,22 +210,30 @@ const ProductionForm = ({
     }
   };
 
-  // Prepare items for searchable selects
+  // Prepare items for searchable selects with better search terms
   const productItems = products.map(product => ({
     id: product.id,
     value: product.id,
     label: `${product.code} - ${product.name}`,
     code: product.code,
-    name: product.name
+    name: product.name,
+    searchTerms: `${product.code} ${product.name}`.toLowerCase()
   }));
 
   const recipeItems = [
-    { id: 'no-recipe', value: '', label: 'No Recipe', name: 'No Recipe' },
+    { 
+      id: 'no-recipe', 
+      value: '', 
+      label: 'No Recipe', 
+      name: 'No Recipe',
+      searchTerms: 'no recipe'
+    },
     ...recipes.map(recipe => ({
       id: recipe.id,
       value: recipe.id,
       label: `${recipe.name} (${recipe.batch_size} ${recipe.unit})`,
-      name: recipe.name
+      name: recipe.name,
+      searchTerms: `${recipe.name} ${recipe.batch_size} ${recipe.unit}`.toLowerCase()
     }))
   ];
 
@@ -233,7 +241,8 @@ const ProductionForm = ({
     id: staff.id.toString(),
     value: staff.id.toString(),
     label: staff.name,
-    name: staff.name
+    name: staff.name,
+    searchTerms: staff.name.toLowerCase()
   }));
 
   return (
@@ -244,12 +253,12 @@ const ProductionForm = ({
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Product Dropdown Select with search */}
+          {/* Product Dropdown Select with enhanced search */}
           <div>
             <Label htmlFor="product">Product *</Label>
             <Select value={productionData.product_id} onValueChange={handleProductChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a product..." />
+                <SelectValue placeholder="Type to search products..." />
               </SelectTrigger>
               <SelectContent items={productItems} searchable={true} />
             </Select>
