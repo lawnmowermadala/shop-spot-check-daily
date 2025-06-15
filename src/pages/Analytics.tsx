@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navigation from "@/components/Navigation";
 import { BarChart, XAxis, YAxis, Bar, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { format, isAfter, isBefore, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Printer, Trophy, AlertTriangle, Lightbulb, Filter, User } from 'lucide-react';
+import { Printer, Trophy, AlertTriangle, Lightbulb, Filter, User, Star, Award } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Search } from 'lucide-react';
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -47,6 +49,11 @@ interface Assignment {
   created_at?: string | null;
 }
 
+interface StaffMember {
+  id: number;
+  name: string;
+}
+
 interface StaffPerformance {
   name: string;
   averageRating: number;
@@ -68,9 +75,20 @@ const Analytics = () => {
   const [selectedStaff, setSelectedStaff] = useState<string>('all');
   const [selectedArea, setSelectedArea] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [ratingMode, setRatingMode] = useState(false);
+  const [staffToRate, setStaffToRate] = useState<StaffMember | null>(null);
+
+  // Rating form state
+  const [ratingForm, setRatingForm] = useState({
+    product_knowledge: 5,
+    customer_service: 5,
+    job_performance: 5,
+    teamwork: 5,
+    comment: ''
+  });
 
   // Fetch ratings data
-  const { data: ratings = [], isLoading: ratingsLoading, error: ratingsError } = useQuery({
+  const { data: ratings = [], isLoading: ratingsLoading, error: ratingsError, refetch: refetchRatings } = useQuery({
     queryKey: ['ratings-analytics'],
     queryFn: async () => {
       const { data, error } = await supabase.from('ratings').select('*');
@@ -80,7 +98,7 @@ const Analytics = () => {
   });
 
   // Fetch assignments data
-  const { data: assignments = [], isLoading: assignmentsLoading, error: assignmentsError } = useQuery({
+  const { data: assignments = [], isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useQuery({
     queryKey: ['assignments-analytics'],
     queryFn: async () => {
       const { data, error } = await supabase.from('assignments').select('*');
@@ -90,7 +108,7 @@ const Analytics = () => {
   });
 
   // Fetch staff members
-  const { data: staffMembers = [] } = useQuery({
+  const { data: staffMembers = [], isLoading: staffLoading } = useQuery({
     queryKey: ['staff-members'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -99,9 +117,110 @@ const Analytics = () => {
         .order('name', { ascending: true });
       
       if (error) throw error;
-      return data;
+      return data as StaffMember[];
     }
   });
+
+  // Mutation for adding a new rating
+  const addRating = useMutation({
+    mutationFn: async () => {
+      if (!staffToRate) throw new Error('No staff member selected');
+      
+      const overall = (
+        ratingForm.product_knowledge + 
+        ratingForm.customer_service + 
+        ratingForm.job_performance + 
+        ratingForm.teamwork
+      ) / 4;
+
+      const { error } = await supabase
+        .from('ratings')
+        .insert({
+          staff_id: staffToRate.id.toString(),
+          staff_name: staffToRate.name,
+          overall,
+          product_knowledge: ratingForm.product_knowledge,
+          customer_service: ratingForm.customer_service,
+          job_performance: ratingForm.job_performance,
+          teamwork: ratingForm.teamwork,
+          comment: ratingForm.comment,
+          rating_date: new Date().toISOString()
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Rating submitted successfully!",
+        variant: "default"
+      });
+      refetchRatings();
+      resetRatingForm();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutation for awarding self initiative
+  const awardSelfInitiative = useMutation({
+    mutationFn: async (staffName: string) => {
+      const { error } = await supabase
+        .from('assignments')
+        .insert({
+          assignee_name: staffName,
+          area: 'Special Recognition',
+          status: 'completed',
+          instructions: `[SELF INITIATIVE MERIT AWARD] ${staffName} demonstrated exceptional initiative on ${format(new Date(), 'PP')}`,
+          created_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Award Granted",
+        description: "Self-initiative award has been recorded!",
+        variant: "default"
+      });
+      refetchAssignments();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const resetRatingForm = () => {
+    setRatingForm({
+      product_knowledge: 5,
+      customer_service: 5,
+      job_performance: 5,
+      teamwork: 5,
+      comment: ''
+    });
+    setStaffToRate(null);
+    setRatingMode(false);
+  };
+
+  const handleRateStaff = (staff: StaffMember) => {
+    setStaffToRate(staff);
+    setRatingMode(true);
+  };
+
+  const handleAwardInitiative = (staffName: string) => {
+    if (confirm(`Grant ${staffName} a Self-Initiative Award?`)) {
+      awardSelfInitiative.mutate(staffName);
+    }
+  };
 
   useEffect(() => {
     if (ratingsError || assignmentsError) {
@@ -231,7 +350,7 @@ const Analytics = () => {
   // Get bottom 3 performing areas (neglected)
   const neglectedAreas = areaCompletion.slice(-3).reverse();
 
-  const isLoading = ratingsLoading || assignmentsLoading;
+  const isLoading = ratingsLoading || assignmentsLoading || staffLoading;
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -346,231 +465,392 @@ const Analytics = () => {
     <div className="container mx-auto p-4 pb-20">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Employee Performance Analytics</h1>
-        <Button onClick={handlePrint} className="gap-2">
-          <Printer className="h-4 w-4" />
-          Generate Report
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant={ratingMode ? "secondary" : "outline"} 
+            onClick={() => setRatingMode(!ratingMode)}
+            className="gap-2"
+          >
+            <Star className="h-4 w-4" />
+            {ratingMode ? 'Cancel Rating' : 'Rate Staff'}
+          </Button>
+          <Button onClick={handlePrint} className="gap-2">
+            <Printer className="h-4 w-4" />
+            Generate Report
+          </Button>
+        </div>
       </div>
 
-      {/* Filters Section */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Date Range</label>
-            <DateRangePicker 
-              dateRange={dateRange} 
-              onDateRangeChange={setDateRange} 
-              className="w-full" 
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Staff Member</label>
-            <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select staff member">
-                  {selectedStaff === 'all' ? 'All Staff' : selectedStaff}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Staff</SelectItem>
-                {staffMembers.map(staff => (
-                  <SelectItem key={staff.id} value={staff.name}>
-                    {staff.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Area</label>
-            <Select value={selectedArea} onValueChange={setSelectedArea}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select area">
-                  {selectedArea === 'all' ? 'All Areas' : selectedArea}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Areas</SelectItem>
-                {uniqueAreas.map(area => (
-                  <SelectItem key={area} value={area}>
-                    {area}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Search</label>
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search staff or areas..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {isLoading ? (
-        <div className="text-center py-10">Loading performance data...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Top Performers */}
-          <Card>
-            <CardHeader className="bg-green-50">
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="text-yellow-500" />
-                Employee Performance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-3">Rank</th>
-                      <th className="text-left p-3">Employee</th>
-                      <th className="text-left p-3">Avg Rating</th>
-                      <th className="text-left p-3">Ratings</th>
-                      <th className="text-left p-3 flex items-center gap-1">
-                        <Lightbulb className="h-4 w-4 text-amber-500" />
-                        Self Initiative
-                      </th>
-                      <th className="text-left p-3">Primary Area</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {staffPerformance.length > 0 ? (
-                      staffPerformance.map((staff, index) => (
-                        <tr key={staff.name} className="border-b hover:bg-gray-50">
-                          <td className="p-3">{index + 1}</td>
-                          <td className="p-3 font-medium">
-                            {staff.name}
-                            {staff.selfInitiativeCount > 0 && (
-                              <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                Initiative Star
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3">{staff.averageRating}</td>
-                          <td className="p-3">{staff.totalRatings}</td>
-                          <td className="p-3">
-                            <span className={`font-semibold ${staff.selfInitiativeCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
-                              {staff.selfInitiativeCount}
-                            </span>
-                          </td>
-                          <td className="p-3">{staff.area || 'N/A'}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="text-center py-4 text-gray-500">
-                          No staff performance data found with current filters
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Top Areas */}
-          <Card>
-            <CardHeader className="bg-blue-50">
-              <CardTitle>Top Performing Areas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {topAreas.length > 0 ? (
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={topAreas}>
-                      <XAxis dataKey="area" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#0088FE" name="Completed Tasks" />
-                    </BarChart>
-                  </ResponsiveContainer>
+      {ratingMode ? (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500" />
+              Rate Staff Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">Select Staff Member *</label>
+                  <Select 
+                    value={staffToRate?.id.toString() || ''} 
+                    onValueChange={(value) => {
+                      const selected = staffMembers.find(s => s.id.toString() === value);
+                      if (selected) setStaffToRate(selected);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select staff member to rate">
+                        {staffToRate?.name || 'Select staff member'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {staffMembers.map(staff => (
+                        <SelectItem key={staff.id} value={staff.id.toString()}>
+                          {staff.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ) : (
-                <div className="text-center py-10 text-gray-500">
-                  No area performance data found with current filters
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Neglected Areas */}
-          <Card>
-            <CardHeader className="bg-red-50">
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="text-orange-500" />
-                Neglected Areas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {neglectedAreas.length > 0 ? (
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={neglectedAreas}>
-                      <XAxis dataKey="area" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#FF8042" name="Completed Tasks" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="text-center py-10 text-gray-500">
-                  No neglected areas found with current filters
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {staffToRate && (
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Product Knowledge: {ratingForm.product_knowledge}/10
+                      </label>
+                      <Slider
+                        value={[ratingForm.product_knowledge]}
+                        onValueChange={(value) => setRatingForm({...ratingForm, product_knowledge: value[0]})}
+                        min={1}
+                        max={10}
+                        step={1}
+                      />
+                    </div>
 
-          {/* Self Initiative Summary */}
-          <Card>
-            <CardHeader className="bg-amber-50">
-              <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="text-amber-500" />
-                Self Initiative Awards
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {Object.entries(selfInitiativeCounts).length > 0 ? (
-                  Object.entries(selfInitiativeCounts)
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([staffName, count]) => (
-                      <div key={staffName} className="flex justify-between items-center p-2 bg-amber-100 rounded">
-                        <span className="font-medium">{staffName}</span>
-                        <span className="bg-amber-200 text-amber-800 px-2 py-1 rounded text-sm font-semibold">
-                          {count} award{count !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    ))
-                ) : (
-                  <div className="text-center text-gray-500 py-4">
-                    No self-initiative awards recorded with current filters
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Customer Service: {ratingForm.customer_service}/10
+                      </label>
+                      <Slider
+                        value={[ratingForm.customer_service]}
+                        onValueChange={(value) => setRatingForm({...ratingForm, customer_service: value[0]})}
+                        min={1}
+                        max={10}
+                        step={1}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Job Performance: {ratingForm.job_performance}/10
+                      </label>
+                      <Slider
+                        value={[ratingForm.job_performance]}
+                        onValueChange={(value) => setRatingForm({...ratingForm, job_performance: value[0]})}
+                        min={1}
+                        max={10}
+                        step={1}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Teamwork: {ratingForm.teamwork}/10
+                      </label>
+                      <Slider
+                        value={[ratingForm.teamwork]}
+                        onValueChange={(value) => setRatingForm({...ratingForm, teamwork: value[0]})}
+                        min={1}
+                        max={10}
+                        step={1}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
+
+              <div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">Comments (Optional)</label>
+                  <Textarea
+                    value={ratingForm.comment}
+                    onChange={(e) => setRatingForm({...ratingForm, comment: e.target.value})}
+                    placeholder="Add any comments about this staff member's performance..."
+                    rows={8}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={resetRatingForm}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => addRating.mutate()}
+                    disabled={!staffToRate || addRating.isPending}
+                  >
+                    {addRating.isPending ? "Submitting..." : "Submit Rating"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Filters Section */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filters
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Date Range</label>
+                <DateRangePicker 
+                  dateRange={dateRange} 
+                  onDateRangeChange={setDateRange} 
+                  className="w-full" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Staff Member</label>
+                <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select staff member">
+                      {selectedStaff === 'all' ? 'All Staff' : selectedStaff}
+                      </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Staff</SelectItem>
+                    {staffMembers.map(staff => (
+                      <SelectItem key={staff.id} value={staff.name}>
+                        {staff.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Area</label>
+                <Select value={selectedArea} onValueChange={setSelectedArea}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select area">
+                      {selectedArea === 'all' ? 'All Areas' : selectedArea}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Areas</SelectItem>
+                    {uniqueAreas.map(area => (
+                      <SelectItem key={area} value={area}>
+                        {area}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search staff or areas..."
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
-        </div>
+
+          {isLoading ? (
+            <div className="text-center py-10">Loading performance data...</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Top Performers */}
+              <Card>
+                <CardHeader className="bg-green-50">
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="text-yellow-500" />
+                    Employee Performance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-3">Rank</th>
+                          <th className="text-left p-3">Employee</th>
+                          <th className="text-left p-3">Avg Rating</th>
+                          <th className="text-left p-3">Ratings</th>
+                          <th className="text-left p-3 flex items-center gap-1">
+                            <Lightbulb className="h-4 w-4 text-amber-500" />
+                            Self Initiative
+                          </th>
+                          <th className="text-left p-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {staffPerformance.length > 0 ? (
+                          staffPerformance.map((staff, index) => (
+                            <tr key={staff.name} className="border-b hover:bg-gray-50">
+                              <td className="p-3">{index + 1}</td>
+                              <td className="p-3 font-medium">
+                                {staff.name}
+                                {staff.selfInitiativeCount > 0 && (
+                                  <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                                    Initiative Star
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3">{staff.averageRating}</td>
+                              <td className="p-3">{staff.totalRatings}</td>
+                              <td className="p-3">
+                                <span className={`font-semibold ${staff.selfInitiativeCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                                  {staff.selfInitiativeCount}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRateStaff(staffMembers.find(s => s.name === staff.name)!)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Star className="h-4 w-4 text-blue-500" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleAwardInitiative(staff.name)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Award className="h-4 w-4 text-amber-500" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="text-center py-4 text-gray-500">
+                              No staff performance data found with current filters
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Top Areas */}
+              <Card>
+                <CardHeader className="bg-blue-50">
+                  <CardTitle>Top Performing Areas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {topAreas.length > 0 ? (
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={topAreas}>
+                          <XAxis dataKey="area" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="count" fill="#0088FE" name="Completed Tasks" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-gray-500">
+                      No area performance data found with current filters
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Neglected Areas */}
+              <Card>
+                <CardHeader className="bg-red-50">
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="text-orange-500" />
+                    Neglected Areas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {neglectedAreas.length > 0 ? (
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={neglectedAreas}>
+                          <XAxis dataKey="area" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="count" fill="#FF8042" name="Completed Tasks" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-gray-500">
+                      No neglected areas found with current filters
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Self Initiative Summary */}
+              <Card>
+                <CardHeader className="bg-amber-50">
+                  <CardTitle className="flex items-center gap-2">
+                    <Lightbulb className="text-amber-500" />
+                    Self Initiative Awards
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {Object.entries(selfInitiativeCounts).length > 0 ? (
+                      Object.entries(selfInitiativeCounts)
+                        .sort(([,a], [,b]) => b - a)
+                        .map(([staffName, count]) => (
+                          <div key={staffName} className="flex justify-between items-center p-2 bg-amber-100 rounded">
+                            <span className="font-medium">{staffName}</span>
+                            <div className="flex gap-2">
+                              <span className="bg-amber-200 text-amber-800 px-2 py-1 rounded text-sm font-semibold">
+                                {count} award{count !== 1 ? 's' : ''}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleAwardInitiative(staffName)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Plus className="h-4 w-4 text-amber-600" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                    ) : (
+                      <div className="text-center text-gray-500 py-4">
+                        No self-initiative awards recorded with current filters
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </>
       )}
 
       <Navigation />
