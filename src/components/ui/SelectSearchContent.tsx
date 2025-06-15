@@ -9,6 +9,11 @@ import {
   SelectItem,
 } from "./SelectBase";
 
+// Simple mobile device detection
+const isMobileDevice = () =>
+  typeof window !== "undefined" &&
+  /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
+
 interface SelectSearchContentProps
   extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> {
   items?: { 
@@ -35,16 +40,20 @@ export const SelectContent = React.forwardRef<
     const searchInputRef = React.useRef<HTMLInputElement>(null);
 
     const showSearch = searchable && items && items.length > 0;
+    const isMobile = isMobileDevice();
 
-    // Focus the input on open
+    // Focus the input on open with mobile considerations
     React.useEffect(() => {
       if (showSearch && searchInputRef.current) {
         const timer = setTimeout(() => {
           searchInputRef.current?.focus();
+          if (isMobile) {
+            searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
         }, 100);
         return () => clearTimeout(timer);
       }
-    }, [showSearch]);
+    }, [showSearch, isMobile]);
 
     const filteredItems = React.useMemo(() => {
       if (!showSearch) return null;
@@ -102,13 +111,16 @@ export const SelectContent = React.forwardRef<
                 <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
                 <input
                   ref={searchInputRef}
-                  type="text"
+                  type="search"
+                  inputMode="text"
                   autoComplete="off"
+                  autoFocus={isMobile ? true : undefined}
                   value={search}
                   onChange={handleSearchChange}
                   placeholder="Type to filter..."
                   className={cn(
-                    "w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary"
+                    "w-full pl-11 pr-2 py-3 text-base rounded bg-background border border-input focus:outline-none focus:ring-2 focus:ring-primary",
+                    isMobile && "min-h-[40px] text-lg" // Bigger for touch on mobile
                   )}
                   onKeyDown={(e) => e.stopPropagation()}
                   aria-label="Search"
