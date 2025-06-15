@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, X, Upload } from 'lucide-react';
+import { User, X, Upload, Lightbulb } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -72,22 +72,38 @@ const ChecklistItem = ({
         console.log('Fetched staff members in ChecklistItem:', data);
         
         if (data && data.length > 0) {
-          // Convert id to string for compatibility with the component
+          // Convert id to string for compatibility with the component and add Self Initiative
           const staffWithStringIds = data.map(staff => ({
             id: staff.id.toString(),
             name: staff.name
           }));
-          setLocalAssignees(staffWithStringIds);
+          
+          // Add "Self Initiative" as first option
+          const staffWithSelfInitiative = [
+            { id: '-1', name: 'Self Initiative' },
+            ...staffWithStringIds
+          ];
+          
+          setLocalAssignees(staffWithSelfInitiative);
         } else if (assignees && assignees.length > 0) {
           // Convert assignees with number ids to string ids for the local state
           const assigneesWithStringIds = assignees.map(assignee => ({
             id: assignee.id.toString(),
             name: assignee.name
           }));
-          setLocalAssignees(assigneesWithStringIds);
-          console.log('Using prop assignees instead:', assigneesWithStringIds);
+          
+          // Add "Self Initiative" as first option
+          const assigneesWithSelfInitiative = [
+            { id: '-1', name: 'Self Initiative' },
+            ...assigneesWithStringIds
+          ];
+          
+          setLocalAssignees(assigneesWithSelfInitiative);
+          console.log('Using prop assignees instead:', assigneesWithSelfInitiative);
         } else {
-          console.log('No staff members available');
+          // Even if no staff, add Self Initiative option
+          setLocalAssignees([{ id: '-1', name: 'Self Initiative' }]);
+          console.log('No staff members available, added Self Initiative only');
         }
       } catch (err) {
         console.error('Exception fetching staff:', err);
@@ -177,8 +193,15 @@ const ChecklistItem = ({
       setPhotoFile(null);
       setPhotoPreview(null);
       setShowAssignForm(false);
+      
+      // Show different toast message for Self Initiative
+      const selectedAssignee = localAssignees.find(a => a.id === selectedAssigneeId);
+      const toastMessage = selectedAssignee?.name === 'Self Initiative' 
+        ? "Task marked as self-initiative!" 
+        : "Assignment created";
+      
       toast({
-        title: "Assignment created",
+        title: toastMessage,
         description: photoUrl ? "Photo uploaded and attached." : "No photo attached."
       });
     } catch (error: any) {
@@ -261,7 +284,14 @@ const ChecklistItem = ({
                   {localAssignees && localAssignees.length > 0 ? (
                     localAssignees.map(assignee => (
                       <SelectItem key={assignee.id} value={assignee.id}>
-                        {assignee.name}
+                        <div className="flex items-center gap-2">
+                          {assignee.name === 'Self Initiative' && (
+                            <Lightbulb className="h-4 w-4 text-amber-500" />
+                          )}
+                          <span className={assignee.name === 'Self Initiative' ? 'text-amber-600 font-medium' : ''}>
+                            {assignee.name}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))
                   ) : (
