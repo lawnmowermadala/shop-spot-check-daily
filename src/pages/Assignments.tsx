@@ -51,6 +51,7 @@ const Assignments = () => {
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
   const [completionMode, setCompletionMode] = useState<{ [key: string]: boolean }>({});
   const [selfInitiativeReward, setSelfInitiativeReward] = useState<{ [key: string]: boolean }>({});
+  const [completionDemerit, setCompletionDemerit] = useState<{ [key: string]: boolean }>({});
   const [incompleteMode, setIncompleteMode] = useState<{ [key: string]: boolean }>({});
   const [demeritAssignment, setDemeritAssignment] = useState<{ [key: string]: boolean }>({});
   const printRef = useRef<HTMLDivElement>(null);
@@ -136,6 +137,15 @@ const Assignments = () => {
         }
       }
 
+      // If completing the task but with demerit for poor standard, add the flag
+      if (status === 'done' && completionDemerit[id]) {
+        if (!updatedInstructions.includes('[DEMERIT ASSIGNED - POOR STANDARD]')) {
+          updatedInstructions = updatedInstructions 
+            ? `${updatedInstructions}\n\n[DEMERIT ASSIGNED - POOR STANDARD] - Task completed but not to required standard.`
+            : '[DEMERIT ASSIGNED - POOR STANDARD] - Task completed but not to required standard.';
+        }
+      }
+
       // If marking as incomplete and demerit is selected, add the flag
       if (status === 'incomplete' && demeritAssignment[id]) {
         if (!updatedInstructions.includes('[DEMERIT ASSIGNED]')) {
@@ -160,6 +170,7 @@ const Assignments = () => {
       // Reset states
       setCompletionMode(prev => ({ ...prev, [id]: false }));
       setSelfInitiativeReward(prev => ({ ...prev, [id]: false }));
+      setCompletionDemerit(prev => ({ ...prev, [id]: false }));
       setIncompleteMode(prev => ({ ...prev, [id]: false }));
       setDemeritAssignment(prev => ({ ...prev, [id]: false }));
       
@@ -169,6 +180,9 @@ const Assignments = () => {
       if (status === 'done' && selfInitiativeReward[id]) {
         toastTitle = "Task Completed with Merit Award!";
         toastDescription = `${assignment.assignee_name} has been awarded a Self Initiative Merit for exceptional performance!`;
+      } else if (status === 'done' && completionDemerit[id]) {
+        toastTitle = "Task Completed with Demerit";
+        toastDescription = `${assignment.assignee_name} has been assigned a demerit for poor standard work.`;
       } else if (status === 'incomplete' && demeritAssignment[id]) {
         toastTitle = "Task Marked Incomplete with Demerit";
         toastDescription = `${assignment.assignee_name} has been assigned a demerit for not following instructions.`;
@@ -542,9 +556,10 @@ const Assignments = () => {
                                       <Checkbox
                                         id={`self-initiative-${assignment.id}`}
                                         checked={selfInitiativeReward[assignment.id] || false}
-                                        onCheckedChange={(checked) => 
-                                          setSelfInitiativeReward(prev => ({ ...prev, [assignment.id]: checked as boolean }))
-                                        }
+                                        onCheckedChange={(checked) => {
+                                          setSelfInitiativeReward(prev => ({ ...prev, [assignment.id]: checked as boolean }));
+                                          if (checked) setCompletionDemerit(prev => ({ ...prev, [assignment.id]: false }));
+                                        }}
                                       />
                                       <label 
                                         htmlFor={`self-initiative-${assignment.id}`}
@@ -552,6 +567,23 @@ const Assignments = () => {
                                       >
                                         <Lightbulb className="h-4 w-4" />
                                         Reward Self Initiative
+                                      </label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Checkbox
+                                        id={`completion-demerit-${assignment.id}`}
+                                        checked={completionDemerit[assignment.id] || false}
+                                        onCheckedChange={(checked) => {
+                                          setCompletionDemerit(prev => ({ ...prev, [assignment.id]: checked as boolean }));
+                                          if (checked) setSelfInitiativeReward(prev => ({ ...prev, [assignment.id]: false }));
+                                        }}
+                                      />
+                                      <label 
+                                        htmlFor={`completion-demerit-${assignment.id}`}
+                                        className="text-sm flex items-center gap-1 text-red-700"
+                                      >
+                                        <AlertCircle className="h-4 w-4" />
+                                        Assign Demerit (Poor Standard)
                                       </label>
                                     </div>
                                     <div className="flex gap-1">
@@ -569,6 +601,7 @@ const Assignments = () => {
                                         onClick={() => {
                                           setCompletionMode(prev => ({ ...prev, [assignment.id]: false }));
                                           setSelfInitiativeReward(prev => ({ ...prev, [assignment.id]: false }));
+                                          setCompletionDemerit(prev => ({ ...prev, [assignment.id]: false }));
                                         }}
                                       >
                                         Cancel
