@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Edit } from 'lucide-react';
+import { Trash2, Edit, Search } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
@@ -23,6 +23,96 @@ interface Ingredient {
   created_at: string;
 }
 
+const SearchableDropdown = ({
+  options,
+  value,
+  onChange,
+  placeholder = "Select an option",
+  searchPlaceholder = "Search...",
+  className = ""
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  className?: string;
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filteredOptions = options.filter(option =>
+    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const selectedOption = options.find(option => option.value === value);
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        type="button"
+        className="w-full p-2 border rounded flex justify-between items-center"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="truncate">
+          {selectedOption?.label || placeholder}
+        </span>
+        <svg
+          className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
+            isOpen ? "transform rotate-180" : ""
+          }`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none max-h-60 overflow-auto">
+          <div className="px-2 py-1 sticky top-0 bg-white border-b">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder={searchPlaceholder}
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          {filteredOptions.length === 0 ? (
+            <div className="px-4 py-2 text-gray-500">No options found</div>
+          ) : (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
+                  value === option.value ? "bg-gray-100 font-medium" : ""
+                }`}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                  setSearchTerm("");
+                }}
+              >
+                {option.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const IngredientsPage = () => {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -36,6 +126,15 @@ const IngredientsPage = () => {
     includes_vat: false,  // VAT inclusion flag
     supplier: ''
   });
+
+  // Unit options for dropdown
+  const unitOptions = [
+    { value: 'kg', label: 'kg' },
+    { value: 'g', label: 'g' },
+    { value: 'l', label: 'l' },
+    { value: 'ml', label: 'ml' },
+    { value: 'units', label: 'units' }
+  ];
 
   // Fetch Ingredients
   const { data: ingredients = [], isLoading } = useQuery({
@@ -233,17 +332,13 @@ const IngredientsPage = () => {
             
             <div>
               <label className="block mb-1 text-sm font-medium">Unit</label>
-              <select 
-                className="w-full p-2 border rounded-md bg-white"
+              <SearchableDropdown
+                options={unitOptions}
                 value={formData.unit}
-                onChange={(e) => setFormData({...formData, unit: e.target.value})}
-              >
-                <option value="kg">kg</option>
-                <option value="g">g</option>
-                <option value="l">l</option>
-                <option value="ml">ml</option>
-                <option value="units">units</option>
-              </select>
+                onChange={(value) => setFormData({...formData, unit: value})}
+                placeholder="Select unit"
+                searchPlaceholder="Search units..."
+              />
             </div>
             
             <div className="space-y-2">
