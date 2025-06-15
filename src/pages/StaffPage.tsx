@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -131,6 +130,11 @@ export default function StaffPage() {
     }
   }
 
+  const departmentOptions = departments.map((dept) => ({
+    value: dept.id.toString(),
+    label: dept.name,
+  }));
+
   return (
     <div className="max-w-md mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6">Staff Management</h1>
@@ -149,13 +153,7 @@ export default function StaffPage() {
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select Department" />
             </SelectTrigger>
-            <SelectContent>
-              {departments.map((dept) => (
-                <SelectItem key={dept.id} value={dept.id.toString()}>
-                  {dept.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
+            <SelectContent items={departmentOptions} />
           </Select>
           
           <Button type="submit">Add Staff Member</Button>

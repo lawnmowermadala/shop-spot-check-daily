@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Rating {
   id: string | number;
@@ -75,6 +76,11 @@ const StaffRatings = () => {
   const staffMembers = Array.from(
     new Set(ratings.map(rating => rating.staff_name))
   );
+
+  const staffOptions = [
+    { value: 'all', label: 'All Staff' },
+    ...staffMembers.map(name => ({ value: name, label: name }))
+  ];
   
   const filteredRatings = selectedStaff === 'all'
     ? ratings
@@ -97,17 +103,12 @@ const StaffRatings = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
           <label htmlFor="staff-filter" className="font-medium">Filter by Staff:</label>
-          <select
-            id="staff-filter"
-            className="border rounded p-1"
-            value={selectedStaff}
-            onChange={(e) => setSelectedStaff(e.target.value)}
-          >
-            <option value="all">All Staff</option>
-            {staffMembers.map(staff => (
-              <option key={staff} value={staff}>{staff}</option>
-            ))}
-          </select>
+          <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by Staff" />
+            </SelectTrigger>
+            <SelectContent items={staffOptions} />
+          </Select>
         </div>
         
         <Button onClick={() => navigate('/rate-staff')}>
