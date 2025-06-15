@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Trash2, Printer, BarChart2, Edit, Save, X } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Printer, BarChart2, Edit, Save, X, Search } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -79,6 +79,96 @@ interface StaffProductionStats {
   total_batches: number;
   total_units: number;
 }
+
+const SearchableDropdown = ({
+  options,
+  value,
+  onChange,
+  placeholder = "Select an option",
+  searchPlaceholder = "Search...",
+  className = ""
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  className?: string;
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filteredOptions = options.filter(option =>
+    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const selectedOption = options.find(option => option.value === value);
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        type="button"
+        className="w-full p-2 border rounded flex justify-between items-center"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="truncate">
+          {selectedOption?.label || placeholder}
+        </span>
+        <svg
+          className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
+            isOpen ? "transform rotate-180" : ""
+          }`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none max-h-60 overflow-auto">
+          <div className="px-2 py-1 sticky top-0 bg-white border-b">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder={searchPlaceholder}
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          {filteredOptions.length === 0 ? (
+            <div className="px-4 py-2 text-gray-500">No options found</div>
+          ) : (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
+                  value === option.value ? "bg-gray-100 font-medium" : ""
+                }`}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                  setSearchTerm("");
+                }}
+              >
+                {option.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ProductionPage = () => {
   const queryClient = useQueryClient();
@@ -928,50 +1018,44 @@ const ProductionPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Product *</label>
-              <select
+              <SearchableDropdown
+                options={products.map(product => ({
+                  value: product.id,
+                  label: `${product.code} - ${product.name}`
+                }))}
                 value={productionData.product_id}
-                onChange={(e) => setProductionData({...productionData, product_id: e.target.value})}
-                className="w-full p-2 border rounded"
-                required
-              >
-                <option value="">Select a product</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>{product.code} - {product.name}</option>
-                ))}
-              </select>
+                onChange={(value) => setProductionData({...productionData, product_id: value})}
+                placeholder="Select a product"
+                searchPlaceholder="Search products..."
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Recipe (Optional)</label>
-              <select
+              <SearchableDropdown
+                options={recipes.map(recipe => ({
+                  value: recipe.id,
+                  label: `${recipe.name} (Batch: ${recipe.batch_size} ${recipe.unit})`
+                }))}
                 value={productionData.recipe_id}
-                onChange={(e) => setProductionData({...productionData, recipe_id: e.target.value})}
-                className="w-full p-2 border rounded"
-              >
-                <option value="">Select a recipe</option>
-                {recipes.map((recipe) => (
-                  <option key={recipe.id} value={recipe.id}>
-                    {recipe.name} (Batch: {recipe.batch_size} {recipe.unit})
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setProductionData({...productionData, recipe_id: value})}
+                placeholder="Select a recipe"
+                searchPlaceholder="Search recipes..."
+              />
             </div>
             
             <div>
               <label className="block text-sm font-medium mb-1">Staff Member *</label>
-              <select
+              <SearchableDropdown
+                options={staffMembers.map(staff => ({
+                  value: staff.id.toString(),
+                  label: staff.name
+                }))}
                 value={productionData.staff_id}
-                onChange={(e) => setProductionData({...productionData, staff_id: e.target.value})}
-                className="w-full p-2 border rounded"
-                required
-              >
-                <option value="">Select staff member</option>
-                {staffMembers.map((staff) => (
-                  <option key={staff.id} value={staff.id.toString()}>
-                    {staff.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setProductionData({...productionData, staff_id: value})}
+                placeholder="Select staff member"
+                searchPlaceholder="Search staff..."
+              />
             </div>
             
             <div>
@@ -1098,48 +1182,44 @@ const ProductionPage = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
                           <label className="block text-sm font-medium mb-1">Product *</label>
-                          <select
+                          <SearchableDropdown
+                            options={products.map(product => ({
+                              value: product.id,
+                              label: `${product.code} - ${product.name}`
+                            }))}
                             value={editData.product_id}
-                            onChange={(e) => setEditData({...editData, product_id: e.target.value})}
-                            className="w-full p-2 border rounded"
-                          >
-                            <option value="">Select a product</option>
-                            {products.map((product) => (
-                              <option key={product.id} value={product.id}>{product.code} - {product.name}</option>
-                            ))}
-                          </select>
+                            onChange={(value) => setEditData({...editData, product_id: value})}
+                            placeholder="Select a product"
+                            searchPlaceholder="Search products..."
+                          />
                         </div>
 
                         <div>
                           <label className="block text-sm font-medium mb-1">Recipe (Optional)</label>
-                          <select
+                          <SearchableDropdown
+                            options={recipes.map(recipe => ({
+                              value: recipe.id,
+                              label: `${recipe.name} (Batch: ${recipe.batch_size} ${recipe.unit})`
+                            }))}
                             value={editData.recipe_id}
-                            onChange={(e) => setEditData({...editData, recipe_id: e.target.value})}
-                            className="w-full p-2 border rounded"
-                          >
-                            <option value="">Select a recipe</option>
-                            {recipes.map((recipe) => (
-                              <option key={recipe.id} value={recipe.id}>
-                                {recipe.name} (Batch: {recipe.batch_size} {recipe.unit})
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(value) => setEditData({...editData, recipe_id: value})}
+                            placeholder="Select a recipe"
+                            searchPlaceholder="Search recipes..."
+                          />
                         </div>
                         
                         <div>
                           <label className="block text-sm font-medium mb-1">Staff Member *</label>
-                          <select
+                          <SearchableDropdown
+                            options={staffMembers.map(staff => ({
+                              value: staff.id.toString(),
+                              label: staff.name
+                            }))}
                             value={editData.staff_id}
-                            onChange={(e) => setEditData({...editData, staff_id: e.target.value})}
-                            className="w-full p-2 border rounded"
-                          >
-                            <option value="">Select staff member</option>
-                            {staffMembers.map((staff) => (
-                              <option key={staff.id} value={staff.id.toString()}>
-                                {staff.name}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(value) => setEditData({...editData, staff_id: value})}
+                            placeholder="Select staff member"
+                            searchPlaceholder="Search staff..."
+                          />
                         </div>
                         
                         <div>
