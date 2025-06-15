@@ -64,7 +64,13 @@ const Index = () => {
         department_name: item.departments?.name || 'No Department'
       }));
 
-      setStaffMembers(formattedStaff);
+      // Add "Self Initiative" as a special staff option
+      const staffWithSelfInitiative = [
+        { id: -1, name: 'Self Initiative', department_id: 0, department_name: 'Initiative' },
+        ...formattedStaff
+      ];
+
+      setStaffMembers(staffWithSelfInitiative);
     } catch (error) {
       console.error('Error fetching staff:', error);
       toast({
@@ -236,9 +242,13 @@ const Index = () => {
 
       await fetchAssignments();
 
+      const toastMessage = assignee.name === 'Self Initiative' 
+        ? `Task marked as self-initiative!` 
+        : `Task assigned to ${assignee.name}!`;
+
       toast({
         title: "Success",
-        description: `Task assigned to ${assignee.name}!`,
+        description: toastMessage,
       });
     } catch (error) {
       console.error('Error assigning area:', error);

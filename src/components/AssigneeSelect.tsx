@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { User } from 'lucide-react';
+import { User, Lightbulb } from 'lucide-react';
 
 interface AssigneeSelectProps {
   value: string;
@@ -26,7 +26,14 @@ const AssigneeSelect: React.FC<AssigneeSelectProps> = ({ value, onChange, assign
         <SelectContent>
           {assignees.map((assignee) => (
             <SelectItem key={assignee.id} value={assignee.id}>
-              {assignee.name}
+              <div className="flex items-center gap-2">
+                {assignee.name === 'Self Initiative' && (
+                  <Lightbulb className="h-4 w-4 text-amber-500" />
+                )}
+                <span className={assignee.name === 'Self Initiative' ? 'text-amber-600 font-medium' : ''}>
+                  {assignee.name}
+                </span>
+              </div>
             </SelectItem>
           ))}
         </SelectContent>
