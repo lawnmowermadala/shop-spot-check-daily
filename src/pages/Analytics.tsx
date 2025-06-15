@@ -10,7 +10,7 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { format, isAfter, isBefore, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Printer, Trophy, AlertTriangle } from 'lucide-react';
+import { Printer, Trophy, AlertTriangle, Lightbulb } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -44,6 +44,7 @@ interface StaffPerformance {
   name: string;
   averageRating: number;
   totalRatings: number;
+  selfInitiativeCount: number;
 }
 
 interface AreaCompletionData {
@@ -110,7 +111,15 @@ const Analytics = () => {
   const filteredRatings = filterByDate(ratings, 'rating_date');
   const filteredAssignments = filterByDate(assignments, 'created_at');
 
-  // Process staff ratings (sorted best to worst)
+  // Count self-initiative awards by staff member
+  const selfInitiativeCounts = filteredAssignments.reduce((acc: Record<string, number>, assignment) => {
+    if (assignment.instructions && assignment.instructions.includes('[SELF INITIATIVE MERIT AWARD]')) {
+      acc[assignment.assignee_name] = (acc[assignment.assignee_name] || 0) + 1;
+    }
+    return acc;
+  }, {});
+
+  // Process staff ratings (sorted best to worst) and include self-initiative counts
   const staffPerformance: StaffPerformance[] = Object.entries(
     filteredRatings.reduce((acc: Record<string, { name: string; overall: number; count: number }>, rating) => {
       if (!acc[rating.staff_name]) {
@@ -127,9 +136,16 @@ const Analytics = () => {
   ).map(([_, data]) => ({
     name: data.name,
     averageRating: Number((data.overall / data.count).toFixed(1)),
-    totalRatings: data.count
+    totalRatings: data.count,
+    selfInitiativeCount: selfInitiativeCounts[data.name] || 0
   }))
-  .sort((a, b) => b.averageRating - a.averageRating);
+  .sort((a, b) => {
+    // Sort by self-initiative count first, then by average rating
+    if (a.selfInitiativeCount !== b.selfInitiativeCount) {
+      return b.selfInitiativeCount - a.selfInitiativeCount;
+    }
+    return b.averageRating - a.averageRating;
+  });
 
   // Process area completion data
   const areaCompletion: AreaCompletionData[] = Object.entries(
@@ -170,6 +186,7 @@ const Analytics = () => {
               .top-performer { background-color: #e6f7e6; }
               .top-area { background-color: #e6f3ff; }
               .neglected-area { background-color: #ffebeb; }
+              .self-initiative { background-color: #fef3c7; }
             </style>
           </head>
           <body>
@@ -190,15 +207,17 @@ const Analytics = () => {
                   <th>Employee</th>
                   <th>Average Rating</th>
                   <th>Total Ratings</th>
+                  <th>Self Initiative Awards</th>
                 </tr>
               </thead>
               <tbody>
                 ${staffPerformance.slice(0, 5).map((staff, index) => `
-                  <tr class="${index === 0 ? 'top-performer' : ''}">
+                  <tr class="${index === 0 ? 'top-performer' : ''} ${staff.selfInitiativeCount > 0 ? 'self-initiative' : ''}">
                     <td>${index + 1}</td>
                     <td>${staff.name}</td>
                     <td>${staff.averageRating}</td>
                     <td>${staff.totalRatings}</td>
+                    <td>${staff.selfInitiativeCount}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -298,15 +317,31 @@ const Analytics = () => {
                       <th className="text-left p-3">Employee</th>
                       <th className="text-left p-3">Avg Rating</th>
                       <th className="text-left p-3">Ratings</th>
+                      <th className="text-left p-3 flex items-center gap-1">
+                        <Lightbulb className="h-4 w-4 text-amber-500" />
+                        Self Initiative
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {staffPerformance.slice(0, 5).map((staff, index) => (
                       <tr key={staff.name} className="border-b hover:bg-gray-50">
                         <td className="p-3">{index + 1}</td>
-                        <td className="p-3 font-medium">{staff.name}</td>
+                        <td className="p-3 font-medium">
+                          {staff.name}
+                          {staff.selfInitiativeCount > 0 && (
+                            <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                              Initiative Star
+                            </span>
+                          )}
+                        </td>
                         <td className="p-3">{staff.averageRating}</td>
                         <td className="p-3">{staff.totalRatings}</td>
+                        <td className="p-3">
+                          <span className={`font-semibold ${staff.selfInitiativeCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                            {staff.selfInitiativeCount}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -352,6 +387,36 @@ const Analytics = () => {
                     <Bar dataKey="count" fill="#FF8042" name="Completed Tasks" />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Self Initiative Summary */}
+          <Card>
+            <CardHeader className="bg-amber-50">
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="text-amber-500" />
+                Self Initiative Awards
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {Object.entries(selfInitiativeCounts)
+                  .sort(([,a], [,b]) => b - a)
+                  .slice(0, 5)
+                  .map(([staffName, count]) => (
+                    <div key={staffName} className="flex justify-between items-center p-2 bg-amber-100 rounded">
+                      <span className="font-medium">{staffName}</span>
+                      <span className="bg-amber-200 text-amber-800 px-2 py-1 rounded text-sm font-semibold">
+                        {count} award{count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  ))}
+                {Object.keys(selfInitiativeCounts).length === 0 && (
+                  <div className="text-center text-gray-500 py-4">
+                    No self-initiative awards recorded in this period
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
