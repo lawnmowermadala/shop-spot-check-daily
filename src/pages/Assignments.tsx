@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from "react-router-dom";
 import { 
@@ -16,7 +15,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -25,6 +24,7 @@ import { DateRangePicker } from "@/components/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Assignment = {
   id: string;
@@ -49,6 +49,8 @@ const Assignments = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
+  const [completionMode, setCompletionMode] = useState<{ [key: string]: boolean }>({});
+  const [selfInitiativeReward, setSelfInitiativeReward] = useState<{ [key: string]: boolean }>({});
   const printRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const assignmentRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
@@ -118,18 +120,47 @@ const Assignments = () => {
 
   const updateAssignmentStatus = async (id: string, status: Assignment['status']) => {
     try {
+      const assignment = assignments.find(a => a.id === id);
+      if (!assignment) return;
+
+      let updatedInstructions = assignment.instructions || '';
+      
+      // If completing the task and self-initiative is rewarded, add the flag
+      if (status === 'done' && selfInitiativeReward[id]) {
+        if (!updatedInstructions.includes('[SELF INITIATIVE MERIT AWARD]')) {
+          updatedInstructions = updatedInstructions 
+            ? `${updatedInstructions}\n\n[SELF INITIATIVE MERIT AWARD] - Recognized for exceptional initiative during task completion.`
+            : '[SELF INITIATIVE MERIT AWARD] - Recognized for exceptional initiative during task completion.';
+        }
+      }
+
       const { error } = await supabase
         .from('assignments')
-        .update({ status })
+        .update({ 
+          status,
+          instructions: updatedInstructions
+        })
         .eq('id', id);
       
       if (error) throw error;
       
       await refetch();
       
+      // Reset states
+      setCompletionMode(prev => ({ ...prev, [id]: false }));
+      setSelfInitiativeReward(prev => ({ ...prev, [id]: false }));
+      
+      const toastTitle = status === 'done' && selfInitiativeReward[id] 
+        ? "Task Completed with Merit Award!" 
+        : "Status Updated";
+        
+      const toastDescription = status === 'done' && selfInitiativeReward[id]
+        ? `${assignment.assignee_name} has been awarded a Self Initiative Merit for exceptional performance!`
+        : `Assignment marked as ${status.replace('-', ' ')}`;
+      
       toast({
-        title: "Status Updated",
-        description: `Assignment marked as ${status.replace('-', ' ')}`,
+        title: toastTitle,
+        description: toastDescription,
       });
     } catch (err) {
       console.error('Error updating status:', err);
@@ -477,7 +508,7 @@ const Assignments = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
                             {assignment.status !== 'in-progress' && (
                               <Button 
                                 variant="outline" 
@@ -488,14 +519,57 @@ const Assignments = () => {
                               </Button>
                             )}
                             {assignment.status !== 'done' && (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => updateAssignmentStatus(assignment.id, 'done')}
-                                className="bg-green-50 hover:bg-green-100 text-green-600"
-                              >
-                                Complete
-                              </Button>
+                              <>
+                                {completionMode[assignment.id] ? (
+                                  <div className="flex flex-col gap-2 p-2 border rounded bg-green-50">
+                                    <div className="flex items-center gap-2">
+                                      <Checkbox
+                                        id={`self-initiative-${assignment.id}`}
+                                        checked={selfInitiativeReward[assignment.id] || false}
+                                        onCheckedChange={(checked) => 
+                                          setSelfInitiativeReward(prev => ({ ...prev, [assignment.id]: checked as boolean }))
+                                        }
+                                      />
+                                      <label 
+                                        htmlFor={`self-initiative-${assignment.id}`}
+                                        className="text-sm flex items-center gap-1 text-amber-700"
+                                      >
+                                        <Lightbulb className="h-4 w-4" />
+                                        Reward Self Initiative
+                                      </label>
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <Button 
+                                        variant="default" 
+                                        size="sm"
+                                        onClick={() => updateAssignmentStatus(assignment.id, 'done')}
+                                        className="bg-green-600 hover:bg-green-700"
+                                      >
+                                        Confirm Complete
+                                      </Button>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => {
+                                          setCompletionMode(prev => ({ ...prev, [assignment.id]: false }));
+                                          setSelfInitiativeReward(prev => ({ ...prev, [assignment.id]: false }));
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => setCompletionMode(prev => ({ ...prev, [assignment.id]: true }))}
+                                    className="bg-green-50 hover:bg-green-100 text-green-600"
+                                  >
+                                    Complete
+                                  </Button>
+                                )}
+                              </>
                             )}
                             {assignment.status !== 'incomplete' && (
                               <Button 
