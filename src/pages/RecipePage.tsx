@@ -3,18 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Edit, Plus, Printer } from 'lucide-react';
+import { Trash2, Edit, Plus, Printer, Search } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 // Types
 interface Recipe {
@@ -50,6 +43,96 @@ interface Ingredient {
   total_price: number;
 }
 
+const SearchableDropdown = ({
+  options,
+  value,
+  onChange,
+  placeholder = "Select an option",
+  searchPlaceholder = "Search...",
+  className = ""
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  className?: string;
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filteredOptions = options.filter(option =>
+    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const selectedOption = options.find(option => option.value === value);
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        type="button"
+        className="w-full p-2 border rounded flex justify-between items-center"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="truncate">
+          {selectedOption?.label || placeholder}
+        </span>
+        <svg
+          className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
+            isOpen ? "transform rotate-180" : ""
+          }`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none max-h-60 overflow-auto">
+          <div className="px-2 py-1 sticky top-0 bg-white border-b">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder={searchPlaceholder}
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          {filteredOptions.length === 0 ? (
+            <div className="px-4 py-2 text-gray-500">No options found</div>
+          ) : (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
+                  value === option.value ? "bg-gray-100 font-medium" : ""
+                }`}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                  setSearchTerm("");
+                }}
+              >
+                {option.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const RecipePage = () => {
   const queryClient = useQueryClient();
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
@@ -65,7 +148,7 @@ const RecipePage = () => {
 
   // Ingredient form state
   const [ingredientData, setIngredientData] = useState({
-    ingredient_id: '', // NEW: store ingredient ID
+    ingredient_id: '',
     ingredient_name: '',
     pack_size: '',
     pack_unit: 'kg',
@@ -76,7 +159,7 @@ const RecipePage = () => {
 
   // Edit states
   const [editIngredientData, setEditIngredientData] = useState({
-    ingredient_id: '', // NEW: store ingredient ID for edit
+    ingredient_id: '',
     ingredient_name: '',
     pack_size: '',
     pack_unit: '',
@@ -86,6 +169,31 @@ const RecipePage = () => {
   });
 
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>('');
+
+  // Unit options
+  const unitOptions = [
+    { value: 'units', label: 'units' },
+    { value: 'kg', label: 'kg' },
+    { value: 'g', label: 'g' },
+    { value: 'l', label: 'l' },
+    { value: 'ml', label: 'ml' }
+  ];
+
+  const packUnitOptions = [
+    { value: 'kg', label: 'kg' },
+    { value: 'g', label: 'g' },
+    { value: 'l', label: 'l' },
+    { value: 'ml', label: 'ml' },
+    { value: 'units', label: 'units' }
+  ];
+
+  const usedUnitOptions = [
+    { value: 'g', label: 'g' },
+    { value: 'kg', label: 'kg' },
+    { value: 'ml', label: 'ml' },
+    { value: 'l', label: 'l' },
+    { value: 'units', label: 'units' }
+  ];
 
   // Fetch all ingredients from the ingredients table
   const { data: availableIngredients = [] } = useQuery({
@@ -326,6 +434,15 @@ const RecipePage = () => {
     window.location.reload(); // Reload to restore functionality
   };
 
+  // Prepare ingredient options for dropdown
+  const ingredientOptions = [
+    { value: 'manual-entry', label: 'Manual Entry' },
+    ...availableIngredients.map(ingredient => ({
+      value: ingredient.id,
+      label: `${ingredient.name} (${ingredient.weight} ${ingredient.unit} - R${ingredient.total_price.toFixed(2)})`
+    }))
+  ];
+
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
       <div className="flex justify-between items-center">
@@ -433,17 +550,13 @@ const RecipePage = () => {
             
             <div>
               <label className="block mb-1 text-sm font-medium">Unit</label>
-              <select 
-                className="w-full p-2 border rounded-md bg-white"
+              <SearchableDropdown
+                options={unitOptions}
                 value={recipeData.unit}
-                onChange={(e) => setRecipeData({...recipeData, unit: e.target.value})}
-              >
-                <option value="units">units</option>
-                <option value="kg">kg</option>
-                <option value="g">g</option>
-                <option value="l">l</option>
-                <option value="ml">ml</option>
-              </select>
+                onChange={(value) => setRecipeData({...recipeData, unit: value})}
+                placeholder="Select unit"
+                searchPlaceholder="Search units..."
+              />
             </div>
             
             <div>
@@ -473,18 +586,16 @@ const RecipePage = () => {
           <CardTitle>Select Recipe to Manage</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedRecipeId} onValueChange={setSelectedRecipeId}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a recipe to add ingredients" />
-            </SelectTrigger>
-            <SelectContent>
-              {recipes.map(recipe => (
-                <SelectItem key={recipe.id} value={recipe.id}>
-                  {recipe.name} (Batch: {recipe.batch_size} {recipe.unit})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableDropdown
+            options={recipes.map(recipe => ({
+              value: recipe.id,
+              label: `${recipe.name} (Batch: ${recipe.batch_size} ${recipe.unit})`
+            }))}
+            value={selectedRecipeId}
+            onChange={setSelectedRecipeId}
+            placeholder="Select a recipe to add ingredients"
+            searchPlaceholder="Search recipes..."
+          />
         </CardContent>
       </Card>
 
@@ -498,22 +609,13 @@ const RecipePage = () => {
             {/* Ingredient Selection Dropdown */}
             <div>
               <label className="block mb-1 text-sm font-medium">Select from Available Ingredients (Optional)</label>
-              <Select 
-                value={ingredientData.ingredient_id || 'manual-entry'} 
-                onValueChange={handleIngredientSelect}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select an existing ingredient or leave blank for manual entry" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual-entry">Manual Entry</SelectItem>
-                  {availableIngredients.map(ingredient => (
-                    <SelectItem key={ingredient.id} value={ingredient.id}>
-                      {ingredient.name} ({ingredient.weight} {ingredient.unit} - R{ingredient.total_price.toFixed(2)})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableDropdown
+                options={ingredientOptions}
+                value={ingredientData.ingredient_id || 'manual-entry'}
+                onChange={handleIngredientSelect}
+                placeholder="Select an existing ingredient or leave blank for manual entry"
+                searchPlaceholder="Search ingredients..."
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -539,17 +641,13 @@ const RecipePage = () => {
               
               <div>
                 <label className="block mb-1 text-sm font-medium">Pack Unit</label>
-                <select 
-                  className="w-full p-2 border rounded-md bg-white"
+                <SearchableDropdown
+                  options={packUnitOptions}
                   value={ingredientData.pack_unit}
-                  onChange={(e) => setIngredientData({...ingredientData, pack_unit: e.target.value})}
-                >
-                  <option value="kg">kg</option>
-                  <option value="g">g</option>
-                  <option value="l">l</option>
-                  <option value="ml">ml</option>
-                  <option value="units">units</option>
-                </select>
+                  onChange={(value) => setIngredientData({...ingredientData, pack_unit: value})}
+                  placeholder="Select pack unit"
+                  searchPlaceholder="Search units..."
+                />
               </div>
               
               <div>
@@ -576,17 +674,13 @@ const RecipePage = () => {
               
               <div>
                 <label className="block mb-1 text-sm font-medium">Used Unit</label>
-                <select 
-                  className="w-full p-2 border rounded-md bg-white"
+                <SearchableDropdown
+                  options={usedUnitOptions}
                   value={ingredientData.used_unit}
-                  onChange={(e) => setIngredientData({...ingredientData, used_unit: e.target.value})}
-                >
-                  <option value="g">g</option>
-                  <option value="kg">kg</option>
-                  <option value="ml">ml</option>
-                  <option value="l">l</option>
-                  <option value="units">units</option>
-                </select>
+                  onChange={(value) => setIngredientData({...ingredientData, used_unit: value})}
+                  placeholder="Select used unit"
+                  searchPlaceholder="Search units..."
+                />
               </div>
             </div>
             
