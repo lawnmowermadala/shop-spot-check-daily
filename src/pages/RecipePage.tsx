@@ -395,6 +395,36 @@ const RecipePage = () => {
     }
   });
 
+  // Delete Recipe
+  const deleteRecipe = useMutation({
+    mutationFn: async (recipeId: string) => {
+      // First delete all recipe ingredients
+      const { error: ingredientsError } = await supabase
+        .from('recipe_ingredients')
+        .delete()
+        .eq('recipe_id', recipeId);
+      
+      if (ingredientsError) throw ingredientsError;
+      
+      // Then delete the recipe
+      const { error: recipeError } = await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', recipeId);
+      
+      if (recipeError) throw recipeError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      // Clear selected recipe if it was deleted
+      setSelectedRecipeId('');
+      toast("Recipe deleted successfully!");
+    },
+    onError: (error: Error) => {
+      toast(error.message);
+    }
+  });
+
   // Calculate total recipe cost
   const totalRecipeCost = recipeIngredients.reduce((sum, ingredient) => 
     sum + (ingredient.calculated_cost || 0), 0
@@ -809,13 +839,26 @@ const RecipePage = () => {
                         Batch Size: {recipe.batch_size} {recipe.unit}
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => setSelectedRecipeId(recipe.id)}
-                      className="ml-4"
-                    >
-                      {selectedRecipeId === recipe.id ? 'Selected' : 'Select'}
-                    </Button>
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setSelectedRecipeId(recipe.id)}
+                      >
+                        {selectedRecipeId === recipe.id ? 'Selected' : 'Select'}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to delete "${recipe.name}"? This action cannot be undone.`)) {
+                            deleteRecipe.mutate(recipe.id);
+                          }
+                        }}
+                        disabled={deleteRecipe.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
