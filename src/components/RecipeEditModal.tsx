@@ -41,6 +41,7 @@ interface RecipeEditModalProps {
 const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) => {
   const queryClient = useQueryClient();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [originalBatchSize, setOriginalBatchSize] = useState<number>(0);
   const [editingIngredient, setEditingIngredient] = useState<string | null>(null);
   const [editedIngredient, setEditedIngredient] = useState<Partial<RecipeIngredient>>({});
   const [newIngredient, setNewIngredient] = useState({
@@ -94,6 +95,7 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
   useEffect(() => {
     if (recipeData) {
       setRecipe(recipeData);
+      setOriginalBatchSize(recipeData.batch_size);
     }
   }, [recipeData]);
 
@@ -220,8 +222,67 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
     }
   });
 
+  // Delete recipe mutation
+  const deleteRecipeMutation = useMutation({
+    mutationFn: async () => {
+      if (!recipeId) throw new Error('No recipe ID');
+      
+      // First delete all recipe ingredients
+      const { error: ingredientsError } = await supabase
+        .from('recipe_ingredients')
+        .delete()
+        .eq('recipe_id', recipeId);
+      
+      if (ingredientsError) throw ingredientsError;
+      
+      // Then delete the recipe
+      const { error: recipeError } = await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', recipeId);
+      
+      if (recipeError) throw recipeError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      toast.success('Recipe deleted successfully!');
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete recipe: ' + error.message);
+    }
+  });
+
   const handleSaveRecipe = () => {
+    if (recipe && originalBatchSize !== recipe.batch_size) {
+      // Calculate scaling factor
+      const scaleFactor = recipe.batch_size / originalBatchSize;
+      
+      // Update all ingredient quantities
+      const updatePromises = ingredients.map(ingredient => 
+        supabase
+          .from('recipe_ingredients')
+          .update({
+            quantity: ingredient.quantity * scaleFactor,
+            quantity_used: ingredient.quantity_used ? ingredient.quantity_used * scaleFactor : null,
+            calculated_cost: ingredient.calculated_cost ? ingredient.calculated_cost * scaleFactor : null
+          })
+          .eq('id', ingredient.id)
+      );
+      
+      Promise.all(updatePromises).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['recipe_ingredients', recipeId] });
+        setOriginalBatchSize(recipe.batch_size);
+      });
+    }
+    
     updateRecipeMutation.mutate();
+  };
+
+  const handleDeleteRecipe = () => {
+    if (confirm('Are you sure you want to delete this recipe? This action cannot be undone.')) {
+      deleteRecipeMutation.mutate();
+    }
   };
 
   const handleAddIngredient = () => {
@@ -256,7 +317,18 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Recipe: {recipe.name}</DialogTitle>
+          <DialogTitle className="flex justify-between items-center">
+            <span>Edit Recipe: {recipe.name}</span>
+            <Button
+              onClick={handleDeleteRecipe}
+              variant="destructive"
+              size="sm"
+              disabled={deleteRecipeMutation.isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {deleteRecipeMutation.isPending ? 'Deleting...' : 'Delete Recipe'}
+            </Button>
+          </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
@@ -278,6 +350,11 @@ const RecipeEditModal = ({ isOpen, onClose, recipeId }: RecipeEditModalProps) =>
                 onChange={(e) => setRecipe({ ...recipe, batch_size: Number(e.target.value) })}
                 placeholder="Batch size"
               />
+              {originalBatchSize !== recipe.batch_size && (
+                <p className="text-sm text-amber-600 mt-1">
+                  Ingredient quantities will be scaled when you save
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Unit</label>
