@@ -15,7 +15,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb, AlertCircle } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb, AlertCircle, Search } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -25,6 +25,7 @@ import { DateRange } from "react-day-picker";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 type Assignment = {
   id: string;
@@ -45,6 +46,96 @@ const statusIcons = {
   'incomplete': <X className="h-5 w-5 text-red-500" />
 };
 
+const SearchableDropdown = ({
+  options,
+  value,
+  onChange,
+  placeholder = "Select an option",
+  searchPlaceholder = "Search...",
+  className = ""
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  className?: string;
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filteredOptions = options.filter(option =>
+    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const selectedOption = options.find(option => option.value === value);
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        type="button"
+        className="w-full p-2 border rounded flex justify-between items-center"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="truncate">
+          {selectedOption?.label || placeholder}
+        </span>
+        <svg
+          className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
+            isOpen ? "transform rotate-180" : ""
+          }`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none max-h-60 overflow-auto">
+          <div className="px-2 py-1 sticky top-0 bg-white border-b">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder={searchPlaceholder}
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          {filteredOptions.length === 0 ? (
+            <div className="px-4 py-2 text-gray-500">No options found</div>
+          ) : (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
+                  value === option.value ? "bg-gray-100 font-medium" : ""
+                }`}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                  setSearchTerm("");
+                }}
+              >
+                {option.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Assignments = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'needs-check' | 'in-progress' | 'done' | 'incomplete'>('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -58,6 +149,7 @@ const Assignments = () => {
   const location = useLocation();
   const assignmentRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('');
 
   const fetchAssignments = async () => {
     try {
@@ -128,7 +220,6 @@ const Assignments = () => {
 
       let updatedInstructions = assignment.instructions || '';
       
-      // If completing the task and self-initiative is rewarded, add the flag
       if (status === 'done' && selfInitiativeReward[id]) {
         if (!updatedInstructions.includes('[SELF INITIATIVE MERIT AWARD]')) {
           updatedInstructions = updatedInstructions 
@@ -137,7 +228,6 @@ const Assignments = () => {
         }
       }
 
-      // If completing the task but with demerit for poor standard, add the flag
       if (status === 'done' && completionDemerit[id]) {
         if (!updatedInstructions.includes('[DEMERIT ASSIGNED - POOR STANDARD]')) {
           updatedInstructions = updatedInstructions 
@@ -146,7 +236,6 @@ const Assignments = () => {
         }
       }
 
-      // If marking as incomplete and demerit is selected, add the flag
       if (status === 'incomplete' && demeritAssignment[id]) {
         if (!updatedInstructions.includes('[DEMERIT ASSIGNED]')) {
           updatedInstructions = updatedInstructions 
@@ -167,7 +256,6 @@ const Assignments = () => {
       
       await refetch();
       
-      // Reset states
       setCompletionMode(prev => ({ ...prev, [id]: false }));
       setSelfInitiativeReward(prev => ({ ...prev, [id]: false }));
       setCompletionDemerit(prev => ({ ...prev, [id]: false }));
@@ -204,7 +292,6 @@ const Assignments = () => {
 
   const clearAssignment = async (id: string) => {
     try {
-      // First check if the assignment can be cleared (only pending status)
       const { data, error: fetchError } = await supabase
         .from('assignments')
         .select('status')
@@ -258,16 +345,27 @@ const Assignments = () => {
       return isWithinInterval(assignmentDate, { start, end });
     }
     
-    // If only start date is selected, match only that day
     const startDay = startOfDay(start);
     const endDay = endOfDay(start);
     return isWithinInterval(assignmentDate, { start: startDay, end: endDay });
   };
   
-  // Apply all filters (status and date)
+  // Get unique staff members for filter dropdown
+  const staffMembers = Array.from(new Set(
+    assignments.map(a => a.assignee_name)
+  )).map(name => ({
+    value: name,
+    label: name
+  }));
+
+  // Apply all filters (status, date, and assignee)
   const filteredAssignments = assignments
     .filter(assignment => filter === 'all' || assignment.status === filter)
-    .filter(isWithinDateRange);
+    .filter(isWithinDateRange)
+    .filter(assignment => 
+      !assigneeFilter || 
+      assignment.assignee_name.toLowerCase().includes(assigneeFilter.toLowerCase())
+    );
 
   const toggleExpandAssignment = (id: string) => {
     setExpandedAssignment(expandedAssignment === id ? null : id);
@@ -278,7 +376,6 @@ const Assignments = () => {
     
     if (!content) return;
     
-    // Create a new window for printing
     const printWindow = window.open('', '_blank');
     
     if (!printWindow) {
@@ -290,7 +387,6 @@ const Assignments = () => {
       return;
     }
     
-    // Create date range text for header
     let dateRangeText = 'All Dates';
     if (dateRange?.from) {
       dateRangeText = dateRange.to 
@@ -298,10 +394,9 @@ const Assignments = () => {
         : format(dateRange.from, 'MMM dd, yyyy');
     }
     
-    // Create status filter text
     const statusText = filter === 'all' ? 'All Statuses' : `Status: ${filter.replace('-', ' ')}`;
+    const assigneeText = assigneeFilter ? `Assignee: ${assigneeFilter}` : 'All Assignees';
     
-    // Create HTML content for printing
     printWindow.document.write(`
       <html>
         <head>
@@ -333,6 +428,7 @@ const Assignments = () => {
           </div>
           <div class="print-info">Date Range: ${dateRangeText}</div>
           <div class="print-info">Filter: ${statusText}</div>
+          <div class="print-info">${assigneeText}</div>
           <div class="print-info">Total: ${filteredAssignments.length} assignments</div>
           <table>
             <thead>
@@ -375,7 +471,6 @@ const Assignments = () => {
     
     printWindow.document.close();
     
-    // Give time for content to load before printing
     setTimeout(() => {
       printWindow.focus();
     }, 500);
@@ -439,6 +534,18 @@ const Assignments = () => {
               className="max-w-sm"
             />
           </div>
+          
+          <div className="w-full md:w-auto">
+            <SearchableDropdown
+              options={staffMembers}
+              value={assigneeFilter}
+              onChange={setAssigneeFilter}
+              placeholder="Filter by assignee"
+              searchPlaceholder="Search staff..."
+              className="min-w-[200px]"
+            />
+          </div>
+          
           <Button 
             variant="outline" 
             onClick={handlePrint}
