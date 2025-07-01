@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,6 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import AssigneeSelect from './AssigneeSelect';
 
 interface Assignee {
   id: number;
@@ -48,7 +46,7 @@ const ChecklistItem = ({
   const [instructions, setInstructions] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [localAssignees, setLocalAssignees] = useState<Array<{ id: string; name: string }>>([]);
+  const [localAssignees, setLocalAssignees] = useState<Array<{ id: string; name: string; value: string; label: string; searchTerms: string }>>([]);
   const [showSelfInitiative, setShowSelfInitiative] = useState(false);
   
   // Fetch staff members directly from Supabase
@@ -74,22 +72,28 @@ const ChecklistItem = ({
         console.log('Fetched staff members in ChecklistItem:', data);
         
         if (data && data.length > 0) {
-          // Convert id to string for compatibility with the component
-          const staffWithStringIds = data.map(staff => ({
+          // Convert to searchable format
+          const staffForSearch = data.map(staff => ({
             id: staff.id.toString(),
-            name: staff.name
+            name: staff.name,
+            value: staff.id.toString(),
+            label: staff.name,
+            searchTerms: staff.name.toLowerCase()
           }));
           
-          setLocalAssignees(staffWithStringIds);
+          setLocalAssignees(staffForSearch);
         } else if (assignees && assignees.length > 0) {
-          // Convert assignees with number ids to string ids for the local state
-          const assigneesWithStringIds = assignees.map(assignee => ({
+          // Convert assignees to searchable format
+          const assigneesForSearch = assignees.map(assignee => ({
             id: assignee.id.toString(),
-            name: assignee.name
+            name: assignee.name,
+            value: assignee.id.toString(),
+            label: assignee.name,
+            searchTerms: assignee.name.toLowerCase()
           }));
           
-          setLocalAssignees(assigneesWithStringIds);
-          console.log('Using prop assignees instead:', assigneesWithStringIds);
+          setLocalAssignees(assigneesForSearch);
+          console.log('Using prop assignees instead:', assigneesForSearch);
         } else {
           setLocalAssignees([]);
           console.log('No staff members available');
@@ -273,19 +277,9 @@ const ChecklistItem = ({
                 }}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Assign to..." />
+                  <SelectValue placeholder="Type to search staff..." />
                 </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {localAssignees && localAssignees.length > 0 ? (
-                    localAssignees.map(assignee => (
-                      <SelectItem key={assignee.id} value={assignee.id}>
-                        {assignee.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>No staff members available</SelectItem>
-                  )}
-                </SelectContent>
+                <SelectContent items={localAssignees} searchable={true} />
               </Select>
             </div>
             
