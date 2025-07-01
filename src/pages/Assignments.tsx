@@ -46,23 +46,23 @@ const statusIcons = {
   'incomplete': <X className="h-5 w-5 text-red-500" />
 };
 
-const SearchableDropdown = ({
+const StaffDropdown = ({
   options,
   value,
   onChange,
-  placeholder = "Select an option",
-  searchPlaceholder = "Search...",
+  placeholder = "Filter by assignee",
   className = ""
 }: {
   options: { value: string; label: string }[];
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  searchPlaceholder?: string;
   className?: string;
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const filteredOptions = options.filter(option =>
     option.label.toLowerCase().includes(searchTerm.toLowerCase())
@@ -70,12 +70,36 @@ const SearchableDropdown = ({
 
   const selectedOption = options.find(option => option.value === value);
 
+  // Keep focus on input when dropdown is open
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         type="button"
-        className="w-full p-2 border rounded flex justify-between items-center"
-        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-2 border rounded flex justify-between items-center bg-white"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setSearchTerm("");
+        }}
       >
         <span className="truncate">
           {selectedOption?.label || placeholder}
@@ -96,40 +120,60 @@ const SearchableDropdown = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none max-h-60 overflow-auto">
+        <div className="absolute z-50 mt-1 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none">
           <div className="px-2 py-1 sticky top-0 bg-white border-b">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
               <Input
+                ref={inputRef}
                 type="text"
-                placeholder={searchPlaceholder}
+                placeholder="Search staff..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setIsOpen(false);
+                  }
+                }}
               />
             </div>
           </div>
-          {filteredOptions.length === 0 ? (
-            <div className="px-4 py-2 text-gray-500">No options found</div>
-          ) : (
-            filteredOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
-                  value === option.value ? "bg-gray-100 font-medium" : ""
-                }`}
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                  setSearchTerm("");
-                }}
-              >
-                {option.label}
-              </button>
-            ))
-          )}
+          <div className="overflow-y-auto max-h-[200px]">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-2 text-gray-500">No staff found</div>
+            ) : (
+              filteredOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
+                    value === option.value ? "bg-gray-100 font-medium" : ""
+                  }`}
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                    setSearchTerm("");
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))
+            )}
+          </div>
+          <div className="px-2 py-1 border-t">
+            <button
+              type="button"
+              className="w-full text-left px-4 py-2 text-blue-600 hover:bg-gray-100"
+              onClick={() => {
+                onChange("");
+                setIsOpen(false);
+                setSearchTerm("");
+              }}
+            >
+              Clear filter
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -353,7 +397,9 @@ const Assignments = () => {
   // Get unique staff members for filter dropdown
   const staffMembers = Array.from(new Set(
     assignments.map(a => a.assignee_name)
-  )).map(name => ({
+  ))
+  .sort()
+  .map(name => ({
     value: name,
     label: name
   }));
@@ -536,12 +582,10 @@ const Assignments = () => {
           </div>
           
           <div className="w-full md:w-auto">
-            <SearchableDropdown
+            <StaffDropdown
               options={staffMembers}
               value={assigneeFilter}
               onChange={setAssigneeFilter}
-              placeholder="Filter by assignee"
-              searchPlaceholder="Search staff..."
               className="min-w-[200px]"
             />
           </div>
