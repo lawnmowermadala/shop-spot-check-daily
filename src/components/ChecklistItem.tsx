@@ -368,10 +368,23 @@ const ChecklistItem = ({
                             </button>
                           ))
                         )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                       </div>
+                       <div className="sticky bottom-0 bg-white p-2 border-t">
+                         <button
+                           type="button"
+                           className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
+                           onClick={() => {
+                             setSelectedAssigneeId("");
+                             setIsDropdownOpen(false);
+                             setSearchTerm("");
+                           }}
+                         >
+                           Cancel / Don't assign
+                         </button>
+                       </div>
+                     </div>
+                   </div>
+                 )}
               </div>
             </div>
             

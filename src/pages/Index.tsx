@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import ChecklistItem from '@/components/ChecklistItem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from "@/components/ui/badge";
 import IncompleteAssignmentsCarousel from '@/components/IncompleteAssignmentsCarousel';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface Area {
   id: string;
@@ -45,6 +46,8 @@ const Index = () => {
   const [todaysAssignmentCount, setTodaysAssignmentCount] = useState(0);
   const [recentlyAssigned, setRecentlyAssigned] = useState<string[]>([]);
   const [incompleteAssignments, setIncompleteAssignments] = useState<Assignment[]>([]);
+  const [editingArea, setEditingArea] = useState<{ id: string; name: string; description: string } | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
 
   // Fetch staff members
   const fetchStaffMembers = async () => {
@@ -268,6 +271,79 @@ const Index = () => {
     return recentlyAssigned.includes(areaName);
   };
 
+  const handleEditArea = async () => {
+    if (!editingArea || !editingArea.name.trim() || !editingArea.description.trim()) {
+      toast({
+        title: "Warning",
+        description: "Please enter both area name and description",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('areas')
+        .update({
+          name: editingArea.name.trim(),
+          description: editingArea.description.trim()
+        })
+        .eq('id', editingArea.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Area updated successfully!",
+      });
+
+      setEditingArea(null);
+      refetch();
+    } catch (error) {
+      console.error('Error updating area:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update area. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteArea = async (areaId: string) => {
+    if (deletePassword !== '2025') {
+      toast({
+        title: "Access Denied",
+        description: "Incorrect password",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('areas')
+        .delete()
+        .eq('id', areaId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Area deleted successfully!",
+      });
+
+      setDeletePassword('');
+      refetch();
+    } catch (error) {
+      console.error('Error deleting area:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete area. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6 text-center">Daily Shop Check</h1>
@@ -340,23 +416,63 @@ const Index = () => {
                   className={`${hasPreviousDayAssignment ? 'border-l-4 border-amber-500 pl-2 bg-amber-50' : ''} 
                               transition-all duration-200`}
                 >
-                  {hasPreviousDayAssignment && (
-                    <Badge variant="outline" className="mb-2 text-amber-700 bg-amber-100 border-amber-200">
-                      Pending from yesterday
-                    </Badge>
-                  )}
-                  <ChecklistItem
-                    area={area.name}
-                    description={area.description}
-                    assignees={staffMembers}
-                    onAssign={(assigneeId, instructions, photoUrl) => 
-                      handleAssignment(area.name, assigneeId, instructions, photoUrl)
-                    }
-                    isAssigned={false}
-                    assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
-                    assignmentCount={areaAssignments.length}
-                    isRecentlyAssigned={isRecentlyAssigned(area.name)}
-                  />
+                   <div className="flex justify-between items-start mb-2">
+                     <div className="flex-1">
+                       {hasPreviousDayAssignment && (
+                         <Badge variant="outline" className="mb-2 text-amber-700 bg-amber-100 border-amber-200">
+                           Pending from yesterday
+                         </Badge>
+                       )}
+                     </div>
+                     <div className="flex gap-1 ml-2">
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => setEditingArea({ id: area.id, name: area.name, description: area.description })}
+                       >
+                         <Edit className="h-3 w-3" />
+                       </Button>
+                       <AlertDialog>
+                         <AlertDialogTrigger asChild>
+                           <Button variant="outline" size="sm">
+                             <Trash2 className="h-3 w-3" />
+                           </Button>
+                         </AlertDialogTrigger>
+                         <AlertDialogContent>
+                           <AlertDialogHeader>
+                             <AlertDialogTitle>Delete Area</AlertDialogTitle>
+                             <AlertDialogDescription>
+                               This action cannot be undone. Please enter the password to confirm deletion.
+                             </AlertDialogDescription>
+                           </AlertDialogHeader>
+                           <Input
+                             type="password"
+                             placeholder="Enter password (2025)"
+                             value={deletePassword}
+                             onChange={(e) => setDeletePassword(e.target.value)}
+                           />
+                           <AlertDialogFooter>
+                             <AlertDialogCancel onClick={() => setDeletePassword('')}>Cancel</AlertDialogCancel>
+                             <AlertDialogAction onClick={() => handleDeleteArea(area.id)}>
+                               Delete
+                             </AlertDialogAction>
+                           </AlertDialogFooter>
+                         </AlertDialogContent>
+                       </AlertDialog>
+                     </div>
+                   </div>
+                   <ChecklistItem
+                     area={area.name}
+                     description={area.description}
+                     assignees={staffMembers}
+                     onAssign={(assigneeId, instructions, photoUrl) => 
+                       handleAssignment(area.name, assigneeId, instructions, photoUrl)
+                     }
+                     isAssigned={false}
+                     assignedTo={areaAssignments.map(a => a.assignee_name).join(', ')}
+                     assignmentCount={areaAssignments.length}
+                     isRecentlyAssigned={isRecentlyAssigned(area.name)}
+                   />
                 </div>
               );
             })
@@ -369,6 +485,38 @@ const Index = () => {
       )}
       
       <Navigation />
+      
+      {/* Edit Area Modal */}
+      {editingArea && (
+        <AlertDialog open={!!editingArea} onOpenChange={() => setEditingArea(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Edit Area</AlertDialogTitle>
+              <AlertDialogDescription>
+                Update the area name and description.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4">
+              <Input
+                placeholder="Area name..."
+                value={editingArea.name}
+                onChange={(e) => setEditingArea({ ...editingArea, name: e.target.value })}
+              />
+              <Input
+                placeholder="Description..."
+                value={editingArea.description}
+                onChange={(e) => setEditingArea({ ...editingArea, description: e.target.value })}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setEditingArea(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleEditArea}>
+                Update Area
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 };
