@@ -27,7 +27,91 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
-// ... (keep all your existing types and statusIcons constant)
+interface Assignment {
+  id?: string;
+  area: string;
+  assignee_id: number;
+  assignee_name: string;
+  status: string;
+  instructions?: string;
+  photo_url?: string | null;
+  created_at?: string;
+}
+
+const statusIcons = {
+  pending: <Clock className="h-4 w-4 text-yellow-500" />,
+  in_progress: <CirclePlay className="h-4 w-4 text-blue-500" />,
+  done: <Check className="h-4 w-4 text-green-500" />,
+  completed: <Check className="h-4 w-4 text-green-500" />
+};
+
+const Assignments = () => {
+  const [statusFilter, setStatusFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [staffMembers, setStaffMembers] = useState<{ value: string; label: string }[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch assignments and staff
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [assignmentsRes, staffRes] = await Promise.all([
+          supabase.from('assignments').select('*').order('created_at', { ascending: false }),
+          supabase.from('staff').select('id, name')
+        ]);
+
+        if (assignmentsRes.data) setAssignments(assignmentsRes.data);
+        if (staffRes.data) {
+          setStaffMembers(staffRes.data.map(staff => ({
+            value: staff.id.toString(),
+            label: staff.name
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const filteredAssignments = assignments.filter(assignment => {
+    if (statusFilter && assignment.status !== statusFilter) return false;
+    if (assigneeFilter && assignment.assignee_id.toString() !== assigneeFilter) return false;
+    if (dateRange?.from && dateRange?.to) {
+      const assignmentDate = new Date(assignment.created_at || '');
+      if (!isWithinInterval(assignmentDate, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) })) return false;
+    }
+    return true;
+  });
+
+  const updateAssignmentStatus = async (id: string, status: string) => {
+    try {
+      await supabase.from('assignments').update({ status }).eq('id', id);
+      setAssignments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+      toast({ title: "Status updated", description: "Assignment status has been updated." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update assignment status.", variant: "destructive" });
+    }
+  };
+
+  const deleteAssignment = async (id: string) => {
+    try {
+      await supabase.from('assignments').delete().eq('id', id);
+      setAssignments(prev => prev.filter(a => a.id !== id));
+      toast({ title: "Assignment deleted", description: "Assignment has been deleted." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete assignment.", variant: "destructive" });
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
 const StaffDropdown = ({
   options,
@@ -169,15 +253,36 @@ const StaffDropdown = ({
   );
 };
 
-// ... (keep all your existing Assignments component code until the return statement)
-
   return (
     <div className="container mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6">Job Assignments</h1>
       
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-wrap gap-2">
-          {/* ... (keep your existing filter buttons) ... */}
+          <Button 
+            variant={statusFilter === "" ? "default" : "outline"}
+            onClick={() => setStatusFilter("")}
+          >
+            All
+          </Button>
+          <Button 
+            variant={statusFilter === "pending" ? "default" : "outline"}
+            onClick={() => setStatusFilter("pending")}
+          >
+            Pending
+          </Button>
+          <Button 
+            variant={statusFilter === "in_progress" ? "default" : "outline"}
+            onClick={() => setStatusFilter("in_progress")}
+          >
+            In Progress
+          </Button>
+          <Button 
+            variant={statusFilter === "done" ? "default" : "outline"}
+            onClick={() => setStatusFilter("done")}
+          >
+            Done
+          </Button>
         </div>
         
         <div className="flex flex-wrap items-center gap-4">
@@ -209,7 +314,75 @@ const StaffDropdown = ({
         </div>
       </div>
 
-      {/* ... (keep the rest of your component) ... */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Assignments
+            {filteredAssignments.length > 0 && (
+              <span className="text-sm text-gray-500">({filteredAssignments.length})</span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-4">Loading assignments...</div>
+          ) : filteredAssignments.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">
+              No assignments found for the selected filters.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Area</TableHead>
+                  <TableHead>Assignee</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAssignments.map((assignment) => (
+                  <TableRow key={assignment.id}>
+                    <TableCell className="font-medium">{assignment.area}</TableCell>
+                    <TableCell>{assignment.assignee_name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {statusIcons[assignment.status as keyof typeof statusIcons]}
+                        <span className="capitalize">{assignment.status.replace('_', ' ')}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(assignment.created_at || ''), 'MMM dd, yyyy HH:mm')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        {assignment.status !== 'done' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => updateAssignmentStatus(assignment.id!, 'done')}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => deleteAssignment(assignment.id!)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
