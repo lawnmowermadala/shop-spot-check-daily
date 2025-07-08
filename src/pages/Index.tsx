@@ -447,7 +447,7 @@ const Index = () => {
                            </AlertDialogHeader>
                            <Input
                              type="password"
-                             placeholder="Enter password (2025)"
+                             placeholder="Enter password"
                              value={deletePassword}
                              onChange={(e) => setDeletePassword(e.target.value)}
                            />
