@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit } from 'lucide-react';
@@ -36,6 +36,14 @@ interface Product {
   code: string;
 }
 
+interface ProductSummary {
+  name: string;
+  code: string;
+  totalQuantity: number;
+  totalLoss: number;
+  items: ExpiredItem[];
+}
+
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
   const [date, setDate] = useState<Date>(new Date());
@@ -45,6 +53,7 @@ const ExpiredStockPage = () => {
   const [isRemovalCalendarOpen, setIsRemovalCalendarOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ExpiredItem | null>(null);
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('day');
+  const [reportView, setReportView] = useState<'summary' | 'detailed'>('summary');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItem; direction: 'asc' | 'desc' }>({
     key: 'total_cost_loss',
     direction: 'desc',
@@ -71,12 +80,6 @@ const ExpiredStockPage = () => {
       return data as Product[];
     }
   });
-
-  // Filter products based on search term
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    product.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   // Fetch expired items with product details
   const { data: expiredItems = [], isLoading } = useQuery({
@@ -136,6 +139,36 @@ const ExpiredStockPage = () => {
   };
 
   const filteredItems = getFilteredItems();
+
+  // Group items by product for summary view
+  const getProductSummaries = (items: ExpiredItem[]): ProductSummary[] => {
+    const productMap = new Map<string, ProductSummary>();
+    
+    items.forEach(item => {
+      const productName = item.product_name;
+      const productCode = item.products?.code || 'N/A';
+      const key = `${productName}-${productCode}`;
+      
+      if (!productMap.has(key)) {
+        productMap.set(key, {
+          name: productName,
+          code: productCode,
+          totalQuantity: 0,
+          totalLoss: 0,
+          items: []
+        });
+      }
+      
+      const summary = productMap.get(key)!;
+      summary.totalQuantity += parseFloat(item.quantity) || 0;
+      summary.totalLoss += item.total_cost_loss || 0;
+      summary.items.push(item);
+    });
+    
+    return Array.from(productMap.values());
+  };
+
+  const productSummaries = getProductSummaries(filteredItems);
 
   // Request sort
   const requestSort = (key: keyof ExpiredItem) => {
@@ -283,7 +316,7 @@ const ExpiredStockPage = () => {
     });
   };
 
-  // Simple print function using window.print()
+  // Print report function
   const handlePrint = () => {
     const printContent = `
       <html>
@@ -291,60 +324,125 @@ const ExpiredStockPage = () => {
           <title>Expired Stock Report</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { text-align: center; }
-            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
-            .summary-item { text-align: center; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+            h1, h2, h3 { color: #333; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+            .summary-item { border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
+            .summary-value { font-size: 1.5rem; font-weight: bold; margin-top: 5px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             th { background-color: #f2f2f2; }
-            .text-red { color: red; }
+            .product-group { margin-top: 30px; }
+            .product-header { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+            .text-red { color: #dc3545; }
+            .text-bold { font-weight: bold; }
+            .page-break { page-break-after: always; }
           </style>
         </head>
         <body>
-          <h1>Expired Stock Report</h1>
-          <p>${format(new Date(), 'PPPP')} - ${timeRange} report</p>
+          <div class="header">
+            <h1>Expired Stock Report</h1>
+            <h3>${format(new Date(), 'PPPP')}</h3>
+            <h2>${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} Summary</h2>
+          </div>
           
           <div class="summary">
             <div class="summary-item">
-              <p>Total Items Lost</p>
-              <h3>${filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}</h3>
+              <div>Total Items Lost</div>
+              <div class="summary-value">${filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}</div>
             </div>
             <div class="summary-item">
-              <p>Total Financial Loss</p>
-              <h3>R${filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}</h3>
+              <div>Total Financial Loss</div>
+              <div class="summary-value text-red">R${filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}</div>
             </div>
             <div class="summary-item">
-              <p>Average Loss Per Item</p>
-              <h3>R${filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}</h3>
+              <div>Average Loss Per Item</div>
+              <div class="summary-value">R${filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}</div>
             </div>
           </div>
           
-          <table>
-            <thead>
-              <tr>
-                <th>Product Code</th>
-                <th>Product Name</th>
-                <th>Quantity Lost</th>
-                <th>Selling Price</th>
-                <th>Total Loss</th>
-                <th>Batch Date</th>
-                <th>Removal Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredItems.map(item => `
+          <h2>${reportView === 'summary' ? 'Product Summary' : 'Detailed Items'}</h2>
+          
+          ${reportView === 'summary' ? `
+            <table>
+              <thead>
                 <tr>
-                  <td>${item.products?.code || 'N/A'}</td>
-                  <td>${item.product_name}</td>
-                  <td>${item.quantity}</td>
-                  <td>R${item.selling_price?.toFixed(2) || '0.00'}</td>
-                  <td class="text-red">R${item.total_cost_loss?.toFixed(2) || '0.00'}</td>
-                  <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
-                  <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
+                  <th>Product Code</th>
+                  <th>Product Name</th>
+                  <th>Total Quantity</th>
+                  <th>Total Loss (ZAR)</th>
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${productSummaries.map(summary => `
+                  <tr>
+                    <td>${summary.code}</td>
+                    <td>${summary.name}</td>
+                    <td>${summary.totalQuantity}</td>
+                    <td class="text-red">R${summary.totalLoss.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : `
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Product Code</th>
+                  <th>Product Name</th>
+                  <th>Quantity</th>
+                  <th>Unit Price</th>
+                  <th>Total Loss</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredItems.map(item => `
+                  <tr>
+                    <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
+                    <td>${item.products?.code || 'N/A'}</td>
+                    <td>${item.product_name}</td>
+                    <td>${item.quantity}</td>
+                    <td>R${item.selling_price?.toFixed(2)}</td>
+                    <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `}
+          
+          ${reportView === 'summary' ? `
+            <div class="page-break"></div>
+            <h2>Detailed Breakdown by Product</h2>
+            ${productSummaries.map(summary => `
+              <div class="product-group">
+                <div class="product-header">
+                  <h3>${summary.name} (${summary.code})</h3>
+                  <div>Total: ${summary.totalQuantity} units | R${summary.totalLoss.toFixed(2)}</div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Quantity</th>
+                      <th>Unit Price</th>
+                      <th>Total Loss</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${summary.items.map(item => `
+                      <tr>
+                        <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
+                        <td>${item.quantity}</td>
+                        <td>R${item.selling_price?.toFixed(2)}</td>
+                        <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `).join('')}
+          ` : ''}
         </body>
       </html>
     `;
@@ -369,33 +467,46 @@ const ExpiredStockPage = () => {
         Record and manage expired products to minimize waste and keep inventory accurate.
       </p>
 
-      {/* Time Range Selector */}
-      <div className="flex gap-2">
-        <Button 
-          variant={timeRange === 'day' ? 'default' : 'outline'}
-          onClick={() => setTimeRange('day')}
-        >
-          Daily
-        </Button>
-        <Button 
-          variant={timeRange === 'week' ? 'default' : 'outline'}
-          onClick={() => setTimeRange('week')}
-        >
-          Weekly
-        </Button>
-        <Button 
-          variant={timeRange === 'month' ? 'default' : 'outline'}
-          onClick={() => setTimeRange('month')}
-        >
-          Monthly
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={handlePrint}
-          className="ml-auto"
-        >
-          Print Report
-        </Button>
+      {/* Report Controls */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex gap-2">
+          <Button 
+            variant={timeRange === 'day' ? 'default' : 'outline'}
+            onClick={() => setTimeRange('day')}
+          >
+            Daily
+          </Button>
+          <Button 
+            variant={timeRange === 'week' ? 'default' : 'outline'}
+            onClick={() => setTimeRange('week')}
+          >
+            Weekly
+          </Button>
+          <Button 
+            variant={timeRange === 'month' ? 'default' : 'outline'}
+            onClick={() => setTimeRange('month')}
+          >
+            Monthly
+          </Button>
+        </div>
+        
+        <div className="flex gap-2 ml-auto">
+          <Select value={reportView} onValueChange={(value) => setReportView(value as 'summary' | 'detailed')}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="View" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="summary">Summary</SelectItem>
+              <SelectItem value="detailed">Detailed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button 
+            variant="outline" 
+            onClick={handlePrint}
+          >
+            Print Report
+          </Button>
+        </div>
       </div>
 
       {/* Loss Summary */}
@@ -451,20 +562,19 @@ const ExpiredStockPage = () => {
                   </div>
                   {isProductDropdownOpen && (
                     <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border max-h-60 overflow-auto">
-                      {filteredProducts.length > 0 ? (
-                        filteredProducts.map(product => (
-                          <div
-                            key={product.id}
-                            className="p-2 hover:bg-gray-100 cursor-pointer"
-                            onClick={() => handleProductSelect(product.id, product.name)}
-                          >
-                            <div className="font-medium">{product.name}</div>
-                            <div className="text-sm text-gray-500">{product.code}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-2 text-sm text-gray-500">No products found</div>
-                      )}
+                      {products.filter(p => 
+                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        p.code.toLowerCase().includes(searchTerm.toLowerCase())
+                      ).map(product => (
+                        <div
+                          key={product.id}
+                          className="p-2 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => handleProductSelect(product.id, product.name)}
+                        >
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-gray-500">{product.code}</div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -587,69 +697,114 @@ const ExpiredStockPage = () => {
       {/* Expired Items List */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <CardTitle>Expired Items History</CardTitle>
+          <CardTitle>Expired Items History ({timeRange})</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="text-center py-4">Loading expired items...</div>
           ) : filteredItems.length > 0 ? (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product Code</TableHead>
-                    <TableHead>Product Name</TableHead>
-                    <TableHead>Quantity Lost</TableHead>
-                    <TableHead>Selling Price (ZAR)</TableHead>
-                    <TableHead 
-                      className="cursor-pointer"
-                      onClick={() => requestSort('total_cost_loss')}
-                    >
-                      Total Loss (ZAR) {sortConfig.key === 'total_cost_loss' && (
-                        sortConfig.direction === 'asc' ? '↑' : '↓'
-                      )}
-                    </TableHead>
-                    <TableHead>Batch Date</TableHead>
-                    <TableHead>Removal Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map(item => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono">
-                        {item.products?.code || 'N/A'}
-                      </TableCell>
-                      <TableCell>{item.product_name}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>R{item.selling_price?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell className="font-semibold text-red-600">
-                        R{item.total_cost_loss?.toFixed(2) || '0.00'}
-                      </TableCell>
-                      <TableCell>{format(parseISO(item.batch_date), 'MMM d, yyyy')}</TableCell>
-                      <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-blue-500 hover:text-blue-700"
-                          onClick={() => startEdit(item)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-red-500 hover:text-red-700"
-                          onClick={() => deleteExpiredItem.mutate(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+              {reportView === 'summary' ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product Code</TableHead>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead>Total Quantity</TableHead>
+                      <TableHead 
+                        className="cursor-pointer"
+                        onClick={() => requestSort('total_cost_loss')}
+                      >
+                        Total Loss (ZAR) {sortConfig.key === 'total_cost_loss' && (
+                          sortConfig.direction === 'asc' ? '↑' : '↓'
+                        )}
+                      </TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {productSummaries.map(summary => (
+                      <TableRow key={`${summary.code}-${summary.name}`}>
+                        <TableCell className="font-mono">{summary.code}</TableCell>
+                        <TableCell>{summary.name}</TableCell>
+                        <TableCell>{summary.totalQuantity}</TableCell>
+                        <TableCell className="font-semibold text-red-600">
+                          R{summary.totalLoss.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-blue-500 hover:text-blue-700"
+                            onClick={() => {
+                              setReportView('detailed');
+                              // Scroll to the first item of this product
+                              setTimeout(() => {
+                                document.getElementById(`product-${summary.code}`)?.scrollIntoView();
+                              }, 100);
+                            }}
+                          >
+                            <Search className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Product Code</TableHead>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Unit Price</TableHead>
+                      <TableHead 
+                        className="cursor-pointer"
+                        onClick={() => requestSort('total_cost_loss')}
+                      >
+                        Total Loss (ZAR) {sortConfig.key === 'total_cost_loss' && (
+                          sortConfig.direction === 'asc' ? '↑' : '↓'
+                        )}
+                      </TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredItems.map(item => (
+                      <TableRow key={item.id} id={`product-${item.products?.code || 'N/A'}`}>
+                        <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell className="font-mono">{item.products?.code || 'N/A'}</TableCell>
+                        <TableCell>{item.product_name}</TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
+                        <TableCell className="font-semibold text-red-600">
+                          R{item.total_cost_loss?.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-blue-500 hover:text-blue-700"
+                            onClick={() => startEdit(item)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-red-500 hover:text-red-700"
+                            onClick={() => deleteExpiredItem.mutate(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
