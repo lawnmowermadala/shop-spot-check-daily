@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Navigation from '@/components/Navigation';
 
 // Types
@@ -20,26 +21,60 @@ interface ExpiredItem {
   quantity: string;
   batch_date: string;
   removal_date: string;
+  product_id?: string;
+  cost_per_unit: number;
+  selling_price: number;
+  total_cost_loss: number;
   created_at?: string;
+  products?: {
+    name: string;
+    code: string;
+  };
+}
+
+interface Product {
+  id: string;
+  name: string;
+  code: string;
 }
 
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
   const [date, setDate] = useState<Date>(new Date());
   const [formData, setFormData] = useState({
+    productId: '',
     productName: '',
     quantity: '',
+    costPerUnit: '',
+    sellingPrice: '',
     batchDate: new Date(),
     removalDate: new Date(),
   });
 
-  // Fetch expired items
+  // Fetch products
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data as Product[];
+    }
+  });
+
+  // Fetch expired items with product details
   const { data: expiredItems = [], isLoading } = useQuery({
     queryKey: ['expired-items'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expired_items')
-        .select('*')
+        .select(`
+          *,
+          products (name, code)
+        `)
         .order('removal_date', { ascending: false });
       
       if (error) throw error;
@@ -47,18 +82,33 @@ const ExpiredStockPage = () => {
     }
   });
 
+  // Handle product selection
+  const handleProductSelect = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      setFormData({
+        ...formData, 
+        productId, 
+        productName: product.name
+      });
+    }
+  };
+
   // Add expired item mutation
   const addExpiredItem = useMutation({
     mutationFn: async () => {
-      if (!formData.productName || !formData.quantity) {
+      if (!formData.productId || !formData.quantity || !formData.sellingPrice) {
         throw new Error('Please fill all required fields');
       }
 
       const { error } = await supabase
         .from('expired_items')
         .insert({
+          product_id: formData.productId,
           product_name: formData.productName,
           quantity: formData.quantity,
+          cost_per_unit: parseFloat(formData.costPerUnit) || 0,
+          selling_price: parseFloat(formData.sellingPrice),
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
         });
@@ -68,8 +118,11 @@ const ExpiredStockPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expired-items'] });
       setFormData({
+        productId: '',
         productName: '',
         quantity: '',
+        costPerUnit: '',
+        sellingPrice: '',
         batchDate: new Date(),
         removalDate: new Date(),
       });
@@ -114,6 +167,34 @@ const ExpiredStockPage = () => {
       <p className="text-gray-600">
         Record and manage expired products to minimize waste and keep inventory accurate.
       </p>
+
+      {/* Loss Summary */}
+      {expiredItems.length > 0 && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Total Items Lost</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {expiredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Total Financial Loss</p>
+                <p className="text-2xl font-bold text-red-600">
+                  £{expiredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Average Loss Per Item</p>
+                <p className="text-2xl font-bold text-red-600">
+                  £{expiredItems.length > 0 ? (expiredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / expiredItems.length).toFixed(2) : '0.00'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       {/* Add Expired Item Form */}
       <Card>
@@ -124,21 +205,51 @@ const ExpiredStockPage = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Product Name</label>
-                <Input
-                  placeholder="Product name"
-                  value={formData.productName}
-                  onChange={(e) => setFormData({...formData, productName: e.target.value})}
-                  required
-                />
+                <label className="block text-sm font-medium mb-1">Select Product *</label>
+                <Select onValueChange={handleProductSelect} value={formData.productId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map(product => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.code} - {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">Quantity</label>
+                <label className="block text-sm font-medium mb-1">Quantity *</label>
                 <Input
-                  placeholder="Quantity"
+                  type="number"
+                  placeholder="Quantity lost"
                   value={formData.quantity}
                   onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Cost Per Unit</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.costPerUnit}
+                  onChange={(e) => setFormData({...formData, costPerUnit: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Selling Price Per Unit *</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.sellingPrice}
+                  onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})}
                   required
                 />
               </div>
@@ -208,8 +319,11 @@ const ExpiredStockPage = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Quantity</TableHead>
+                    <TableHead>Product Code</TableHead>
+                    <TableHead>Product Name</TableHead>
+                    <TableHead>Quantity Lost</TableHead>
+                    <TableHead>Selling Price</TableHead>
+                    <TableHead>Total Loss</TableHead>
                     <TableHead>Batch Date</TableHead>
                     <TableHead>Removal Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -218,8 +332,15 @@ const ExpiredStockPage = () => {
                 <TableBody>
                   {expiredItems.map(item => (
                     <TableRow key={item.id}>
+                      <TableCell className="font-mono">
+                        {item.products?.code || 'N/A'}
+                      </TableCell>
                       <TableCell>{item.product_name}</TableCell>
                       <TableCell>{item.quantity}</TableCell>
+                      <TableCell>£{item.selling_price?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell className="font-semibold text-red-600">
+                        £{item.total_cost_loss?.toFixed(2) || '0.00'}
+                      </TableCell>
                       <TableCell>{format(parseISO(item.batch_date), 'MMM d, yyyy')}</TableCell>
                       <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right">

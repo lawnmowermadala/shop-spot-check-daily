@@ -97,29 +97,49 @@ export type Database = {
       expired_items: {
         Row: {
           batch_date: string
+          cost_per_unit: number | null
           created_at: string | null
           id: string
+          product_id: string | null
           product_name: string
           quantity: string
           removal_date: string
+          selling_price: number | null
+          total_cost_loss: number | null
         }
         Insert: {
           batch_date: string
+          cost_per_unit?: number | null
           created_at?: string | null
           id?: string
+          product_id?: string | null
           product_name: string
           quantity: string
           removal_date: string
+          selling_price?: number | null
+          total_cost_loss?: number | null
         }
         Update: {
           batch_date?: string
+          cost_per_unit?: number | null
           created_at?: string | null
           id?: string
+          product_id?: string | null
           product_name?: string
           quantity?: string
           removal_date?: string
+          selling_price?: number | null
+          total_cost_loss?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expired_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ingredients: {
         Row: {
