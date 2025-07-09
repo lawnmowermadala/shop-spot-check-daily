@@ -197,20 +197,16 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
-      const quantity = parseFloat(formData.quantity);
-      const sellingPrice = parseFloat(formData.sellingPrice);
-      const totalLoss = quantity * sellingPrice;
-
       const { error } = await supabase
         .from('expired_items')
         .insert({
           product_id: formData.productId,
           product_name: formData.productName,
           quantity: formData.quantity,
-          selling_price: sellingPrice,
-          total_cost_loss: totalLoss,
+          selling_price: parseFloat(formData.sellingPrice),
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
+          // Let the database calculate total_cost_loss
         });
 
       if (error) throw error;
@@ -239,20 +235,16 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
-      const quantity = parseFloat(updatedItem.quantity);
-      const sellingPrice = updatedItem.selling_price;
-      const totalLoss = quantity * sellingPrice;
-
       const { error } = await supabase
         .from('expired_items')
         .update({
           product_id: updatedItem.product_id,
           product_name: updatedItem.product_name,
           quantity: updatedItem.quantity,
-          selling_price: sellingPrice,
-          total_cost_loss: totalLoss,
+          selling_price: updatedItem.selling_price,
           batch_date: format(new Date(updatedItem.batch_date), 'yyyy-MM-dd'),
           removal_date: format(new Date(updatedItem.removal_date), 'yyyy-MM-dd')
+          // Let the database calculate total_cost_loss
         })
         .eq('id', updatedItem.id);
 
