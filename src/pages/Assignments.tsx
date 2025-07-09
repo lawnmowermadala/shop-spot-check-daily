@@ -91,6 +91,42 @@ const Assignments = () => {
     }
   });
 
+  // Mutation for awarding demerit
+  const awardDemerit = useMutation({
+    mutationFn: async (staffName: string) => {
+      const { data, error } = await supabase
+        .from('assignments')
+        .insert({
+          area: 'Performance Demerit',
+          assignee_id: -2,
+          assignee_name: staffName,
+          status: 'completed',
+          instructions: `[PERFORMANCE DEMERIT] ${staffName} requires performance improvement as of ${format(new Date(), 'PP')}`,
+          created_at: new Date().toISOString()
+        })
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Demerit Recorded",
+        description: "Performance demerit has been recorded.",
+        variant: "default"
+      });
+      // Refresh assignments
+      fetchAssignments();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to record demerit. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
   const fetchAssignments = async () => {
     try {
       const [assignmentsRes, staffRes] = await Promise.all([
@@ -120,6 +156,12 @@ const Assignments = () => {
   const handleAwardInitiative = (staffName: string) => {
     if (confirm(`Grant ${staffName} a Self-Initiative Award?`)) {
       awardSelfInitiative.mutate(staffName);
+    }
+  };
+
+  const handleAwardDemerit = (staffName: string) => {
+    if (confirm(`Record Performance Demerit for ${staffName}?`)) {
+      awardDemerit.mutate(staffName);
     }
   };
 
@@ -391,8 +433,9 @@ const StaffDropdown = ({
               <TableBody>
                 {filteredAssignments.map((assignment) => {
                   const isReward = assignment.instructions?.includes('[SELF INITIATIVE MERIT AWARD]');
+                  const isDemerit = assignment.instructions?.includes('[PERFORMANCE DEMERIT]');
                   return (
-                    <TableRow key={assignment.id} className={isReward ? 'bg-amber-50' : ''}>
+                    <TableRow key={assignment.id} className={isReward ? 'bg-amber-50' : isDemerit ? 'bg-red-50' : ''}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {assignment.area}
@@ -402,6 +445,12 @@ const StaffDropdown = ({
                               Merit Award
                             </Badge>
                           )}
+                          {isDemerit && (
+                            <Badge variant="secondary" className="bg-red-100 text-red-800">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Demerit
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -409,6 +458,9 @@ const StaffDropdown = ({
                           {assignment.assignee_name}
                           {isReward && (
                             <Star className="h-4 w-4 text-amber-500" />
+                          )}
+                          {isDemerit && (
+                            <AlertCircle className="h-4 w-4 text-red-500" />
                           )}
                         </div>
                       </TableCell>
@@ -425,6 +477,11 @@ const StaffDropdown = ({
                               <div className="flex items-center gap-1 text-amber-700">
                                 <Lightbulb className="h-3 w-3" />
                                 {assignment.instructions.replace('[SELF INITIATIVE MERIT AWARD] ', '')}
+                              </div>
+                            ) : isDemerit ? (
+                              <div className="flex items-center gap-1 text-red-700">
+                                <AlertTriangle className="h-3 w-3" />
+                                {assignment.instructions.replace('[PERFORMANCE DEMERIT] ', '')}
                               </div>
                             ) : (
                               assignment.instructions
@@ -457,16 +514,27 @@ const StaffDropdown = ({
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          {assignment.status !== 'done' && !isReward && (
+                          {assignment.status === 'pending' && !isReward && !isDemerit && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateAssignmentStatus(assignment.id!, 'in_progress')}
+                              title="Start Assignment"
+                            >
+                              <CirclePlay className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {assignment.status === 'in_progress' && !isReward && !isDemerit && (
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => updateAssignmentStatus(assignment.id!, 'done')}
+                              title="Mark as Done"
                             >
                               <Check className="h-4 w-4" />
                             </Button>
                           )}
-                          {!isReward && (
+                          {!isReward && !isDemerit && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -476,10 +544,21 @@ const StaffDropdown = ({
                               <Award className="h-4 w-4 text-amber-500" />
                             </Button>
                           )}
+                          {!isReward && !isDemerit && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAwardDemerit(assignment.assignee_name)}
+                              title="Record Performance Demerit"
+                            >
+                              <AlertTriangle className="h-4 w-4 text-red-500" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => deleteAssignment(assignment.id!)}
+                            title="Delete Assignment"
                           >
                             <X className="h-4 w-4" />
                           </Button>
