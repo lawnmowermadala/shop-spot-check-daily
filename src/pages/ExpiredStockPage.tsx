@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, X } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, X, Printer, ArrowUp, ArrowDown } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navigation from '@/components/Navigation';
+import ReactToPrint from 'react-to-print';
 
 // Types
 interface ExpiredItem {
@@ -39,6 +40,7 @@ interface Product {
 
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
+  const reportRef = useRef<HTMLDivElement>(null);
   const [date, setDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
@@ -46,6 +48,10 @@ const ExpiredStockPage = () => {
   const [isRemovalCalendarOpen, setIsRemovalCalendarOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ExpiredItem | null>(null);
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('day');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItem; direction: 'asc' | 'desc' }>({
+    key: 'total_cost_loss',
+    direction: 'desc',
+  });
   const [formData, setFormData] = useState({
     productId: '',
     productName: '',
@@ -92,6 +98,17 @@ const ExpiredStockPage = () => {
     }
   });
 
+  // Sort items
+  const sortedItems = [...expiredItems].sort((a, b) => {
+    if (a[sortConfig.key] < b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (a[sortConfig.key] > b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
   // Get filtered items based on time range
   const getFilteredItems = () => {
     const now = new Date();
@@ -115,13 +132,22 @@ const ExpiredStockPage = () => {
         endDate = endOfDay(now);
     }
 
-    return expiredItems.filter(item => {
+    return sortedItems.filter(item => {
       const removalDate = new Date(item.removal_date);
       return removalDate >= startDate && removalDate <= endDate;
     });
   };
 
   const filteredItems = getFilteredItems();
+
+  // Request sort
+  const requestSort = (key: keyof ExpiredItem) => {
+    let direction: 'asc' | 'desc' = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   // Handle product selection
   const handleProductSelect = (productId: string, productName: string) => {
@@ -244,6 +270,65 @@ const ExpiredStockPage = () => {
   const cancelEdit = () => {
     setEditingItem(null);
   };
+
+  // Report component
+  const Report = () => (
+    <div ref={reportRef} className="p-6 bg-white">
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold">Expired Stock Report</h1>
+        <p className="text-gray-600">{format(new Date(), 'PPPP')}</p>
+        <p className="text-gray-600 capitalize">{timeRange} report</p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="text-center border p-4 rounded-lg">
+          <p className="text-sm text-gray-600">Total Items Lost</p>
+          <p className="text-2xl font-bold">
+            {filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}
+          </p>
+        </div>
+        <div className="text-center border p-4 rounded-lg">
+          <p className="text-sm text-gray-600">Total Financial Loss</p>
+          <p className="text-2xl font-bold">
+            R{filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
+          </p>
+        </div>
+        <div className="text-center border p-4 rounded-lg">
+          <p className="text-sm text-gray-600">Average Loss Per Item</p>
+          <p className="text-2xl font-bold">
+            R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}
+          </p>
+        </div>
+      </div>
+
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="p-2 text-left border">Product Code</th>
+            <th className="p-2 text-left border">Product Name</th>
+            <th className="p-2 text-left border">Quantity</th>
+            <th className="p-2 text-left border">Selling Price</th>
+            <th className="p-2 text-left border">Total Loss</th>
+            <th className="p-2 text-left border">Batch Date</th>
+            <th className="p-2 text-left border">Removal Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredItems.map(item => (
+            <tr key={item.id} className="border-b">
+              <td className="p-2 border">{item.products?.code || 'N/A'}</td>
+              <td className="p-2 border">{item.product_name}</td>
+              <td className="p-2 border">{item.quantity}</td>
+              <td className="p-2 border">R{item.selling_price?.toFixed(2) || '0.00'}</td>
+              <td className="p-2 border font-semibold">R{item.total_cost_loss?.toFixed(2) || '0.00'}</td>
+              <td className="p-2 border">{format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
+              <td className="p-2 border">{format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
@@ -475,9 +560,9 @@ const ExpiredStockPage = () => {
       
       {/* Expired Items List */}
       <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
+        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <CardTitle>Expired Items History</CardTitle>
-          <div className="mt-2 md:mt-0">
+          <div className="flex flex-col md:flex-row gap-2">
             <Select value={timeRange} onValueChange={(value) => setTimeRange(value as 'day' | 'week' | 'month')}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Time Range" />
@@ -488,6 +573,15 @@ const ExpiredStockPage = () => {
                 <SelectItem value="month">Monthly</SelectItem>
               </SelectContent>
             </Select>
+            <ReactToPrint
+              trigger={() => (
+                <Button variant="outline" className="gap-2">
+                  <Printer className="h-4 w-4" />
+                  Print Report
+                </Button>
+              )}
+              content={() => reportRef.current}
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -502,7 +596,21 @@ const ExpiredStockPage = () => {
                     <TableHead>Product Name</TableHead>
                     <TableHead>Quantity Lost</TableHead>
                     <TableHead>Selling Price (ZAR)</TableHead>
-                    <TableHead>Total Loss (ZAR)</TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => requestSort('total_cost_loss')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Total Loss (ZAR)
+                        {sortConfig.key === 'total_cost_loss' ? (
+                          sortConfig.direction === 'asc' ? (
+                            <ArrowUp className="h-4 w-4" />
+                          ) : (
+                            <ArrowDown className="h-4 w-4" />
+                          )
+                        ) : null}
+                      </div>
+                    </TableHead>
                     <TableHead>Batch Date</TableHead>
                     <TableHead>Removal Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -553,6 +661,11 @@ const ExpiredStockPage = () => {
           )}
         </CardContent>
       </Card>
+      
+      {/* Hidden report for printing */}
+      <div className="hidden">
+        <Report />
+      </div>
       
       <Navigation />
     </div>
