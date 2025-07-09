@@ -15,10 +15,10 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb, AlertCircle, Search } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb, AlertCircle, Search, Award, Star } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DateRange } from "react-day-picker";
@@ -26,6 +26,7 @@ import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface Assignment {
   id?: string;
@@ -52,32 +53,75 @@ const Assignments = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [staffMembers, setStaffMembers] = useState<{ value: string; label: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // Mutation for awarding self initiative
+  const awardSelfInitiative = useMutation({
+    mutationFn: async (staffName: string) => {
+      const { data, error } = await supabase
+        .from('assignments')
+        .insert({
+          area: 'Self Initiative Merit',
+          assignee_id: -1,
+          assignee_name: staffName,
+          status: 'completed',
+          instructions: `[SELF INITIATIVE MERIT AWARD] ${staffName} demonstrated exceptional initiative on ${format(new Date(), 'PP')}`,
+          created_at: new Date().toISOString()
+        })
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Award Granted",
+        description: "Self-initiative award has been recorded!",
+        variant: "default"
+      });
+      // Refresh assignments
+      fetchAssignments();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to grant award. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const fetchAssignments = async () => {
+    try {
+      const [assignmentsRes, staffRes] = await Promise.all([
+        supabase.from('assignments').select('*').order('created_at', { ascending: false }),
+        supabase.from('staff').select('id, name')
+      ]);
+
+      if (assignmentsRes.data) setAssignments(assignmentsRes.data);
+      if (staffRes.data) {
+        setStaffMembers(staffRes.data.map(staff => ({
+          value: staff.id.toString(),
+          label: staff.name
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Fetch assignments and staff
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [assignmentsRes, staffRes] = await Promise.all([
-          supabase.from('assignments').select('*').order('created_at', { ascending: false }),
-          supabase.from('staff').select('id, name')
-        ]);
-
-        if (assignmentsRes.data) setAssignments(assignmentsRes.data);
-        if (staffRes.data) {
-          setStaffMembers(staffRes.data.map(staff => ({
-            value: staff.id.toString(),
-            label: staff.name
-          })));
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchAssignments();
   }, []);
+
+  const handleAwardInitiative = (staffName: string) => {
+    if (confirm(`Grant ${staffName} a Self-Initiative Award?`)) {
+      awardSelfInitiative.mutate(staffName);
+    }
+  };
 
   const filteredAssignments = assignments.filter(assignment => {
     if (statusFilter && assignment.status !== statusFilter) return false;
@@ -338,51 +382,119 @@ const StaffDropdown = ({
                   <TableHead>Area</TableHead>
                   <TableHead>Assignee</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Instructions</TableHead>
+                  <TableHead>Photo</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAssignments.map((assignment) => (
-                  <TableRow key={assignment.id}>
-                    <TableCell className="font-medium">{assignment.area}</TableCell>
-                    <TableCell>{assignment.assignee_name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {statusIcons[assignment.status as keyof typeof statusIcons]}
-                        <span className="capitalize">{assignment.status.replace('_', ' ')}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(assignment.created_at || ''), 'MMM dd, yyyy HH:mm')}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        {assignment.status !== 'done' && (
+                {filteredAssignments.map((assignment) => {
+                  const isReward = assignment.instructions?.includes('[SELF INITIATIVE MERIT AWARD]');
+                  return (
+                    <TableRow key={assignment.id} className={isReward ? 'bg-amber-50' : ''}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {assignment.area}
+                          {isReward && (
+                            <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                              <Award className="h-3 w-3 mr-1" />
+                              Merit Award
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {assignment.assignee_name}
+                          {isReward && (
+                            <Star className="h-4 w-4 text-amber-500" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {statusIcons[assignment.status as keyof typeof statusIcons]}
+                          <span className="capitalize">{assignment.status.replace('_', ' ')}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        {assignment.instructions ? (
+                          <div className="text-sm">
+                            {isReward ? (
+                              <div className="flex items-center gap-1 text-amber-700">
+                                <Lightbulb className="h-3 w-3" />
+                                {assignment.instructions.replace('[SELF INITIATIVE MERIT AWARD] ', '')}
+                              </div>
+                            ) : (
+                              assignment.instructions
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">No instructions</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {assignment.photo_url ? (
+                          <div className="w-16 h-16">
+                            <AspectRatio ratio={1}>
+                              <img
+                                src={assignment.photo_url}
+                                alt="Assignment photo"
+                                className="rounded-md object-cover w-full h-full cursor-pointer"
+                                onClick={() => window.open(assignment.photo_url!, '_blank')}
+                              />
+                            </AspectRatio>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded-md">
+                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(assignment.created_at || ''), 'MMM dd, yyyy HH:mm')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {assignment.status !== 'done' && !isReward && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateAssignmentStatus(assignment.id!, 'done')}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {!isReward && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAwardInitiative(assignment.assignee_name)}
+                              title="Award Self Initiative Merit"
+                            >
+                              <Award className="h-4 w-4 text-amber-500" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => updateAssignmentStatus(assignment.id!, 'done')}
+                            onClick={() => deleteAssignment(assignment.id!)}
                           >
-                            <Check className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                           </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => deleteAssignment(assignment.id!)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
+      
+      <Navigation />
     </div>
   );
 };
