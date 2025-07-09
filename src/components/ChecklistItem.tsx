@@ -1,15 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, X, Upload, Lightbulb } from 'lucide-react';
+import { User, X, Upload, Lightbulb, Search } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -48,6 +42,41 @@ const ChecklistItem = ({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [localAssignees, setLocalAssignees] = useState<Array<{ id: string; name: string; value: string; label: string; searchTerms: string }>>([]);
   const [showSelfInitiative, setShowSelfInitiative] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const filteredAssignees = localAssignees.filter(assignee =>
+    assignee.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const selectedAssignee = localAssignees.find(assignee => assignee.id === selectedAssigneeId);
+
+  // Focus management for mobile
+  useEffect(() => {
+    if (isDropdownOpen && inputRef.current) {
+      inputRef.current.focus();
+      // Scroll dropdown into view on mobile
+      setTimeout(() => {
+        dropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [isDropdownOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
   // Fetch staff members directly from Supabase
   useEffect(() => {
@@ -269,18 +298,94 @@ const ChecklistItem = ({
           <div className="mt-4 space-y-4">
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-gray-500" />
-              <Select 
-                value={selectedAssigneeId} 
-                onValueChange={(value) => {
-                  console.log('Selected staff member:', value);
-                  setSelectedAssigneeId(value);
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Type to search staff..." />
-                </SelectTrigger>
-                <SelectContent items={localAssignees} searchable={true} />
-              </Select>
+              <div className="relative w-full" ref={dropdownRef}>
+                <button
+                  type="button"
+                  className="w-full p-2 border rounded flex justify-between items-center bg-white text-left"
+                  onClick={() => {
+                    setIsDropdownOpen(!isDropdownOpen);
+                    setSearchTerm("");
+                  }}
+                >
+                  <span className="truncate">
+                    {selectedAssignee?.name || "Type to search staff..."}
+                  </span>
+                  <svg
+                    className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
+                      isDropdownOpen ? "transform rotate-180" : ""
+                    }`}
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+
+                {isDropdownOpen && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 md:absolute md:inset-auto md:mt-1 md:block md:bg-transparent">
+                    <div className="w-full max-w-md mx-4 bg-white rounded-lg shadow-lg md:relative md:max-h-60 md:overflow-auto">
+                      <div className="sticky top-0 z-10 bg-white p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                          <Input
+                            ref={inputRef}
+                            type="text"
+                            placeholder="Search staff..."
+                            className="pl-9"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setIsDropdownOpen(false);
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto max-h-[60vh] md:max-h-52">
+                        {filteredAssignees.length === 0 ? (
+                          <div className="px-4 py-2 text-gray-500">No staff found</div>
+                        ) : (
+                          filteredAssignees.map((assignee) => (
+                            <button
+                              key={assignee.id}
+                              type="button"
+                              className={`w-full text-left px-4 py-3 hover:bg-gray-100 ${
+                                selectedAssigneeId === assignee.id ? "bg-gray-100 font-medium" : ""
+                              }`}
+                              onClick={() => {
+                                setSelectedAssigneeId(assignee.id);
+                                setIsDropdownOpen(false);
+                                setSearchTerm("");
+                                console.log('Selected staff member:', assignee.id);
+                              }}
+                            >
+                              {assignee.name}
+                            </button>
+                          ))
+                        )}
+                       </div>
+                       <div className="sticky bottom-0 bg-white p-2 border-t">
+                         <button
+                           type="button"
+                           className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
+                           onClick={() => {
+                             setSelectedAssigneeId("");
+                             setIsDropdownOpen(false);
+                             setSearchTerm("");
+                           }}
+                         >
+                           Cancel / Don't assign
+                         </button>
+                       </div>
+                     </div>
+                   </div>
+                 )}
+              </div>
             </div>
             
             {/* Self Initiative Toggle */}
