@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, X, Printer, ArrowUp, ArrowDown } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navigation from '@/components/Navigation';
-import ReactToPrint from 'react-to-print';
 
 // Types
 interface ExpiredItem {
@@ -40,7 +38,6 @@ interface Product {
 
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
-  const reportRef = useRef<HTMLDivElement>(null);
   const [date, setDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
@@ -167,6 +164,8 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
+      const totalLoss = parseFloat(formData.quantity) * parseFloat(formData.sellingPrice);
+
       const { error } = await supabase
         .from('expired_items')
         .insert({
@@ -174,6 +173,7 @@ const ExpiredStockPage = () => {
           product_name: formData.productName,
           quantity: formData.quantity,
           selling_price: parseFloat(formData.sellingPrice),
+          total_cost_loss: totalLoss,
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
         });
@@ -190,7 +190,7 @@ const ExpiredStockPage = () => {
         batchDate: new Date(),
         removalDate: new Date(),
       });
-      toast.success("Expired item logged successfully!");
+      toast("Expired item logged successfully!");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -204,6 +204,8 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
+      const totalLoss = parseFloat(updatedItem.quantity) * updatedItem.selling_price;
+
       const { error } = await supabase
         .from('expired_items')
         .update({
@@ -211,6 +213,7 @@ const ExpiredStockPage = () => {
           product_name: updatedItem.product_name,
           quantity: updatedItem.quantity,
           selling_price: updatedItem.selling_price,
+          total_cost_loss: totalLoss,
           batch_date: format(new Date(updatedItem.batch_date), 'yyyy-MM-dd'),
           removal_date: format(new Date(updatedItem.removal_date), 'yyyy-MM-dd')
         })
@@ -221,7 +224,7 @@ const ExpiredStockPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expired-items'] });
       setEditingItem(null);
-      toast.success("Expired item updated successfully!");
+      toast("Expired item updated successfully!");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -240,7 +243,7 @@ const ExpiredStockPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expired-items'] });
-      toast.success("Item removed from expired records");
+      toast("Item removed from expired records");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -249,86 +252,111 @@ const ExpiredStockPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addExpiredItem.mutate();
-  };
-
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
     if (editingItem) {
       updateExpiredItem.mutate(editingItem);
+    } else {
+      addExpiredItem.mutate();
     }
   };
 
   const startEdit = (item: ExpiredItem) => {
-    setEditingItem({
-      ...item,
-      batch_date: format(parseISO(item.batch_date), 'yyyy-MM-dd'),
-      removal_date: format(parseISO(item.removal_date), 'yyyy-MM-dd')
+    setEditingItem(item);
+    setFormData({
+      productId: item.product_id || '',
+      productName: item.product_name,
+      quantity: item.quantity,
+      sellingPrice: item.selling_price.toString(),
+      batchDate: new Date(item.batch_date),
+      removalDate: new Date(item.removal_date),
     });
   };
 
   const cancelEdit = () => {
     setEditingItem(null);
+    setFormData({
+      productId: '',
+      productName: '',
+      quantity: '',
+      sellingPrice: '',
+      batchDate: new Date(),
+      removalDate: new Date(),
+    });
   };
 
-  // Report component
-  const Report = () => (
-    <div ref={reportRef} className="p-6 bg-white">
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold">Expired Stock Report</h1>
-        <p className="text-gray-600">{format(new Date(), 'PPPP')}</p>
-        <p className="text-gray-600 capitalize">{timeRange} report</p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="text-center border p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Items Lost</p>
-          <p className="text-2xl font-bold">
-            {filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}
-          </p>
-        </div>
-        <div className="text-center border p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Financial Loss</p>
-          <p className="text-2xl font-bold">
-            R{filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
-          </p>
-        </div>
-        <div className="text-center border p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Average Loss Per Item</p>
-          <p className="text-2xl font-bold">
-            R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}
-          </p>
-        </div>
-      </div>
+  // Simple print function using window.print()
+  const handlePrint = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Expired Stock Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { text-align: center; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+            .summary-item { text-align: center; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .text-red { color: red; }
+          </style>
+        </head>
+        <body>
+          <h1>Expired Stock Report</h1>
+          <p>${format(new Date(), 'PPPP')} - ${timeRange} report</p>
+          
+          <div class="summary">
+            <div class="summary-item">
+              <p>Total Items Lost</p>
+              <h3>${filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}</h3>
+            </div>
+            <div class="summary-item">
+              <p>Total Financial Loss</p>
+              <h3>R${filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}</h3>
+            </div>
+            <div class="summary-item">
+              <p>Average Loss Per Item</p>
+              <h3>R${filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}</h3>
+            </div>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Product Code</th>
+                <th>Product Name</th>
+                <th>Quantity Lost</th>
+                <th>Selling Price</th>
+                <th>Total Loss</th>
+                <th>Batch Date</th>
+                <th>Removal Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredItems.map(item => `
+                <tr>
+                  <td>${item.products?.code || 'N/A'}</td>
+                  <td>${item.product_name}</td>
+                  <td>${item.quantity}</td>
+                  <td>R${item.selling_price?.toFixed(2) || '0.00'}</td>
+                  <td class="text-red">R${item.total_cost_loss?.toFixed(2) || '0.00'}</td>
+                  <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
+                  <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
 
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="p-2 text-left border">Product Code</th>
-            <th className="p-2 text-left border">Product Name</th>
-            <th className="p-2 text-left border">Quantity</th>
-            <th className="p-2 text-left border">Selling Price</th>
-            <th className="p-2 text-left border">Total Loss</th>
-            <th className="p-2 text-left border">Batch Date</th>
-            <th className="p-2 text-left border">Removal Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredItems.map(item => (
-            <tr key={item.id} className="border-b">
-              <td className="p-2 border">{item.products?.code || 'N/A'}</td>
-              <td className="p-2 border">{item.product_name}</td>
-              <td className="p-2 border">{item.quantity}</td>
-              <td className="p-2 border">R{item.selling_price?.toFixed(2) || '0.00'}</td>
-              <td className="p-2 border font-semibold">R{item.total_cost_loss?.toFixed(2) || '0.00'}</td>
-              <td className="p-2 border">{format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
-              <td className="p-2 border">{format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+    const printWindow = window.open('', '_blank');
+    printWindow?.document.write(printContent);
+    printWindow?.document.close();
+    printWindow?.focus();
+    setTimeout(() => {
+      printWindow?.print();
+    }, 500);
+  };
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
@@ -341,40 +369,60 @@ const ExpiredStockPage = () => {
         Record and manage expired products to minimize waste and keep inventory accurate.
       </p>
 
-      {/* Analytics Tabs */}
-      <Tabs defaultValue="day" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="day" onClick={() => setTimeRange('day')}>Daily</TabsTrigger>
-          <TabsTrigger value="week" onClick={() => setTimeRange('week')}>Weekly</TabsTrigger>
-          <TabsTrigger value="month" onClick={() => setTimeRange('month')}>Monthly</TabsTrigger>
-        </TabsList>
-        
-        {/* Loss Summary */}
-        <Card className="bg-red-50 border-red-200 mt-4">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Total Items Lost ({timeRange})</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Total Financial Loss ({timeRange})</p>
-                <p className="text-2xl font-bold text-red-600">
-                  R{filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Average Loss Per Item ({timeRange})</p>
-                <p className="text-2xl font-bold text-red-600">
-                  R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}
-                </p>
-              </div>
+      {/* Time Range Selector */}
+      <div className="flex gap-2">
+        <Button 
+          variant={timeRange === 'day' ? 'default' : 'outline'}
+          onClick={() => setTimeRange('day')}
+        >
+          Daily
+        </Button>
+        <Button 
+          variant={timeRange === 'week' ? 'default' : 'outline'}
+          onClick={() => setTimeRange('week')}
+        >
+          Weekly
+        </Button>
+        <Button 
+          variant={timeRange === 'month' ? 'default' : 'outline'}
+          onClick={() => setTimeRange('month')}
+        >
+          Monthly
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={handlePrint}
+          className="ml-auto"
+        >
+          Print Report
+        </Button>
+      </div>
+
+      {/* Loss Summary */}
+      <Card className="bg-red-50 border-red-200">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Total Items Lost ({timeRange})</p>
+              <p className="text-2xl font-bold text-red-600">
+                {filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      </Tabs>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Total Financial Loss ({timeRange})</p>
+              <p className="text-2xl font-bold text-red-600">
+                R{filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Average Loss Per Item ({timeRange})</p>
+              <p className="text-2xl font-bold text-red-600">
+                R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       
       {/* Add/Edit Expired Item Form */}
       <Card>
@@ -382,7 +430,7 @@ const ExpiredStockPage = () => {
           <CardTitle>{editingItem ? 'Edit Expired Item' : 'Log Expired Item'}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={editingItem ? handleEditSubmit : handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="relative">
                 <label className="block text-sm font-medium mb-1">Select Product *</label>
@@ -392,22 +440,16 @@ const ExpiredStockPage = () => {
                     <Input
                       placeholder="Search by name or barcode"
                       className="border-0 pl-2 focus-visible:ring-0 focus-visible:ring-offset-0"
-                      value={editingItem ? editingItem.product_name : searchTerm}
-                      onChange={(e) => editingItem ? 
-                        setEditingItem({...editingItem, product_name: e.target.value}) : 
-                        setSearchTerm(e.target.value)
-                      }
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                       onFocus={() => setIsProductDropdownOpen(true)}
-                      readOnly={!!editingItem}
                     />
-                    {!editingItem && (
-                      <ChevronDown 
-                        className="h-4 w-4 mr-3 text-gray-400 cursor-pointer" 
-                        onClick={() => setIsProductDropdownOpen(!isProductDropdownOpen)}
-                      />
-                    )}
+                    <ChevronDown 
+                      className="h-4 w-4 mr-3 text-gray-400 cursor-pointer" 
+                      onClick={() => setIsProductDropdownOpen(!isProductDropdownOpen)}
+                    />
                   </div>
-                  {isProductDropdownOpen && !editingItem && (
+                  {isProductDropdownOpen && (
                     <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border max-h-60 overflow-auto">
                       {filteredProducts.length > 0 ? (
                         filteredProducts.map(product => (
@@ -426,21 +468,19 @@ const ExpiredStockPage = () => {
                     </div>
                   )}
                 </div>
-                {(formData.productId || editingItem) && (
+                {formData.productId && (
                   <div className="mt-2 p-2 bg-gray-50 rounded-md">
-                    <div className="font-medium">Selected: {editingItem ? editingItem.product_name : formData.productName}</div>
-                    {!editingItem && (
-                      <button
-                        type="button"
-                        className="text-sm text-red-500 mt-1"
-                        onClick={() => {
-                          setFormData({...formData, productId: '', productName: ''});
-                          setSearchTerm('');
-                        }}
-                      >
-                        Clear selection
-                      </button>
-                    )}
+                    <div className="font-medium">Selected: {formData.productName}</div>
+                    <button
+                      type="button"
+                      className="text-sm text-red-500 mt-1"
+                      onClick={() => {
+                        setFormData({...formData, productId: '', productName: ''});
+                        setSearchTerm('');
+                      }}
+                    >
+                      Clear selection
+                    </button>
                   </div>
                 )}
               </div>
@@ -450,11 +490,8 @@ const ExpiredStockPage = () => {
                 <Input
                   type="number"
                   placeholder="Quantity lost"
-                  value={editingItem ? editingItem.quantity : formData.quantity}
-                  onChange={(e) => editingItem ? 
-                    setEditingItem({...editingItem, quantity: e.target.value}) : 
-                    setFormData({...formData, quantity: e.target.value})
-                  }
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({...formData, quantity: e.target.value})}
                   required
                 />
               </div>
@@ -465,11 +502,8 @@ const ExpiredStockPage = () => {
                   type="number"
                   step="0.01"
                   placeholder="0.00"
-                  value={editingItem ? editingItem.selling_price.toString() : formData.sellingPrice}
-                  onChange={(e) => editingItem ? 
-                    setEditingItem({...editingItem, selling_price: parseFloat(e.target.value) || 0}) : 
-                    setFormData({...formData, sellingPrice: e.target.value})
-                  }
+                  value={formData.sellingPrice}
+                  onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})}
                   required
                 />
               </div>
@@ -480,20 +514,16 @@ const ExpiredStockPage = () => {
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(editingItem ? new Date(editingItem.batch_date) : formData.batchDate, "PPP")}
+                      {format(formData.batchDate, "PPP")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
-                      selected={editingItem ? new Date(editingItem.batch_date) : formData.batchDate}
+                      selected={formData.batchDate}
                       onSelect={(date) => {
                         if (date) {
-                          if (editingItem) {
-                            setEditingItem({...editingItem, batch_date: format(date, 'yyyy-MM-dd')});
-                          } else {
-                            setFormData({...formData, batchDate: date});
-                          }
+                          setFormData({...formData, batchDate: date});
                           setIsBatchCalendarOpen(false);
                         }
                       }}
@@ -509,20 +539,16 @@ const ExpiredStockPage = () => {
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(editingItem ? new Date(editingItem.removal_date) : formData.removalDate, "PPP")}
+                      {format(formData.removalDate, "PPP")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
-                      selected={editingItem ? new Date(editingItem.removal_date) : formData.removalDate}
+                      selected={formData.removalDate}
                       onSelect={(date) => {
                         if (date) {
-                          if (editingItem) {
-                            setEditingItem({...editingItem, removal_date: format(date, 'yyyy-MM-dd')});
-                          } else {
-                            setFormData({...formData, removalDate: date});
-                          }
+                          setFormData({...formData, removalDate: date});
                           setIsRemovalCalendarOpen(false);
                         }
                       }}
@@ -560,29 +586,8 @@ const ExpiredStockPage = () => {
       
       {/* Expired Items List */}
       <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
           <CardTitle>Expired Items History</CardTitle>
-          <div className="flex flex-col md:flex-row gap-2">
-            <Select value={timeRange} onValueChange={(value) => setTimeRange(value as 'day' | 'week' | 'month')}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Time Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="day">Daily</SelectItem>
-                <SelectItem value="week">Weekly</SelectItem>
-                <SelectItem value="month">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
-            <ReactToPrint
-              trigger={() => (
-                <Button variant="outline" className="gap-2">
-                  <Printer className="h-4 w-4" />
-                  Print Report
-                </Button>
-              )}
-              content={() => reportRef.current}
-            />
-          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -600,16 +605,9 @@ const ExpiredStockPage = () => {
                       className="cursor-pointer"
                       onClick={() => requestSort('total_cost_loss')}
                     >
-                      <div className="flex items-center gap-1">
-                        Total Loss (ZAR)
-                        {sortConfig.key === 'total_cost_loss' ? (
-                          sortConfig.direction === 'asc' ? (
-                            <ArrowUp className="h-4 w-4" />
-                          ) : (
-                            <ArrowDown className="h-4 w-4" />
-                          )
-                        ) : null}
-                      </div>
+                      Total Loss (ZAR) {sortConfig.key === 'total_cost_loss' && (
+                        sortConfig.direction === 'asc' ? '↑' : '↓'
+                      )}
                     </TableHead>
                     <TableHead>Batch Date</TableHead>
                     <TableHead>Removal Date</TableHead>
@@ -661,11 +659,6 @@ const ExpiredStockPage = () => {
           )}
         </CardContent>
       </Card>
-      
-      {/* Hidden report for printing */}
-      <div className="hidden">
-        <Report />
-      </div>
       
       <Navigation />
     </div>
