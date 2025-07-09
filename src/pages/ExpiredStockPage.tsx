@@ -197,7 +197,9 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
-      const totalLoss = parseFloat(formData.quantity) * parseFloat(formData.sellingPrice);
+      const quantity = parseFloat(formData.quantity);
+      const sellingPrice = parseFloat(formData.sellingPrice);
+      const totalLoss = quantity * sellingPrice;
 
       const { error } = await supabase
         .from('expired_items')
@@ -205,7 +207,7 @@ const ExpiredStockPage = () => {
           product_id: formData.productId,
           product_name: formData.productName,
           quantity: formData.quantity,
-          selling_price: parseFloat(formData.sellingPrice),
+          selling_price: sellingPrice,
           total_cost_loss: totalLoss,
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
@@ -223,7 +225,7 @@ const ExpiredStockPage = () => {
         batchDate: new Date(),
         removalDate: new Date(),
       });
-      toast("Expired item logged successfully!");
+      toast.success("Expired item logged successfully!");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -237,7 +239,9 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
-      const totalLoss = parseFloat(updatedItem.quantity) * updatedItem.selling_price;
+      const quantity = parseFloat(updatedItem.quantity);
+      const sellingPrice = updatedItem.selling_price;
+      const totalLoss = quantity * sellingPrice;
 
       const { error } = await supabase
         .from('expired_items')
@@ -245,7 +249,7 @@ const ExpiredStockPage = () => {
           product_id: updatedItem.product_id,
           product_name: updatedItem.product_name,
           quantity: updatedItem.quantity,
-          selling_price: updatedItem.selling_price,
+          selling_price: sellingPrice,
           total_cost_loss: totalLoss,
           batch_date: format(new Date(updatedItem.batch_date), 'yyyy-MM-dd'),
           removal_date: format(new Date(updatedItem.removal_date), 'yyyy-MM-dd')
@@ -257,7 +261,7 @@ const ExpiredStockPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expired-items'] });
       setEditingItem(null);
-      toast("Expired item updated successfully!");
+      toast.success("Expired item updated successfully!");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -276,7 +280,7 @@ const ExpiredStockPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expired-items'] });
-      toast("Item removed from expired records");
+      toast.success("Item removed from expired records");
     },
     onError: (error: Error) => {
       toast.error(error.message);
