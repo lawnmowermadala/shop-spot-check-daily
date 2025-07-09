@@ -126,21 +126,13 @@ const UserManual = () => {
                       Create shop areas that need regular checking. Each area should have a clear name and description.
                     </p>
                   </li>
-                   <li className="bg-gray-50 p-3 rounded">
-                     <div className="font-medium">Assigning Tasks</div>
-                     <p className="text-sm text-gray-600 mt-1">
-                       Click "Assign to..." on any area to delegate inspection responsibility to staff members.
-                       Type to search and filter staff names in the dropdown. Click "Cancel / Don't assign" to close 
-                       the dropdown without making a selection.
-                     </p>
-                   </li>
-                   <li className="bg-gray-50 p-3 rounded">
-                     <div className="font-medium">Managing Areas</div>
-                     <p className="text-sm text-gray-600 mt-1">
-                       Each area has edit and delete buttons. Click the edit button to modify the name and description.
-                       Use the delete button with password confirmation to permanently remove areas.
-                     </p>
-                   </li>
+                  <li className="bg-gray-50 p-3 rounded">
+                    <div className="font-medium">Assigning Tasks</div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Click "Assign" on any area to delegate inspection responsibility to staff members.
+                      You can provide specific instructions and even attach a reference photo.
+                    </p>
+                  </li>
                   <li className="bg-gray-50 p-3 rounded">
                     <div className="font-medium">Assignment Status Tracker</div>
                     <p className="text-sm text-gray-600 mt-1">

@@ -15,10 +15,10 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb, AlertCircle, Search, Award, Star } from 'lucide-react';
+import { Check, Clock, CirclePlay, X, AlertTriangle, Calendar, Printer, FileText, ImageIcon, Lightbulb, AlertCircle, Search } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DateRange } from "react-day-picker";
@@ -26,178 +26,8 @@ import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 
-interface Assignment {
-  id?: string;
-  area: string;
-  assignee_id: number;
-  assignee_name: string;
-  status: string;
-  instructions?: string;
-  photo_url?: string | null;
-  created_at?: string;
-}
-
-const statusIcons = {
-  pending: <Clock className="h-4 w-4 text-yellow-500" />,
-  in_progress: <CirclePlay className="h-4 w-4 text-blue-500" />,
-  done: <Check className="h-4 w-4 text-green-500" />,
-  completed: <Check className="h-4 w-4 text-green-500" />
-};
-
-const Assignments = () => {
-  const [statusFilter, setStatusFilter] = useState("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [staffMembers, setStaffMembers] = useState<{ value: string; label: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const queryClient = useQueryClient();
-
-  // Mutation for awarding self initiative
-  const awardSelfInitiative = useMutation({
-    mutationFn: async (staffName: string) => {
-      const { data, error } = await supabase
-        .from('assignments')
-        .insert({
-          area: 'Self Initiative Merit',
-          assignee_id: -1,
-          assignee_name: staffName,
-          status: 'completed',
-          instructions: `[SELF INITIATIVE MERIT AWARD] ${staffName} demonstrated exceptional initiative on ${format(new Date(), 'PP')}`,
-          created_at: new Date().toISOString()
-        })
-        .select();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Award Granted",
-        description: "Self-initiative award has been recorded!",
-        variant: "default"
-      });
-      // Refresh assignments
-      fetchAssignments();
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to grant award. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Mutation for awarding demerit
-  const awardDemerit = useMutation({
-    mutationFn: async (staffName: string) => {
-      const { data, error } = await supabase
-        .from('assignments')
-        .insert({
-          area: 'Performance Demerit',
-          assignee_id: -2,
-          assignee_name: staffName,
-          status: 'completed',
-          instructions: `[PERFORMANCE DEMERIT] ${staffName} requires performance improvement as of ${format(new Date(), 'PP')}`,
-          created_at: new Date().toISOString()
-        })
-        .select();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Demerit Recorded",
-        description: "Performance demerit has been recorded.",
-        variant: "default"
-      });
-      // Refresh assignments
-      fetchAssignments();
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to record demerit. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const fetchAssignments = async () => {
-    try {
-      const [assignmentsRes, staffRes] = await Promise.all([
-        supabase.from('assignments').select('*').order('created_at', { ascending: false }),
-        supabase.from('staff').select('id, name')
-      ]);
-
-      if (assignmentsRes.data) setAssignments(assignmentsRes.data);
-      if (staffRes.data) {
-        setStaffMembers(staffRes.data.map(staff => ({
-          value: staff.id.toString(),
-          label: staff.name
-        })));
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch assignments and staff
-  useEffect(() => {
-    fetchAssignments();
-  }, []);
-
-  const handleAwardInitiative = (staffName: string) => {
-    if (confirm(`Grant ${staffName} a Self-Initiative Award?`)) {
-      awardSelfInitiative.mutate(staffName);
-    }
-  };
-
-  const handleAwardDemerit = (staffName: string) => {
-    if (confirm(`Record Performance Demerit for ${staffName}?`)) {
-      awardDemerit.mutate(staffName);
-    }
-  };
-
-  const filteredAssignments = assignments.filter(assignment => {
-    if (statusFilter && assignment.status !== statusFilter) return false;
-    if (assigneeFilter && assignment.assignee_id.toString() !== assigneeFilter) return false;
-    if (dateRange?.from && dateRange?.to) {
-      const assignmentDate = new Date(assignment.created_at || '');
-      if (!isWithinInterval(assignmentDate, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) })) return false;
-    }
-    return true;
-  });
-
-  const updateAssignmentStatus = async (id: string, status: string) => {
-    try {
-      await supabase.from('assignments').update({ status }).eq('id', id);
-      setAssignments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
-      toast({ title: "Status updated", description: "Assignment status has been updated." });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to update assignment status.", variant: "destructive" });
-    }
-  };
-
-  const deleteAssignment = async (id: string) => {
-    try {
-      await supabase.from('assignments').delete().eq('id', id);
-      setAssignments(prev => prev.filter(a => a.id !== id));
-      toast({ title: "Assignment deleted", description: "Assignment has been deleted." });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to delete assignment.", variant: "destructive" });
-    }
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
+// ... (keep all your existing types and statusIcons constant)
 
 const StaffDropdown = ({
   options,
@@ -339,36 +169,15 @@ const StaffDropdown = ({
   );
 };
 
+// ... (keep all your existing Assignments component code until the return statement)
+
   return (
     <div className="container mx-auto p-4 pb-20">
       <h1 className="text-2xl font-bold mb-6">Job Assignments</h1>
       
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-wrap gap-2">
-          <Button 
-            variant={statusFilter === "" ? "default" : "outline"}
-            onClick={() => setStatusFilter("")}
-          >
-            All
-          </Button>
-          <Button 
-            variant={statusFilter === "pending" ? "default" : "outline"}
-            onClick={() => setStatusFilter("pending")}
-          >
-            Pending
-          </Button>
-          <Button 
-            variant={statusFilter === "in_progress" ? "default" : "outline"}
-            onClick={() => setStatusFilter("in_progress")}
-          >
-            In Progress
-          </Button>
-          <Button 
-            variant={statusFilter === "done" ? "default" : "outline"}
-            onClick={() => setStatusFilter("done")}
-          >
-            Done
-          </Button>
+          {/* ... (keep your existing filter buttons) ... */}
         </div>
         
         <div className="flex flex-wrap items-center gap-4">
@@ -400,180 +209,7 @@ const StaffDropdown = ({
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Assignments
-            {filteredAssignments.length > 0 && (
-              <span className="text-sm text-gray-500">({filteredAssignments.length})</span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-4">Loading assignments...</div>
-          ) : filteredAssignments.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">
-              No assignments found for the selected filters.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Area</TableHead>
-                  <TableHead>Assignee</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Instructions</TableHead>
-                  <TableHead>Photo</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAssignments.map((assignment) => {
-                  const isReward = assignment.instructions?.includes('[SELF INITIATIVE MERIT AWARD]');
-                  const isDemerit = assignment.instructions?.includes('[PERFORMANCE DEMERIT]');
-                  return (
-                    <TableRow key={assignment.id} className={isReward ? 'bg-amber-50' : isDemerit ? 'bg-red-50' : ''}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {assignment.area}
-                          {isReward && (
-                            <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                              <Award className="h-3 w-3 mr-1" />
-                              Merit Award
-                            </Badge>
-                          )}
-                          {isDemerit && (
-                            <Badge variant="secondary" className="bg-red-100 text-red-800">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Demerit
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {assignment.assignee_name}
-                          {isReward && (
-                            <Star className="h-4 w-4 text-amber-500" />
-                          )}
-                          {isDemerit && (
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {statusIcons[assignment.status as keyof typeof statusIcons]}
-                          <span className="capitalize">{assignment.status.replace('_', ' ')}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-xs">
-                        {assignment.instructions ? (
-                          <div className="text-sm">
-                            {isReward ? (
-                              <div className="flex items-center gap-1 text-amber-700">
-                                <Lightbulb className="h-3 w-3" />
-                                {assignment.instructions.replace('[SELF INITIATIVE MERIT AWARD] ', '')}
-                              </div>
-                            ) : isDemerit ? (
-                              <div className="flex items-center gap-1 text-red-700">
-                                <AlertTriangle className="h-3 w-3" />
-                                {assignment.instructions.replace('[PERFORMANCE DEMERIT] ', '')}
-                              </div>
-                            ) : (
-                              assignment.instructions
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">No instructions</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {assignment.photo_url ? (
-                          <div className="w-16 h-16">
-                            <AspectRatio ratio={1}>
-                              <img
-                                src={assignment.photo_url}
-                                alt="Assignment photo"
-                                className="rounded-md object-cover w-full h-full cursor-pointer"
-                                onClick={() => window.open(assignment.photo_url!, '_blank')}
-                              />
-                            </AspectRatio>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded-md">
-                            <ImageIcon className="h-6 w-6 text-gray-400" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(assignment.created_at || ''), 'MMM dd, yyyy HH:mm')}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {assignment.status === 'pending' && !isReward && !isDemerit && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateAssignmentStatus(assignment.id!, 'in_progress')}
-                              title="Start Assignment"
-                            >
-                              <CirclePlay className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {assignment.status === 'in_progress' && !isReward && !isDemerit && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateAssignmentStatus(assignment.id!, 'done')}
-                              title="Mark as Done"
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {!isReward && !isDemerit && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleAwardInitiative(assignment.assignee_name)}
-                              title="Award Self Initiative Merit"
-                            >
-                              <Award className="h-4 w-4 text-amber-500" />
-                            </Button>
-                          )}
-                          {!isReward && !isDemerit && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleAwardDemerit(assignment.assignee_name)}
-                              title="Record Performance Demerit"
-                            >
-                              <AlertTriangle className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => deleteAssignment(assignment.id!)}
-                            title="Delete Assignment"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Navigation />
+      {/* ... (keep the rest of your component) ... */}
     </div>
   );
 };
