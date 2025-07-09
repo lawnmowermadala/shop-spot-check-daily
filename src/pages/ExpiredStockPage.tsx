@@ -1,8 +1,7 @@
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
-import { Calendar as CalendarIcon, AlertTriangle, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Navigation from '@/components/Navigation';
 
 // Types
@@ -22,7 +20,6 @@ interface ExpiredItem {
   batch_date: string;
   removal_date: string;
   product_id?: string;
-  cost_per_unit: number;
   selling_price: number;
   total_cost_loss: number;
   created_at?: string;
@@ -41,11 +38,12 @@ interface Product {
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
   const [date, setDate] = useState<Date>(new Date());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [formData, setFormData] = useState({
     productId: '',
     productName: '',
     quantity: '',
-    costPerUnit: '',
     sellingPrice: '',
     batchDate: new Date(),
     removalDate: new Date(),
@@ -65,6 +63,12 @@ const ExpiredStockPage = () => {
     }
   });
 
+  // Filter products based on search term
+  const filteredProducts = products.filter(product => 
+    product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    product.code.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   // Fetch expired items with product details
   const { data: expiredItems = [], isLoading } = useQuery({
     queryKey: ['expired-items'],
@@ -83,15 +87,14 @@ const ExpiredStockPage = () => {
   });
 
   // Handle product selection
-  const handleProductSelect = (productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (product) {
-      setFormData({
-        ...formData, 
-        productId, 
-        productName: product.name
-      });
-    }
+  const handleProductSelect = (productId: string, productName: string) => {
+    setFormData({
+      ...formData, 
+      productId, 
+      productName
+    });
+    setSearchTerm('');
+    setIsProductDropdownOpen(false);
   };
 
   // Add expired item mutation
@@ -101,14 +104,16 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
+      const totalLoss = parseFloat(formData.quantity) * parseFloat(formData.sellingPrice);
+
       const { error } = await supabase
         .from('expired_items')
         .insert({
           product_id: formData.productId,
           product_name: formData.productName,
           quantity: formData.quantity,
-          cost_per_unit: parseFloat(formData.costPerUnit) || 0,
           selling_price: parseFloat(formData.sellingPrice),
+          total_cost_loss: totalLoss,
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
         });
@@ -121,7 +126,6 @@ const ExpiredStockPage = () => {
         productId: '',
         productName: '',
         quantity: '',
-        costPerUnit: '',
         sellingPrice: '',
         batchDate: new Date(),
         removalDate: new Date(),
@@ -182,13 +186,13 @@ const ExpiredStockPage = () => {
               <div className="text-center">
                 <p className="text-sm text-gray-600">Total Financial Loss</p>
                 <p className="text-2xl font-bold text-red-600">
-                  £{expiredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
+                  R{expiredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-gray-600">Average Loss Per Item</p>
                 <p className="text-2xl font-bold text-red-600">
-                  £{expiredItems.length > 0 ? (expiredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / expiredItems.length).toFixed(2) : '0.00'}
+                  R{expiredItems.length > 0 ? (expiredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / expiredItems.length).toFixed(2) : '0.00'}
                 </p>
               </div>
             </div>
@@ -204,20 +208,57 @@ const ExpiredStockPage = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium mb-1">Select Product *</label>
-                <Select onValueChange={handleProductSelect} value={formData.productId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map(product => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.code} - {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <div className="flex items-center border rounded-md">
+                    <Search className="ml-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name or barcode"
+                      className="border-0 pl-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onFocus={() => setIsProductDropdownOpen(true)}
+                    />
+                    <ChevronDown 
+                      className="h-4 w-4 mr-3 text-gray-400 cursor-pointer" 
+                      onClick={() => setIsProductDropdownOpen(!isProductDropdownOpen)}
+                    />
+                  </div>
+                  {isProductDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border max-h-60 overflow-auto">
+                      {filteredProducts.length > 0 ? (
+                        filteredProducts.map(product => (
+                          <div
+                            key={product.id}
+                            className="p-2 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => handleProductSelect(product.id, product.name)}
+                          >
+                            <div className="font-medium">{product.name}</div>
+                            <div className="text-sm text-gray-500">{product.code}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-gray-500">No products found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {formData.productId && (
+                  <div className="mt-2 p-2 bg-gray-50 rounded-md">
+                    <div className="font-medium">Selected: {formData.productName}</div>
+                    <button
+                      type="button"
+                      className="text-sm text-red-500 mt-1"
+                      onClick={() => {
+                        setFormData({...formData, productId: '', productName: ''});
+                        setSearchTerm('');
+                      }}
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                )}
               </div>
               
               <div>
@@ -232,18 +273,7 @@ const ExpiredStockPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Cost Per Unit</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={formData.costPerUnit}
-                  onChange={(e) => setFormData({...formData, costPerUnit: e.target.value})}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Selling Price Per Unit *</label>
+                <label className="block text-sm font-medium mb-1">Selling Price Per Unit (ZAR) *</label>
                 <Input
                   type="number"
                   step="0.01"
@@ -322,8 +352,8 @@ const ExpiredStockPage = () => {
                     <TableHead>Product Code</TableHead>
                     <TableHead>Product Name</TableHead>
                     <TableHead>Quantity Lost</TableHead>
-                    <TableHead>Selling Price</TableHead>
-                    <TableHead>Total Loss</TableHead>
+                    <TableHead>Selling Price (ZAR)</TableHead>
+                    <TableHead>Total Loss (ZAR)</TableHead>
                     <TableHead>Batch Date</TableHead>
                     <TableHead>Removal Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -337,9 +367,9 @@ const ExpiredStockPage = () => {
                       </TableCell>
                       <TableCell>{item.product_name}</TableCell>
                       <TableCell>{item.quantity}</TableCell>
-                      <TableCell>£{item.selling_price?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell>R{item.selling_price?.toFixed(2) || '0.00'}</TableCell>
                       <TableCell className="font-semibold text-red-600">
-                        £{item.total_cost_loss?.toFixed(2) || '0.00'}
+                        R{item.total_cost_loss?.toFixed(2) || '0.00'}
                       </TableCell>
                       <TableCell>{format(parseISO(item.batch_date), 'MMM d, yyyy')}</TableCell>
                       <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
