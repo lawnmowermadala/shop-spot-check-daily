@@ -384,7 +384,8 @@ const ExpiredStockPage = () => {
             <table>
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th>Production Date</th>
+                  <th>Removal Date</th>
                   <th>Product Code</th>
                   <th>Product Name</th>
                   <th>Quantity</th>
@@ -395,6 +396,7 @@ const ExpiredStockPage = () => {
               <tbody>
                 ${filteredItems.map(item => `
                   <tr>
+                    <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
                     <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
                     <td>${item.products?.code || 'N/A'}</td>
                     <td>${item.product_name}</td>
@@ -418,21 +420,23 @@ const ExpiredStockPage = () => {
                 </div>
                 <table>
                   <thead>
-                    <tr>
-                      <th>Date</th>
+                     <tr>
+                      <th>Production Date</th>
+                      <th>Removal Date</th>
                       <th>Quantity</th>
                       <th>Unit Price</th>
                       <th>Total Loss</th>
-                    </tr>
+                     </tr>
                   </thead>
                   <tbody>
                     ${summary.items.map(item => `
-                      <tr>
+                       <tr>
+                        <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
                         <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
                         <td>${item.quantity}</td>
                         <td>R${item.selling_price?.toFixed(2)}</td>
                         <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
-                      </tr>
+                       </tr>
                     `).join('')}
                   </tbody>
                 </table>
@@ -615,7 +619,7 @@ const ExpiredStockPage = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">Batch Date</label>
+                <label className="block text-sm font-medium mb-1">Production Date</label>
                 <Popover open={isBatchCalendarOpen} onOpenChange={setIsBatchCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
@@ -750,12 +754,13 @@ const ExpiredStockPage = () => {
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Product Code</TableHead>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Unit Price</TableHead>
+                     <TableRow>
+                       <TableHead>Production Date</TableHead>
+                       <TableHead>Removal Date</TableHead>
+                       <TableHead>Product Code</TableHead>
+                       <TableHead>Product Name</TableHead>
+                       <TableHead>Quantity</TableHead>
+                       <TableHead>Unit Price</TableHead>
                       <TableHead 
                         className="cursor-pointer"
                         onClick={() => requestSort('total_cost_loss')}
@@ -769,12 +774,13 @@ const ExpiredStockPage = () => {
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map(item => (
-                      <TableRow key={item.id} id={`product-${item.products?.code || 'N/A'}`}>
-                        <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
-                        <TableCell className="font-mono">{item.products?.code || 'N/A'}</TableCell>
-                        <TableCell>{item.product_name}</TableCell>
-                        <TableCell>{item.quantity}</TableCell>
-                        <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
+                       <TableRow key={item.id} id={`product-${item.products?.code || 'N/A'}`}>
+                         <TableCell>{format(parseISO(item.batch_date), 'MMM d, yyyy')}</TableCell>
+                         <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
+                         <TableCell className="font-mono">{item.products?.code || 'N/A'}</TableCell>
+                         <TableCell>{item.product_name}</TableCell>
+                         <TableCell>{item.quantity}</TableCell>
+                         <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
                         <TableCell className="font-semibold text-red-600">
                           R{item.total_cost_loss?.toFixed(2)}
                         </TableCell>
