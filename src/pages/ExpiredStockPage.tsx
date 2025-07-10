@@ -381,30 +381,30 @@ const ExpiredStockPage = () => {
               </tbody>
             </table>
           ` : `
-            <table>
-              <thead>
-                <tr>
-                  <th>Production Date</th>
-                  <th>Removal Date</th>
-                  <th>Product Code</th>
-                  <th>Product Name</th>
-                  <th>Quantity</th>
-                  <th>Unit Price</th>
-                  <th>Total Loss</th>
-                </tr>
-              </thead>
+             <table>
+               <thead>
+                 <tr>
+                   <th>Production Date</th>
+                   <th>Removal Date</th>
+                   <th>Product Code</th>
+                   <th>Product Name</th>
+                   <th>Quantity</th>
+                   <th>Unit Price</th>
+                   <th>Total Loss</th>
+                 </tr>
+               </thead>
               <tbody>
-                ${filteredItems.map(item => `
-                  <tr>
-                    <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
-                    <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
-                    <td>${item.products?.code || 'N/A'}</td>
-                    <td>${item.product_name}</td>
-                    <td>${item.quantity}</td>
-                    <td>R${item.selling_price?.toFixed(2)}</td>
-                    <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
+                 ${filteredItems.map(item => `
+                   <tr>
+                     <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
+                     <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
+                     <td>${item.products?.code || 'N/A'}</td>
+                     <td>${item.product_name}</td>
+                     <td>${item.quantity}</td>
+                     <td>R${item.selling_price?.toFixed(2)}</td>
+                     <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
+                   </tr>
+                 `).join('')}
               </tbody>
             </table>
           `}
@@ -429,15 +429,15 @@ const ExpiredStockPage = () => {
                      </tr>
                   </thead>
                   <tbody>
-                    ${summary.items.map(item => `
+                     ${summary.items.map(item => `
                        <tr>
-                        <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
-                        <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
-                        <td>${item.quantity}</td>
-                        <td>R${item.selling_price?.toFixed(2)}</td>
-                        <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
+                         <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
+                         <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
+                         <td>${item.quantity}</td>
+                         <td>R${item.selling_price?.toFixed(2)}</td>
+                         <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
                        </tr>
-                    `).join('')}
+                     `).join('')}
                   </tbody>
                 </table>
               </div>
