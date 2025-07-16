@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit } from 'lucide-react';
+import { DateRange } from 'react-day-picker';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DateRangePicker } from '@/components/DateRangePicker';
 import Navigation from '@/components/Navigation';
 
 // Types
@@ -52,7 +54,8 @@ const ExpiredStockPage = () => {
   const [isBatchCalendarOpen, setIsBatchCalendarOpen] = useState(false);
   const [isRemovalCalendarOpen, setIsRemovalCalendarOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ExpiredItem | null>(null);
-  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('day');
+  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'custom'>('day');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [reportView, setReportView] = useState<'summary' | 'detailed'>('summary');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItem; direction: 'asc' | 'desc' }>({
     key: 'total_cost_loss',
@@ -126,6 +129,14 @@ const ExpiredStockPage = () => {
       case 'month':
         startDate = startOfMonth(now);
         endDate = endOfMonth(now);
+        break;
+      case 'custom':
+        if (dateRange?.from && dateRange?.to) {
+          startDate = startOfDay(dateRange.from);
+          endDate = endOfDay(dateRange.to);
+        } else {
+          return sortedItems; // Return all items if no custom range selected
+        }
         break;
       default:
         startDate = startOfDay(now);
@@ -488,7 +499,21 @@ const ExpiredStockPage = () => {
           >
             Monthly
           </Button>
+          <Button 
+            variant={timeRange === 'custom' ? 'default' : 'outline'}
+            onClick={() => setTimeRange('custom')}
+          >
+            Custom Range
+          </Button>
         </div>
+        
+        {timeRange === 'custom' && (
+          <DateRangePicker
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            className="w-auto"
+          />
+        )}
         
         <div className="flex gap-2 ml-auto">
           <Select value={reportView} onValueChange={(value) => setReportView(value as 'summary' | 'detailed')}>
