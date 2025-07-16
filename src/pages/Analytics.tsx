@@ -349,11 +349,37 @@ const Analytics = () => {
   // Get unique areas from assignments
   const uniqueAreas = [...new Set(assignments.map(a => a.area))].sort();
 
-  // Count self-initiative awards by staff member
-  const selfInitiativeCounts = filteredAssignments.reduce((acc: Record<string, number>, assignment) => {
-    if (assignment.instructions && assignment.instructions.includes('[SELF INITIATIVE MERIT AWARD]')) {
-      acc[assignment.assignee_name] = (acc[assignment.assignee_name] || 0) + 1;
+  // Filter self-initiative awards by time period
+  const getSelfInitiativeAssignmentsByPeriod = () => {
+    let startDate: Date;
+    let endDate: Date = new Date();
+    
+    switch (timePeriod) {
+      case 'week':
+        startDate = startOfWeek(new Date());
+        break;
+      case 'month':
+        startDate = startOfMonth(new Date());
+        break;
+      case 'year':
+        startDate = startOfYear(new Date());
+        break;
+      default:
+        startDate = startOfWeek(new Date());
     }
+    
+    return assignments.filter(assignment => {
+      if (!assignment.instructions?.includes('[SELF INITIATIVE MERIT AWARD]')) return false;
+      if (!assignment.created_at) return false;
+      
+      const assignmentDate = parseISO(assignment.created_at);
+      return isAfter(assignmentDate, startDate) && isBefore(assignmentDate, endDate);
+    });
+  };
+
+  // Count self-initiative awards by staff member for selected time period
+  const selfInitiativeCounts = getSelfInitiativeAssignmentsByPeriod().reduce((acc: Record<string, number>, assignment) => {
+    acc[assignment.assignee_name] = (acc[assignment.assignee_name] || 0) + 1;
     return acc;
   }, {});
 
@@ -1044,6 +1070,19 @@ const Analytics = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
+                    <div className="mb-4">
+                      <label className="text-sm font-medium mb-2 block">Filter by Period:</label>
+                      <Select value={timePeriod} onValueChange={(value: 'week' | 'month' | 'year') => setTimePeriod(value)}>
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Select time period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="week">This Week</SelectItem>
+                          <SelectItem value="month">This Month</SelectItem>
+                          <SelectItem value="year">This Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-3">
                       {Object.entries(selfInitiativeCounts).length > 0 ? (
                         Object.entries(selfInitiativeCounts)
