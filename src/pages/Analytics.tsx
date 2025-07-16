@@ -82,8 +82,12 @@ const Analytics = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [ratingMode, setRatingMode] = useState(false);
   const [staffToRate, setStaffToRate] = useState<StaffMember | null>(null);
-  const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'year'>('week');
+  const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'year' | 'custom'>('week');
   const [bestStaff, setBestStaff] = useState<{week?: string, month?: string, year?: string}>({});
+  const [initiativeDateRange, setInitiativeDateRange] = useState<DateRange | undefined>({
+    from: new Date(new Date().setDate(new Date().getDate() - 7)),
+    to: new Date()
+  });
 
   // Rating form state
   const [ratingForm, setRatingForm] = useState({
@@ -281,7 +285,7 @@ const Analytics = () => {
   };
 
   const handleNameBestStaff = (staffName: string) => {
-    if (confirm(`Name ${staffName} as the best staff of the ${timePeriod}?`)) {
+    if (timePeriod !== 'custom' && confirm(`Name ${staffName} as the best staff of the ${timePeriod}?`)) {
       nameBestStaff.mutate({ staffName, period: timePeriod });
     }
   };
@@ -354,18 +358,30 @@ const Analytics = () => {
     let startDate: Date;
     let endDate: Date = new Date();
     
-    switch (timePeriod) {
-      case 'week':
-        startDate = startOfWeek(new Date());
-        break;
-      case 'month':
-        startDate = startOfMonth(new Date());
-        break;
-      case 'year':
-        startDate = startOfYear(new Date());
-        break;
-      default:
-        startDate = startOfWeek(new Date());
+    if (timePeriod === 'custom') {
+      // Use custom date range
+      if (!initiativeDateRange?.from || !initiativeDateRange?.to) {
+        // If no custom range set, default to last 7 days
+        startDate = new Date(new Date().setDate(new Date().getDate() - 7));
+      } else {
+        startDate = startOfDay(initiativeDateRange.from);
+        endDate = endOfDay(initiativeDateRange.to);
+      }
+    } else {
+      // Use preset periods
+      switch (timePeriod) {
+        case 'week':
+          startDate = startOfWeek(new Date());
+          break;
+        case 'month':
+          startDate = startOfMonth(new Date());
+          break;
+        case 'year':
+          startDate = startOfYear(new Date());
+          break;
+        default:
+          startDate = startOfWeek(new Date());
+      }
     }
     
     return assignments.filter(assignment => {
@@ -1070,18 +1086,32 @@ const Analytics = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="mb-4">
-                      <label className="text-sm font-medium mb-2 block">Filter by Period:</label>
-                      <Select value={timePeriod} onValueChange={(value: 'week' | 'month' | 'year') => setTimePeriod(value)}>
-                        <SelectTrigger className="w-[200px]">
-                          <SelectValue placeholder="Select time period" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="week">This Week</SelectItem>
-                          <SelectItem value="month">This Month</SelectItem>
-                          <SelectItem value="year">This Year</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="mb-4 space-y-3">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Filter by Period:</label>
+                        <Select value={timePeriod} onValueChange={(value: 'week' | 'month' | 'year' | 'custom') => setTimePeriod(value)}>
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Select time period" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="week">This Week</SelectItem>
+                            <SelectItem value="month">This Month</SelectItem>
+                            <SelectItem value="year">This Year</SelectItem>
+                            <SelectItem value="custom">Custom Date Range</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {timePeriod === 'custom' && (
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Custom Date Range:</label>
+                          <DateRangePicker 
+                            dateRange={initiativeDateRange} 
+                            onDateRangeChange={setInitiativeDateRange}
+                            className="w-full max-w-[300px]" 
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-3">
                       {Object.entries(selfInitiativeCounts).length > 0 ? (
