@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
+import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
 
 // Types
@@ -841,6 +842,9 @@ const ExpiredStockPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* AI Production Analysis Report */}
+      <ProductionAnalysisReport />
       
       <Navigation />
     </div>
