@@ -24,7 +24,6 @@ interface ExpiredItem {
   removal_date: string;
   product_id?: string;
   selling_price: number;
-  total_selling_value: number;
   created_at?: string;
   products?: {
     name: string;
@@ -43,7 +42,11 @@ interface ProductSummary {
   code: string;
   totalQuantity: number;
   totalValue: number;
-  items: ExpiredItem[];
+  items: ExpiredItemWithTotal[];
+}
+
+interface ExpiredItemWithTotal extends ExpiredItem {
+  total_selling_value: number;
 }
 
 const ExpiredStockPage = () => {
@@ -52,11 +55,11 @@ const ExpiredStockPage = () => {
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [isBatchCalendarOpen, setIsBatchCalendarOpen] = useState(false);
   const [isRemovalCalendarOpen, setIsRemovalCalendarOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<ExpiredItem | null>(null);
+  const [editingItem, setEditingItem] = useState<ExpiredItemWithTotal | null>(null);
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'custom'>('day');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [reportView, setReportView] = useState<'summary' | 'detailed'>('summary');
-  const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItem; direction: 'asc' | 'desc' }>({
+  const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItemWithTotal; direction: 'asc' | 'desc' }>({
     key: 'removal_date',
     direction: 'desc',
   });
@@ -82,7 +85,7 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Fetch expired items with calculated selling value
+  // Fetch expired items and calculate total_selling_value on client side
   const { data: expiredItems = [], isLoading: isLoadingExpiredItems } = useQuery({
     queryKey: ['expired-items'],
     queryFn: async () => {
@@ -93,10 +96,12 @@ const ExpiredStockPage = () => {
           products (name, code)
         `);
       if (error) throw error;
+      
+      // Calculate total_selling_value for each item
       return (data as ExpiredItem[]).map(item => ({
         ...item,
         total_selling_value: item.selling_price * parseFloat(item.quantity)
-      }));
+      })) as ExpiredItemWithTotal[];
     }
   });
 
@@ -151,7 +156,7 @@ const ExpiredStockPage = () => {
   const filteredItems = getFilteredItems();
 
   // Group items by product
-  const getProductSummaries = (items: ExpiredItem[]): ProductSummary[] => {
+  const getProductSummaries = (items: ExpiredItemWithTotal[]): ProductSummary[] => {
     const productMap = new Map<string, ProductSummary>();
     
     items.forEach(item => {
@@ -209,7 +214,6 @@ const ExpiredStockPage = () => {
           product_name: formData.productName,
           quantity: formData.quantity,
           selling_price: sellingPrice,
-          total_selling_value: total_selling_value,
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
         });
@@ -235,14 +239,13 @@ const ExpiredStockPage = () => {
 
   // Update expired item
   const updateExpiredItem = useMutation({
-    mutationFn: async (updatedItem: ExpiredItem) => {
+    mutationFn: async (updatedItem: ExpiredItemWithTotal) => {
       if (!updatedItem.product_id || !updatedItem.quantity || !updatedItem.selling_price) {
         throw new Error('Please fill all required fields');
       }
 
       const quantity = parseFloat(updatedItem.quantity);
       const sellingPrice = updatedItem.selling_price;
-      const total_selling_value = quantity * sellingPrice;
 
       const { error } = await supabase
         .from('expired_items')
@@ -251,7 +254,6 @@ const ExpiredStockPage = () => {
           product_name: updatedItem.product_name,
           quantity: updatedItem.quantity,
           selling_price: sellingPrice,
-          total_selling_value: total_selling_value,
           batch_date: format(new Date(updatedItem.batch_date), 'yyyy-MM-dd'),
           removal_date: format(new Date(updatedItem.removal_date), 'yyyy-MM-dd')
         })
@@ -296,7 +298,7 @@ const ExpiredStockPage = () => {
     }
   };
 
-  const startEdit = (item: ExpiredItem) => {
+  const startEdit = (item: ExpiredItemWithTotal) => {
     setEditingItem(item);
     setFormData({
       productId: item.product_id || '',
@@ -456,7 +458,7 @@ const ExpiredStockPage = () => {
     }
   };
 
-  const requestSort = (key: keyof ExpiredItem) => {
+  const requestSort = (key: keyof ExpiredItemWithTotal) => {
     let direction: 'asc' | 'desc' = 'desc';
     if (sortConfig.key === key && sortConfig.direction === 'desc') {
       direction = 'asc';
@@ -879,3 +881,5 @@ const ExpiredStockPage = () => {
     </div>
   );
 };
+
+export default ExpiredStockPage;
