@@ -16,7 +16,6 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
 
-// Types
 interface ExpiredItem {
   id: string;
   product_name: string;
@@ -49,7 +48,6 @@ interface ProductSummary {
 
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
-  const [date, setDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [isBatchCalendarOpen, setIsBatchCalendarOpen] = useState(false);
@@ -79,13 +77,12 @@ const ExpiredStockPage = () => {
         .from('products')
         .select('*')
         .order('name');
-      
       if (error) throw error;
       return data as Product[];
     }
   });
 
-  // Fetch expired items with product details
+  // Fetch expired items with calculated selling value
   const { data: expiredItems = [], isLoading } = useQuery({
     queryKey: ['expired-items'],
     queryFn: async () => {
@@ -96,7 +93,6 @@ const ExpiredStockPage = () => {
           products (name, code)
         `)
         .order('removal_date', { ascending: false });
-      
       if (error) throw error;
       return (data as ExpiredItem[]).map(item => ({
         ...item,
@@ -116,7 +112,7 @@ const ExpiredStockPage = () => {
     return 0;
   });
 
-  // Get filtered items based on time range
+  // Filter items by time range
   const getFilteredItems = () => {
     const now = new Date();
     let startDate, endDate;
@@ -155,7 +151,7 @@ const ExpiredStockPage = () => {
 
   const filteredItems = getFilteredItems();
 
-  // Group items by product for summary view
+  // Group items by product
   const getProductSummaries = (items: ExpiredItem[]): ProductSummary[] => {
     const productMap = new Map<string, ProductSummary>();
     
@@ -185,15 +181,6 @@ const ExpiredStockPage = () => {
 
   const productSummaries = getProductSummaries(filteredItems);
 
-  // Request sort
-  const requestSort = (key: keyof ExpiredItem) => {
-    let direction: 'asc' | 'desc' = 'desc';
-    if (sortConfig.key === key && sortConfig.direction === 'desc') {
-      direction = 'asc';
-    }
-    setSortConfig({ key, direction });
-  };
-
   // Handle product selection
   const handleProductSelect = (productId: string, productName: string) => {
     setFormData({
@@ -205,7 +192,7 @@ const ExpiredStockPage = () => {
     setIsProductDropdownOpen(false);
   };
 
-  // Add expired item mutation
+  // Add expired item
   const addExpiredItem = useMutation({
     mutationFn: async () => {
       if (!formData.productId || !formData.quantity || !formData.sellingPrice) {
@@ -247,7 +234,7 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Update expired item mutation
+  // Update expired item
   const updateExpiredItem = useMutation({
     mutationFn: async (updatedItem: ExpiredItem) => {
       if (!updatedItem.product_id || !updatedItem.quantity || !updatedItem.selling_price) {
@@ -283,14 +270,13 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Delete expired item mutation
+  // Delete expired item
   const deleteExpiredItem = useMutation({
     mutationFn: async (itemId: string) => {
       const { error } = await supabase
         .from('expired_items')
         .delete()
         .eq('id', itemId);
-      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -335,76 +321,93 @@ const ExpiredStockPage = () => {
     });
   };
 
-  // Print report function - optimized for 1-2 pages
+  // Optimized print function
   const handlePrint = () => {
     const totalValue = filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0);
     const totalQuantity = filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
-    const avgValuePerItem = filteredItems.length > 0 ? totalValue / filteredItems.length : 0;
+    const totalProducts = filteredItems.length;
+    const avgValuePerProduct = totalProducts > 0 ? totalValue / totalProducts : 0;
 
     const printContent = `
       <html>
         <head>
           <title>Expired Stock Report</title>
           <style>
-            @page { size: auto; margin: 5mm; }
+            @page { size: A4; margin: 10mm; }
             body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; }
             h1 { font-size: 18px; margin: 5px 0; }
             h2 { font-size: 16px; margin: 5px 0; }
-            h3 { font-size: 14px; margin: 5px 0; }
             .header { text-align: center; margin-bottom: 10px; }
-            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
-            .summary-item { border: 1px solid #ddd; padding: 8px; border-radius: 3px; text-align: center; }
-            .summary-value { font-size: 14px; font-weight: bold; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
-            th, td { border: 1px solid #ddd; padding: 4px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .product-group { margin-top: 15px; break-inside: avoid; }
-            .product-header { background-color: #f8f9fa; padding: 5px; border-radius: 3px; margin-bottom: 5px; }
+            .summary-grid { 
+              display: grid; 
+              grid-template-columns: repeat(4, 1fr); 
+              gap: 10px; 
+              margin-bottom: 15px;
+            }
+            .summary-item { 
+              border: 1px solid #ddd; 
+              padding: 8px; 
+              border-radius: 3px; 
+              text-align: center; 
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-top: 10px; 
+              font-size: 11px;
+              page-break-inside: avoid;
+            }
+            th, td { 
+              border: 1px solid #ddd; 
+              padding: 4px; 
+              text-align: left; 
+            }
             .text-red { color: #dc3545; }
-            .text-bold { font-weight: bold; }
-            .avoid-break { break-inside: avoid; }
-            .compact { margin: 5px 0; }
+            .no-break { page-break-inside: avoid; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>Expired Stock Report</h1>
-            <div class="compact">${format(new Date(), 'PPPP')}</div>
-            <h2>${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} Summary</h2>
+          <div class="header no-break">
+            <h1>Expired Stock Report - ${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)}</h1>
+            <div>Generated: ${format(new Date(), 'PPPPp')}</div>
           </div>
           
-          <div class="summary avoid-break">
+          <div class="summary-grid no-break">
             <div class="summary-item">
-              <div>Total Items Lost</div>
-              <div class="summary-value">${totalQuantity}</div>
+              <div>Products Expired</div>
+              <div class="text-red">${totalProducts}</div>
             </div>
             <div class="summary-item">
-              <div>Total Selling Value</div>
-              <div class="summary-value text-red">R${totalValue.toFixed(2)}</div>
+              <div>Total Units Lost</div>
+              <div class="text-red">${totalQuantity}</div>
             </div>
             <div class="summary-item">
-              <div>Average Value Per Item</div>
-              <div class="summary-value">R${avgValuePerItem.toFixed(2)}</div>
+              <div>Potential Sales Value</div>
+              <div class="text-red">R${totalValue.toFixed(2)}</div>
+            </div>
+            <div class="summary-item">
+              <div>Avg Value Per Product</div>
+              <div class="text-red">R${avgValuePerProduct.toFixed(2)}</div>
             </div>
           </div>
           
-          <h2 class="avoid-break">${reportView === 'summary' ? 'Product Summary' : 'Detailed Items'}</h2>
+          <h2 class="no-break">${reportView === 'summary' ? 'Product Summary' : 'Expired Items Details'}</h2>
           
           ${reportView === 'summary' ? `
-            <table class="avoid-break">
+            <table class="no-break">
               <thead>
                 <tr>
-                  <th>Product Code</th>
-                  <th>Product Name</th>
-                  <th>Total Quantity</th>
-                  <th>Total Value (ZAR)</th>
+                  <th>Product</th>
+                  <th>Code</th>
+                  <th>Units</th>
+                  <th>Total Value</th>
                 </tr>
               </thead>
               <tbody>
                 ${productSummaries.map(summary => `
                   <tr>
-                    <td>${summary.code}</td>
                     <td>${summary.name}</td>
+                    <td>${summary.code}</td>
                     <td>${summary.totalQuantity}</td>
                     <td class="text-red">R${summary.totalValue.toFixed(2)}</td>
                   </tr>
@@ -412,81 +415,46 @@ const ExpiredStockPage = () => {
               </tbody>
             </table>
           ` : `
-             <table class="avoid-break">
-               <thead>
-                 <tr>
-                   <th>Production Date</th>
-                   <th>Removal Date</th>
-                   <th>Product Code</th>
-                   <th>Product Name</th>
-                   <th>Quantity</th>
-                   <th>Unit Price</th>
-                   <th>Total Value</th>
-                 </tr>
-               </thead>
+            <table class="no-break">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Code</th>
+                  <th>Prod Date</th>
+                  <th>Expiry</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
               <tbody>
-                 ${filteredItems.map(item => `
-                   <tr>
-                     <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
-                     <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
-                     <td>${item.products?.code || 'N/A'}</td>
-                     <td>${item.product_name}</td>
-                     <td>${item.quantity}</td>
-                     <td>R${item.selling_price?.toFixed(2)}</td>
-                     <td class="text-red">R${item.total_selling_value?.toFixed(2)}</td>
-                   </tr>
-                 `).join('')}
+                ${filteredItems.map(item => `
+                  <tr>
+                    <td>${item.product_name}</td>
+                    <td>${item.products?.code || 'N/A'}</td>
+                    <td>${format(parseISO(item.batch_date), 'MMM d')}</td>
+                    <td>${format(parseISO(item.removal_date), 'MMM d')}</td>
+                    <td>${item.quantity}</td>
+                    <td>R${item.selling_price?.toFixed(2)}</td>
+                    <td class="text-red">R${item.total_selling_value?.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
               </tbody>
             </table>
           `}
-          
-          ${reportView === 'summary' ? `
-            <h2 class="avoid-break">Detailed Breakdown by Product</h2>
-            <div style="columns: 2; column-gap: 15px;">
-              ${productSummaries.map(summary => `
-                <div class="product-group">
-                  <div class="product-header">
-                    <h3>${summary.name} (${summary.code})</h3>
-                    <div class="compact">Total: ${summary.totalQuantity} units | R${summary.totalValue.toFixed(2)}</div>
-                  </div>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Prod Date</th>
-                        <th>Removal Date</th>
-                        <th>Qty</th>
-                        <th>Price</th>
-                        <th>Value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${summary.items.map(item => `
-                        <tr>
-                          <td>${format(parseISO(item.batch_date), 'MMM d')}</td>
-                          <td>${format(parseISO(item.removal_date), 'MMM d')}</td>
-                          <td>${item.quantity}</td>
-                          <td>R${item.selling_price?.toFixed(2)}</td>
-                          <td class="text-red">R${item.total_selling_value?.toFixed(2)}</td>
-                        </tr>
-                      `).join('')}
-                    </tbody>
-                  </table>
-                </div>
-              `).join('')}
-            </div>
-          ` : ''}
         </body>
       </html>
     `;
 
     const printWindow = window.open('', '_blank');
-    printWindow?.document.write(printContent);
-    printWindow?.document.close();
-    printWindow?.focus();
-    setTimeout(() => {
-      printWindow?.print();
-      printWindow?.close();
-    }, 500);
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    }
   };
 
   return (
@@ -556,24 +524,30 @@ const ExpiredStockPage = () => {
         </div>
       </div>
 
-      {/* Value Summary */}
+      {/* Sales Value Summary */}
       <Card className="bg-red-50 border-red-200">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600">Total Items Lost ({timeRange})</p>
+              <p className="text-sm text-gray-600">Products Expired</p>
+              <p className="text-2xl font-bold text-red-600">
+                {filteredItems.length}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Total Units Lost</p>
               <p className="text-2xl font-bold text-red-600">
                 {filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Total Selling Value ({timeRange})</p>
+              <p className="text-sm text-gray-600">Potential Sales Value</p>
               <p className="text-2xl font-bold text-red-600">
                 R{filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0).toFixed(2)}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Average Value Per Item ({timeRange})</p>
+              <p className="text-sm text-gray-600">Avg Value Per Product</p>
               <p className="text-2xl font-bold text-red-600">
                 R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0) / filteredItems.length).toFixed(2) : '0.00'}
               </p>
@@ -582,7 +556,7 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
       
-      {/* Add/Edit Expired Item Form */}
+      {/* Add/Edit Form */}
       <Card>
         <CardHeader>
           <CardTitle>{editingItem ? 'Edit Expired Item' : 'Log Expired Item'}</CardTitle>
@@ -654,7 +628,7 @@ const ExpiredStockPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Selling Price Per Unit (ZAR) *</label>
+                <label className="block text-sm font-medium mb-1">Selling Price (ZAR) *</label>
                 <Input
                   type="number"
                   step="0.01"
@@ -758,14 +732,7 @@ const ExpiredStockPage = () => {
                       <TableHead>Product Code</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead>Total Quantity</TableHead>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => requestSort('total_selling_value')}
-                      >
-                        Total Value (ZAR) {sortConfig.key === 'total_selling_value' && (
-                          sortConfig.direction === 'asc' ? '↑' : '↓'
-                        )}
-                      </TableHead>
+                      <TableHead>Total Value (ZAR)</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -800,33 +767,26 @@ const ExpiredStockPage = () => {
               ) : (
                 <Table>
                   <TableHeader>
-                     <TableRow>
-                       <TableHead>Production Date</TableHead>
-                       <TableHead>Removal Date</TableHead>
-                       <TableHead>Product Code</TableHead>
-                       <TableHead>Product Name</TableHead>
-                       <TableHead>Quantity</TableHead>
-                       <TableHead>Unit Price</TableHead>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => requestSort('total_selling_value')}
-                      >
-                        Total Value (ZAR) {sortConfig.key === 'total_selling_value' && (
-                          sortConfig.direction === 'asc' ? '↑' : '↓'
-                        )}
-                      </TableHead>
+                    <TableRow>
+                      <TableHead>Production Date</TableHead>
+                      <TableHead>Removal Date</TableHead>
+                      <TableHead>Product Code</TableHead>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Unit Price</TableHead>
+                      <TableHead>Total Value</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map(item => (
-                       <TableRow key={item.id} id={`product-${item.products?.code || 'N/A'}`}>
-                         <TableCell>{format(parseISO(item.batch_date), 'MMM d, yyyy')}</TableCell>
-                         <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
-                         <TableCell className="font-mono">{item.products?.code || 'N/A'}</TableCell>
-                         <TableCell>{item.product_name}</TableCell>
-                         <TableCell>{item.quantity}</TableCell>
-                         <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
+                      <TableRow key={item.id} id={`product-${item.products?.code || 'N/A'}`}>
+                        <TableCell>{format(parseISO(item.batch_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell className="font-mono">{item.products?.code || 'N/A'}</TableCell>
+                        <TableCell>{item.product_name}</TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
                         <TableCell className="font-semibold text-red-600">
                           R{item.total_selling_value?.toFixed(2)}
                         </TableCell>
@@ -863,9 +823,7 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
-      {/* AI Production Analysis Report */}
       <ProductionAnalysisReport />
-      
       <Navigation />
     </div>
   );
