@@ -13,7 +13,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
-import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
 
 interface ExpiredItem {
@@ -363,6 +362,7 @@ const ExpiredStockPage = () => {
             }
             .text-red { color: #dc3545; }
             .no-break { page-break-inside: avoid; }
+            .signature { margin-top: 30px; text-align: right; font-style: italic; }
           </style>
         </head>
         <body>
@@ -441,6 +441,11 @@ const ExpiredStockPage = () => {
               </tbody>
             </table>
           `}
+          
+          <div class="signature no-break">
+            Prepared by: Elton Niati AI Boot agent<br />
+            Date: ${format(new Date(), 'yyyy-MM-dd')}
+          </div>
         </body>
       </html>
     `;
@@ -874,7 +879,6 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
-      <ProductionAnalysisReport />
       <Navigation />
     </div>
   );
