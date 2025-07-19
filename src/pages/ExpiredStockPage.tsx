@@ -25,7 +25,7 @@ interface ExpiredItem {
   removal_date: string;
   product_id?: string;
   selling_price: number;
-  total_cost_loss: number;
+  total_selling_value: number;
   created_at?: string;
   products?: {
     name: string;
@@ -43,7 +43,7 @@ interface ProductSummary {
   name: string;
   code: string;
   totalQuantity: number;
-  totalLoss: number;
+  totalValue: number;
   items: ExpiredItem[];
 }
 
@@ -59,7 +59,7 @@ const ExpiredStockPage = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [reportView, setReportView] = useState<'summary' | 'detailed'>('summary');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItem; direction: 'asc' | 'desc' }>({
-    key: 'total_cost_loss',
+    key: 'total_selling_value',
     direction: 'desc',
   });
   const [formData, setFormData] = useState({
@@ -98,7 +98,10 @@ const ExpiredStockPage = () => {
         .order('removal_date', { ascending: false });
       
       if (error) throw error;
-      return data as ExpiredItem[];
+      return (data as ExpiredItem[]).map(item => ({
+        ...item,
+        total_selling_value: item.selling_price * parseFloat(item.quantity)
+      }));
     }
   });
 
@@ -136,7 +139,7 @@ const ExpiredStockPage = () => {
           startDate = startOfDay(dateRange.from);
           endDate = endOfDay(dateRange.to);
         } else {
-          return sortedItems; // Return all items if no custom range selected
+          return sortedItems;
         }
         break;
       default:
@@ -166,14 +169,14 @@ const ExpiredStockPage = () => {
           name: productName,
           code: productCode,
           totalQuantity: 0,
-          totalLoss: 0,
+          totalValue: 0,
           items: []
         });
       }
       
       const summary = productMap.get(key)!;
       summary.totalQuantity += parseFloat(item.quantity) || 0;
-      summary.totalLoss += item.total_cost_loss || 0;
+      summary.totalValue += item.total_selling_value || 0;
       summary.items.push(item);
     });
     
@@ -209,16 +212,20 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
+      const quantity = parseFloat(formData.quantity);
+      const sellingPrice = parseFloat(formData.sellingPrice);
+      const total_selling_value = quantity * sellingPrice;
+
       const { error } = await supabase
         .from('expired_items')
         .insert({
           product_id: formData.productId,
           product_name: formData.productName,
           quantity: formData.quantity,
-          selling_price: parseFloat(formData.sellingPrice),
+          selling_price: sellingPrice,
+          total_selling_value: total_selling_value,
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
-          // Let the database calculate total_cost_loss
         });
 
       if (error) throw error;
@@ -247,16 +254,20 @@ const ExpiredStockPage = () => {
         throw new Error('Please fill all required fields');
       }
 
+      const quantity = parseFloat(updatedItem.quantity);
+      const sellingPrice = updatedItem.selling_price;
+      const total_selling_value = quantity * sellingPrice;
+
       const { error } = await supabase
         .from('expired_items')
         .update({
           product_id: updatedItem.product_id,
           product_name: updatedItem.product_name,
           quantity: updatedItem.quantity,
-          selling_price: updatedItem.selling_price,
+          selling_price: sellingPrice,
+          total_selling_value: total_selling_value,
           batch_date: format(new Date(updatedItem.batch_date), 'yyyy-MM-dd'),
           removal_date: format(new Date(updatedItem.removal_date), 'yyyy-MM-dd')
-          // Let the database calculate total_cost_loss
         })
         .eq('id', updatedItem.id);
 
@@ -324,61 +335,69 @@ const ExpiredStockPage = () => {
     });
   };
 
-  // Print report function
+  // Print report function - optimized for 1-2 pages
   const handlePrint = () => {
+    const totalValue = filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0);
+    const totalQuantity = filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
+    const avgValuePerItem = filteredItems.length > 0 ? totalValue / filteredItems.length : 0;
+
     const printContent = `
       <html>
         <head>
           <title>Expired Stock Report</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1, h2, h3 { color: #333; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
-            .summary-item { border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
-            .summary-value { font-size: 1.5rem; font-weight: bold; margin-top: 5px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            @page { size: auto; margin: 5mm; }
+            body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; }
+            h1 { font-size: 18px; margin: 5px 0; }
+            h2 { font-size: 16px; margin: 5px 0; }
+            h3 { font-size: 14px; margin: 5px 0; }
+            .header { text-align: center; margin-bottom: 10px; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+            .summary-item { border: 1px solid #ddd; padding: 8px; border-radius: 3px; text-align: center; }
+            .summary-value { font-size: 14px; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+            th, td { border: 1px solid #ddd; padding: 4px; text-align: left; }
             th { background-color: #f2f2f2; }
-            .product-group { margin-top: 30px; }
-            .product-header { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+            .product-group { margin-top: 15px; break-inside: avoid; }
+            .product-header { background-color: #f8f9fa; padding: 5px; border-radius: 3px; margin-bottom: 5px; }
             .text-red { color: #dc3545; }
             .text-bold { font-weight: bold; }
-            .page-break { page-break-after: always; }
+            .avoid-break { break-inside: avoid; }
+            .compact { margin: 5px 0; }
           </style>
         </head>
         <body>
           <div class="header">
             <h1>Expired Stock Report</h1>
-            <h3>${format(new Date(), 'PPPP')}</h3>
+            <div class="compact">${format(new Date(), 'PPPP')}</div>
             <h2>${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} Summary</h2>
           </div>
           
-          <div class="summary">
+          <div class="summary avoid-break">
             <div class="summary-item">
               <div>Total Items Lost</div>
-              <div class="summary-value">${filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}</div>
+              <div class="summary-value">${totalQuantity}</div>
             </div>
             <div class="summary-item">
-              <div>Total Financial Loss</div>
-              <div class="summary-value text-red">R${filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}</div>
+              <div>Total Selling Value</div>
+              <div class="summary-value text-red">R${totalValue.toFixed(2)}</div>
             </div>
             <div class="summary-item">
-              <div>Average Loss Per Item</div>
-              <div class="summary-value">R${filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}</div>
+              <div>Average Value Per Item</div>
+              <div class="summary-value">R${avgValuePerItem.toFixed(2)}</div>
             </div>
           </div>
           
-          <h2>${reportView === 'summary' ? 'Product Summary' : 'Detailed Items'}</h2>
+          <h2 class="avoid-break">${reportView === 'summary' ? 'Product Summary' : 'Detailed Items'}</h2>
           
           ${reportView === 'summary' ? `
-            <table>
+            <table class="avoid-break">
               <thead>
                 <tr>
                   <th>Product Code</th>
                   <th>Product Name</th>
                   <th>Total Quantity</th>
-                  <th>Total Loss (ZAR)</th>
+                  <th>Total Value (ZAR)</th>
                 </tr>
               </thead>
               <tbody>
@@ -387,13 +406,13 @@ const ExpiredStockPage = () => {
                     <td>${summary.code}</td>
                     <td>${summary.name}</td>
                     <td>${summary.totalQuantity}</td>
-                    <td class="text-red">R${summary.totalLoss.toFixed(2)}</td>
+                    <td class="text-red">R${summary.totalValue.toFixed(2)}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
           ` : `
-             <table>
+             <table class="avoid-break">
                <thead>
                  <tr>
                    <th>Production Date</th>
@@ -402,7 +421,7 @@ const ExpiredStockPage = () => {
                    <th>Product Name</th>
                    <th>Quantity</th>
                    <th>Unit Price</th>
-                   <th>Total Loss</th>
+                   <th>Total Value</th>
                  </tr>
                </thead>
               <tbody>
@@ -414,7 +433,7 @@ const ExpiredStockPage = () => {
                      <td>${item.product_name}</td>
                      <td>${item.quantity}</td>
                      <td>R${item.selling_price?.toFixed(2)}</td>
-                     <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
+                     <td class="text-red">R${item.total_selling_value?.toFixed(2)}</td>
                    </tr>
                  `).join('')}
               </tbody>
@@ -422,38 +441,39 @@ const ExpiredStockPage = () => {
           `}
           
           ${reportView === 'summary' ? `
-            <div class="page-break"></div>
-            <h2>Detailed Breakdown by Product</h2>
-            ${productSummaries.map(summary => `
-              <div class="product-group">
-                <div class="product-header">
-                  <h3>${summary.name} (${summary.code})</h3>
-                  <div>Total: ${summary.totalQuantity} units | R${summary.totalLoss.toFixed(2)}</div>
+            <h2 class="avoid-break">Detailed Breakdown by Product</h2>
+            <div style="columns: 2; column-gap: 15px;">
+              ${productSummaries.map(summary => `
+                <div class="product-group">
+                  <div class="product-header">
+                    <h3>${summary.name} (${summary.code})</h3>
+                    <div class="compact">Total: ${summary.totalQuantity} units | R${summary.totalValue.toFixed(2)}</div>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Prod Date</th>
+                        <th>Removal Date</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                        <th>Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${summary.items.map(item => `
+                        <tr>
+                          <td>${format(parseISO(item.batch_date), 'MMM d')}</td>
+                          <td>${format(parseISO(item.removal_date), 'MMM d')}</td>
+                          <td>${item.quantity}</td>
+                          <td>R${item.selling_price?.toFixed(2)}</td>
+                          <td class="text-red">R${item.total_selling_value?.toFixed(2)}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
                 </div>
-                <table>
-                  <thead>
-                     <tr>
-                      <th>Production Date</th>
-                      <th>Removal Date</th>
-                      <th>Quantity</th>
-                      <th>Unit Price</th>
-                      <th>Total Loss</th>
-                     </tr>
-                  </thead>
-                  <tbody>
-                     ${summary.items.map(item => `
-                       <tr>
-                         <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
-                         <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
-                         <td>${item.quantity}</td>
-                         <td>R${item.selling_price?.toFixed(2)}</td>
-                         <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
-                       </tr>
-                     `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            `).join('')}
+              `).join('')}
+            </div>
           ` : ''}
         </body>
       </html>
@@ -465,6 +485,7 @@ const ExpiredStockPage = () => {
     printWindow?.focus();
     setTimeout(() => {
       printWindow?.print();
+      printWindow?.close();
     }, 500);
   };
 
@@ -535,7 +556,7 @@ const ExpiredStockPage = () => {
         </div>
       </div>
 
-      {/* Loss Summary */}
+      {/* Value Summary */}
       <Card className="bg-red-50 border-red-200">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -546,15 +567,15 @@ const ExpiredStockPage = () => {
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Total Financial Loss ({timeRange})</p>
+              <p className="text-sm text-gray-600">Total Selling Value ({timeRange})</p>
               <p className="text-2xl font-bold text-red-600">
-                R{filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
+                R{filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0).toFixed(2)}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Average Loss Per Item ({timeRange})</p>
+              <p className="text-sm text-gray-600">Average Value Per Item ({timeRange})</p>
               <p className="text-2xl font-bold text-red-600">
-                R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}
+                R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0) / filteredItems.length).toFixed(2) : '0.00'}
               </p>
             </div>
           </div>
@@ -739,9 +760,9 @@ const ExpiredStockPage = () => {
                       <TableHead>Total Quantity</TableHead>
                       <TableHead 
                         className="cursor-pointer"
-                        onClick={() => requestSort('total_cost_loss')}
+                        onClick={() => requestSort('total_selling_value')}
                       >
-                        Total Loss (ZAR) {sortConfig.key === 'total_cost_loss' && (
+                        Total Value (ZAR) {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -755,7 +776,7 @@ const ExpiredStockPage = () => {
                         <TableCell>{summary.name}</TableCell>
                         <TableCell>{summary.totalQuantity}</TableCell>
                         <TableCell className="font-semibold text-red-600">
-                          R{summary.totalLoss.toFixed(2)}
+                          R{summary.totalValue.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button 
@@ -764,7 +785,6 @@ const ExpiredStockPage = () => {
                             className="text-blue-500 hover:text-blue-700"
                             onClick={() => {
                               setReportView('detailed');
-                              // Scroll to the first item of this product
                               setTimeout(() => {
                                 document.getElementById(`product-${summary.code}`)?.scrollIntoView();
                               }, 100);
@@ -789,9 +809,9 @@ const ExpiredStockPage = () => {
                        <TableHead>Unit Price</TableHead>
                       <TableHead 
                         className="cursor-pointer"
-                        onClick={() => requestSort('total_cost_loss')}
+                        onClick={() => requestSort('total_selling_value')}
                       >
-                        Total Loss (ZAR) {sortConfig.key === 'total_cost_loss' && (
+                        Total Value (ZAR) {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -808,7 +828,7 @@ const ExpiredStockPage = () => {
                          <TableCell>{item.quantity}</TableCell>
                          <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
                         <TableCell className="font-semibold text-red-600">
-                          R{item.total_cost_loss?.toFixed(2)}
+                          R{item.total_selling_value?.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button 
