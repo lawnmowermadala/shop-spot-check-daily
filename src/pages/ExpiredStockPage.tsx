@@ -363,7 +363,6 @@ const ExpiredStockPage = () => {
             }
             .text-red { color: #dc3545; }
             .no-break { page-break-inside: avoid; }
-            .signature { margin-top: 30px; text-align: right; font-style: italic; }
           </style>
         </head>
         <body>
@@ -382,7 +381,7 @@ const ExpiredStockPage = () => {
               <div class="text-red">${totalQuantity}</div>
             </div>
             <div class="summary-item">
-              <div>Value of Product Sale</div>
+              <div>Potential Sales Value</div>
               <div class="text-red">R${totalValue.toFixed(2)}</div>
             </div>
             <div class="summary-item">
@@ -400,7 +399,7 @@ const ExpiredStockPage = () => {
                   <th>Product</th>
                   <th>Code</th>
                   <th>Units</th>
-                  <th>Value of Product Sale</th>
+                  <th>Total Value</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,7 +423,7 @@ const ExpiredStockPage = () => {
                   <th>Expiry</th>
                   <th>Qty</th>
                   <th>Unit Price</th>
-                  <th>Value of Product Sale</th>
+                  <th>Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -442,11 +441,6 @@ const ExpiredStockPage = () => {
               </tbody>
             </table>
           `}
-          
-          <div class="signature no-break">
-            Prepared by: Elton Niati AI Boot agent<br />
-            Date: ${format(new Date(), 'yyyy-MM-dd')}
-          </div>
         </body>
       </html>
     `;
@@ -565,7 +559,7 @@ const ExpiredStockPage = () => {
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Value of Product Sale</p>
+              <p className="text-sm text-gray-600">Potential Sales Value</p>
               <p className="text-2xl font-bold text-red-600">
                 R{filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0).toFixed(2)}
               </p>
@@ -758,7 +752,7 @@ const ExpiredStockPage = () => {
                         className="cursor-pointer"
                         onClick={() => requestSort('total_selling_value')}
                       >
-                        Value of Product Sale (ZAR) {sortConfig.key === 'total_selling_value' && (
+                        Total Value (ZAR) {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -828,7 +822,7 @@ const ExpiredStockPage = () => {
                         className="cursor-pointer"
                         onClick={() => requestSort('total_selling_value')}
                       >
-                        Value of Product Sale {sortConfig.key === 'total_selling_value' && (
+                        Total {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -885,51 +879,3 @@ const ExpiredStockPage = () => {
     </div>
   );
 };
-
-// Updated Production Analysis Report Component
-const ProductionAnalysisReport = () => {
-  // Mock data for the report
-  const reportData = {
-    unitsProduced: 7116,
-    valueOfProductSale: 15275.79,
-    expiredLoss: 2119.01,
-    wasteRate: 13.87
-  };
-
-  return (
-    <Card className="mt-6">
-      <CardHeader>
-        <CardTitle>Production Analysis Report</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-600">Units Produced</p>
-            <p className="text-2xl font-bold">{reportData.unitsProduced}</p>
-          </div>
-          <div className="bg-green-50 rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-600">Value of Product Sale</p>
-            <p className="text-2xl font-bold">R{reportData.valueOfProductSale.toFixed(2)}</p>
-          </div>
-          <div className="bg-red-50 rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-600">Expired Loss</p>
-            <p className="text-2xl font-bold text-red-600">R{reportData.expiredLoss.toFixed(2)}</p>
-          </div>
-          <div className="bg-orange-50 rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-600">Waste Rate</p>
-            <p className="text-2xl font-bold">{reportData.wasteRate.toFixed(2)}%</p>
-          </div>
-        </div>
-
-        <div className="border-t pt-4">
-          <div className="text-right italic">
-            <p>Prepared by: Elton Niati AI Boot agent</p>
-            <p>Date: {format(new Date(), 'yyyy-MM-dd')}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-export default ExpiredStockPage;
