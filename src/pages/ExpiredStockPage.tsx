@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
+import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
 
 interface ExpiredItem {
@@ -879,8 +880,55 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
+      <ProductionAnalysisReport />
       <Navigation />
     </div>
+  );
+};
+
+// Updated Production Analysis Report Component
+const ProductionAnalysisReport = () => {
+  // Mock data for the report
+  const reportData = {
+    unitsProduced: 7116,
+    valueOfProductSale: 15275.79,
+    expiredLoss: 2119.01,
+    wasteRate: 13.87
+  };
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Production Analysis Report</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-blue-50 rounded-lg p-4 text-center">
+            <p className="text-sm text-gray-600">Units Produced</p>
+            <p className="text-2xl font-bold">{reportData.unitsProduced}</p>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4 text-center">
+            <p className="text-sm text-gray-600">Value of Product Sale</p>
+            <p className="text-2xl font-bold">R{reportData.valueOfProductSale.toFixed(2)}</p>
+          </div>
+          <div className="bg-red-50 rounded-lg p-4 text-center">
+            <p className="text-sm text-gray-600">Expired Loss</p>
+            <p className="text-2xl font-bold text-red-600">R{reportData.expiredLoss.toFixed(2)}</p>
+          </div>
+          <div className="bg-orange-50 rounded-lg p-4 text-center">
+            <p className="text-sm text-gray-600">Waste Rate</p>
+            <p className="text-2xl font-bold">{reportData.wasteRate.toFixed(2)}%</p>
+          </div>
+        </div>
+
+        <div className="border-t pt-4">
+          <div className="text-right italic">
+            <p>Prepared by: Elton Niati AI Boot agent</p>
+            <p>Date: {format(new Date(), 'yyyy-MM-dd')}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
