@@ -56,6 +56,7 @@ const ExpiredStockPage = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [reportView, setReportView] = useState<'summary' | 'detailed'>('summary');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItem; direction: 'asc' | 'desc' }>({
+  const [isGeneratingAIReport, setIsGeneratingAIReport] = useState(false);
     key: 'removal_date',
     direction: 'desc',
   });
@@ -67,7 +68,15 @@ const ExpiredStockPage = () => {
     batchDate: new Date(),
     removalDate: new Date(),
   });
-
+  // Function to handle AI report generation
+  const handleGenerateAIReport = () => {
+    setIsGeneratingAIReport(true);
+    // Simulate AI processing delay
+    setTimeout(() => {
+      setIsGeneratingAIReport(false);
+      toast.success("AI Production Analysis generated!");
+    }, 1500);
+  };
   // Fetch products
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
@@ -885,6 +894,152 @@ const ExpiredStockPage = () => {
           <CardTitle>AI Production Optimization Analysis</CardTitle>
           <div className="text-sm text-gray-500">
             {format(new Date(), 'MMM d, yyyy')} - {format(new Date(), 'MMM d, yyyy')}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-600">Units Produced</p>
+              <p className="text-2xl font-bold">7124</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-600">Selling Value</p>
+              <p className="text-2xl font-bold">R15433.29</p>
+            </div>
+            <div className="bg-red-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-600">Expired Loss</p>
+              <p className="text-2xl font-bold text-red-600">R2119.01</p>
+            </div>
+            <div className="bg-orange-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-600">Waste Rate</p>
+              <p className="text-2xl font-bold">13.73%</p>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="text-right italic">
+              <p>Prepared by: Elton Niati AI Agent</p>
+              <p>Date: {format(new Date(), 'yyyy-MM-dd')}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Navigation />
+    </div>
+  );
+};
+/ Function to print AI report
+  const handlePrintAIReport = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>AI Production Optimization Analysis</title>
+          <style>
+            @page { size: A4; margin: 10mm; }
+            body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; }
+            h1 { font-size: 20px; margin-bottom: 5px; }
+            h2 { font-size: 16px; margin: 15px 0 10px; }
+            .header { text-align: center; margin-bottom: 15px; }
+            .metrics-grid { 
+              display: grid; 
+              grid-template-columns: repeat(4, 1fr); 
+              gap: 15px; 
+              margin-bottom: 20px;
+            }
+            .metric-card { 
+              border: 1px solid #eee; 
+              padding: 15px; 
+              border-radius: 5px; 
+              text-align: center;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .metric-value { font-size: 24px; font-weight: bold; margin: 5px 0; }
+            .signature { margin-top: 30px; text-align: right; font-style: italic; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>AI Production Optimization Analysis</h1>
+            <p>Generated: ${format(new Date(), 'PPPPp')}</p>
+          </div>
+          
+          <div class="metrics-grid">
+            <div class="metric-card" style="background-color: #f0f9ff;">
+              <p>Units Produced</p>
+              <p class="metric-value">7124</p>
+            </div>
+            <div class="metric-card" style="background-color: #f0fdf4;">
+              <p>Selling Value</p>
+              <p class="metric-value">R15433.29</p>
+            </div>
+            <div class="metric-card" style="background-color: #fef2f2;">
+              <p>Expired Loss</p>
+              <p class="metric-value" style="color: #dc2626;">R2119.01</p>
+            </div>
+            <div class="metric-card" style="background-color: #fff7ed;">
+              <p>Waste Rate</p>
+              <p class="metric-value">13.73%</p>
+            </div>
+          </div>
+          
+          <div class="signature">
+            <p>Prepared by: Elton Niati AI Agent</p>
+            <p>Date: ${format(new Date(), 'yyyy-MM-dd')}</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    }
+  };
+
+  return (
+    <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
+      {/* ... [keep all existing JSX up to the Expired Items List card] ... */}
+
+      {/* AI Production Optimization Analysis */}
+      <Card className="mt-6">
+        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <CardTitle>AI Production Optimization Analysis</CardTitle>
+            <div className="text-sm text-gray-500">
+              {format(new Date(), 'MMM d, yyyy')} - {format(new Date(), 'MMM d, yyyy')}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={handleGenerateAIReport}
+              disabled={isGeneratingAIReport}
+            >
+              {isGeneratingAIReport ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate AI Analysis
+                </>
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handlePrintAIReport}
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              Print Report
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
