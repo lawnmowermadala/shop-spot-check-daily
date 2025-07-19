@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
+import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
 
 interface ExpiredItem {
@@ -56,7 +57,7 @@ const ExpiredStockPage = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [reportView, setReportView] = useState<'summary' | 'detailed'>('summary');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItem; direction: 'asc' | 'desc' }>({
-    key: 'removal_date',
+    key: 'total_selling_value',
     direction: 'desc',
   });
   const [formData, setFormData] = useState({
@@ -69,7 +70,7 @@ const ExpiredStockPage = () => {
   });
 
   // Fetch products
-  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+  const { data: products = [] } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -82,7 +83,7 @@ const ExpiredStockPage = () => {
   });
 
   // Fetch expired items with calculated selling value
-  const { data: expiredItems = [], isLoading: isLoadingExpiredItems } = useQuery({
+  const { data: expiredItems = [], isLoading } = useQuery({
     queryKey: ['expired-items'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -90,7 +91,8 @@ const ExpiredStockPage = () => {
         .select(`
           *,
           products (name, code)
-        `);
+        `)
+        .order('removal_date', { ascending: false });
       if (error) throw error;
       return (data as ExpiredItem[]).map(item => ({
         ...item,
@@ -362,7 +364,6 @@ const ExpiredStockPage = () => {
             }
             .text-red { color: #dc3545; }
             .no-break { page-break-inside: avoid; }
-            .signature { margin-top: 30px; text-align: right; font-style: italic; }
           </style>
         </head>
         <body>
@@ -381,7 +382,7 @@ const ExpiredStockPage = () => {
               <div class="text-red">${totalQuantity}</div>
             </div>
             <div class="summary-item">
-              <div>Value of Product Sale</div>
+              <div>Potential Sales Value</div>
               <div class="text-red">R${totalValue.toFixed(2)}</div>
             </div>
             <div class="summary-item">
@@ -399,7 +400,7 @@ const ExpiredStockPage = () => {
                   <th>Product</th>
                   <th>Code</th>
                   <th>Units</th>
-                  <th>Value of Product Sale</th>
+                  <th>Total Value</th>
                 </tr>
               </thead>
               <tbody>
@@ -423,7 +424,7 @@ const ExpiredStockPage = () => {
                   <th>Expiry</th>
                   <th>Qty</th>
                   <th>Unit Price</th>
-                  <th>Value of Product Sale</th>
+                  <th>Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -441,11 +442,6 @@ const ExpiredStockPage = () => {
               </tbody>
             </table>
           `}
-          
-          <div class="signature no-break">
-            Prepared by: Elton Niati AI Boot agent<br />
-            Date: ${format(new Date(), 'yyyy-MM-dd')}
-          </div>
         </body>
       </html>
     `;
@@ -460,25 +456,6 @@ const ExpiredStockPage = () => {
       }, 500);
     }
   };
-
-  const requestSort = (key: keyof ExpiredItem) => {
-    let direction: 'asc' | 'desc' = 'desc';
-    if (sortConfig.key === key && sortConfig.direction === 'desc') {
-      direction = 'asc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  if (isLoadingProducts || isLoadingExpiredItems) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading expired stock data...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
@@ -564,7 +541,7 @@ const ExpiredStockPage = () => {
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Value of Product Sale</p>
+              <p className="text-sm text-gray-600">Potential Sales Value</p>
               <p className="text-2xl font-bold text-red-600">
                 R{filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0).toFixed(2)}
               </p>
@@ -744,7 +721,9 @@ const ExpiredStockPage = () => {
           <CardTitle>Expired Items History ({timeRange})</CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredItems.length > 0 ? (
+          {isLoading ? (
+            <div className="text-center py-4">Loading expired items...</div>
+          ) : filteredItems.length > 0 ? (
             <div className="overflow-x-auto">
               {reportView === 'summary' ? (
                 <Table>
@@ -753,14 +732,7 @@ const ExpiredStockPage = () => {
                       <TableHead>Product Code</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead>Total Quantity</TableHead>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => requestSort('total_selling_value')}
-                      >
-                        Value of Product Sale (ZAR) {sortConfig.key === 'total_selling_value' && (
-                          sortConfig.direction === 'asc' ? '↑' : '↓'
-                        )}
-                      </TableHead>
+                      <TableHead>Total Value (ZAR)</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -796,51 +768,23 @@ const ExpiredStockPage = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => requestSort('product_name')}
-                      >
-                        Product {sortConfig.key === 'product_name' && (
-                          sortConfig.direction === 'asc' ? '↑' : '↓'
-                        )}
-                      </TableHead>
-                      <TableHead>Code</TableHead>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => requestSort('batch_date')}
-                      >
-                        Prod Date {sortConfig.key === 'batch_date' && (
-                          sortConfig.direction === 'asc' ? '↑' : '↓'
-                        )}
-                      </TableHead>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => requestSort('removal_date')}
-                      >
-                        Expiry {sortConfig.key === 'removal_date' && (
-                          sortConfig.direction === 'asc' ? '↑' : '↓'
-                        )}
-                      </TableHead>
-                      <TableHead>Qty</TableHead>
+                      <TableHead>Production Date</TableHead>
+                      <TableHead>Removal Date</TableHead>
+                      <TableHead>Product Code</TableHead>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead>Quantity</TableHead>
                       <TableHead>Unit Price</TableHead>
-                      <TableHead 
-                        className="cursor-pointer"
-                        onClick={() => requestSort('total_selling_value')}
-                      >
-                        Value of Product Sale {sortConfig.key === 'total_selling_value' && (
-                          sortConfig.direction === 'asc' ? '↑' : '↓'
-                        )}
-                      </TableHead>
+                      <TableHead>Total Value</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map(item => (
                       <TableRow key={item.id} id={`product-${item.products?.code || 'N/A'}`}>
-                        <TableCell>{item.product_name}</TableCell>
+                        <TableCell>{format(parseISO(item.batch_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="font-mono">{item.products?.code || 'N/A'}</TableCell>
-                        <TableCell>{format(parseISO(item.batch_date), 'MMM d')}</TableCell>
-                        <TableCell>{format(parseISO(item.removal_date), 'MMM d')}</TableCell>
+                        <TableCell>{item.product_name}</TableCell>
                         <TableCell>{item.quantity}</TableCell>
                         <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
                         <TableCell className="font-semibold text-red-600">
@@ -879,43 +823,7 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
-      {/* AI Production Optimization Analysis */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>AI Production Optimization Analysis</CardTitle>
-          <div className="text-sm text-gray-500">
-            {format(new Date(), 'MMM d, yyyy')} - {format(new Date(), 'MMM d, yyyy')}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-600">Units Produced</p>
-              <p className="text-2xl font-bold">7124</p>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-600">Selling Value</p>
-              <p className="text-2xl font-bold">R15433.29</p>
-            </div>
-            <div className="bg-red-50 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-600">Expired Loss</p>
-              <p className="text-2xl font-bold text-red-600">R2119.01</p>
-            </div>
-            <div className="bg-orange-50 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-600">Waste Rate</p>
-              <p className="text-2xl font-bold">13.73%</p>
-            </div>
-          </div>
-
-          <div className="border-t pt-4">
-            <div className="text-right italic">
-              <p>Prepared by: Elton Niati AI Agent</p>
-              <p>Date: {format(new Date(), 'yyyy-MM-dd')}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+      <ProductionAnalysisReport />
       <Navigation />
     </div>
   );
