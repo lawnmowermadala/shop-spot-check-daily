@@ -142,14 +142,14 @@ const ProductionAnalysisReport: React.FC = () => {
             <div class="metric-value">${analysisResult.summary.totalProduction.toFixed(0)}</div>
             <div class="metric-label">Total Units Produced</div>
           </div>
-          <div class="metric">
-            <div class="metric-value">$${analysisResult.summary.totalProductionCost.toFixed(2)}</div>
-            <div class="metric-label">Total Production Cost</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value">$${analysisResult.summary.totalExpiredLoss.toFixed(2)}</div>
-            <div class="metric-label">Expired Stock Loss</div>
-          </div>
+           <div class="metric">
+             <div class="metric-value">R${analysisResult.summary.totalProductionCost.toFixed(2)}</div>
+             <div class="metric-label">Total Production Cost</div>
+           </div>
+           <div class="metric">
+             <div class="metric-value">R${analysisResult.summary.totalExpiredLoss.toFixed(2)}</div>
+             <div class="metric-label">Expired Stock Loss</div>
+           </div>
           <div class="metric">
             <div class="metric-value">${analysisResult.summary.wastePercentage}%</div>
             <div class="metric-label">Waste Percentage</div>
@@ -223,13 +223,13 @@ const ProductionAnalysisReport: React.FC = () => {
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      ${analysisResult.summary.totalProductionCost.toFixed(2)}
+                      R{analysisResult.summary.totalProductionCost.toFixed(2)}
                     </div>
                     <div className="text-sm text-muted-foreground">Production Cost</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-red-600">
-                      ${analysisResult.summary.totalExpiredLoss.toFixed(2)}
+                      R{analysisResult.summary.totalExpiredLoss.toFixed(2)}
                     </div>
                     <div className="text-sm text-muted-foreground">Expired Loss</div>
                   </div>

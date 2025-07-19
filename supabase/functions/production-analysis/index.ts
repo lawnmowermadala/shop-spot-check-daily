@@ -117,7 +117,7 @@ Please provide a comprehensive analysis including:
    - Optimal production quantities by product
 
 4. **COST IMPACT ANALYSIS**:
-   - Total financial loss from expired products
+   - Total financial loss from expired products (in South African Rand - ZAR)
    - Cost savings potential from optimization
    - ROI projections for recommended changes
 
@@ -127,7 +127,7 @@ Please provide a comprehensive analysis including:
 
 7. **ACTIONABLE RECOMMENDATIONS**: Specific, measurable steps to reduce waste and optimize production
 
-Format the response as a professional report that can be printed and used for production meetings. Include specific numbers, percentages, and clear action items.
+Format the response as a professional report that can be printed and used for production meetings. Include specific numbers, percentages, and clear action items. All currency amounts should be referenced in South African Rand (ZAR).
 `;
 
     // Call OpenRouter API
