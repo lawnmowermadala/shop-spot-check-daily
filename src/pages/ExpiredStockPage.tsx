@@ -381,7 +381,7 @@ const ExpiredStockPage = () => {
               <div class="text-red">${totalQuantity}</div>
             </div>
             <div class="summary-item">
-              <div>Value of Product Sale</div>
+              <div>Potential Sales Value</div>
               <div class="text-red">R${totalValue.toFixed(2)}</div>
             </div>
             <div class="summary-item">
@@ -399,7 +399,7 @@ const ExpiredStockPage = () => {
                   <th>Product</th>
                   <th>Code</th>
                   <th>Units</th>
-                  <th>Value of Product Sale</th>
+                  <th>Total Value</th>
                 </tr>
               </thead>
               <tbody>
@@ -423,7 +423,7 @@ const ExpiredStockPage = () => {
                   <th>Expiry</th>
                   <th>Qty</th>
                   <th>Unit Price</th>
-                  <th>Value of Product Sale</th>
+                  <th>Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -559,7 +559,7 @@ const ExpiredStockPage = () => {
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Value of Product Sale</p>
+              <p className="text-sm text-gray-600">Potential Sales Value</p>
               <p className="text-2xl font-bold text-red-600">
                 R{filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0).toFixed(2)}
               </p>
@@ -752,7 +752,7 @@ const ExpiredStockPage = () => {
                         className="cursor-pointer"
                         onClick={() => requestSort('total_selling_value')}
                       >
-                        Value of Product Sale (ZAR) {sortConfig.key === 'total_selling_value' && (
+                        Total Value (ZAR) {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -822,7 +822,7 @@ const ExpiredStockPage = () => {
                         className="cursor-pointer"
                         onClick={() => requestSort('total_selling_value')}
                       >
-                        Value of Product Sale {sortConfig.key === 'total_selling_value' && (
+                        Total {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
