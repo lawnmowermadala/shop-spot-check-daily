@@ -64,7 +64,8 @@ serve(async (req) => {
         quantity,
         total_cost_loss,
         removal_date,
-        batch_date
+        batch_date,
+        selling_price
       `)
       .gte('removal_date', dateRange.from)
       .lte('removal_date', dateRange.to);
@@ -87,8 +88,17 @@ serve(async (req) => {
       total_cost_loss: item.total_cost_loss,
       removal_date: item.removal_date,
       day_of_week: new Date(item.removal_date).toLocaleDateString('en-US', { weekday: 'long' }),
-      batch_date: item.batch_date
+      batch_date: item.batch_date,
+      selling_price: item.selling_price
     })) || [];
+
+    // Create selling price lookup from expired items
+    const sellingPriceLookup = transformedExpired.reduce((acc, item) => {
+      if (item.selling_price && !acc[item.product_name]) {
+        acc[item.product_name] = item.selling_price;
+      }
+      return acc;
+    }, {});
 
     // Calculate daily breakdowns for better analysis
     const dailyProductionBreakdown = transformedProduction.reduce((acc, item) => {
@@ -98,14 +108,20 @@ serve(async (req) => {
       }
       acc[date].totalCost += item.total_cost || 0;
       acc[date].totalQuantity += item.quantity_produced || 0;
-      acc[date].saleValue += (item.total_cost || 0) * 1.4; // 40% markup
+      
+      // Use actual selling price if available, otherwise fallback to 40% markup
+      const sellingPrice = sellingPriceLookup[item.product_name];
+      const saleValue = sellingPrice 
+        ? (item.quantity_produced || 0) * sellingPrice
+        : (item.total_cost || 0) * 1.4;
+      acc[date].saleValue += saleValue;
       
       if (!acc[date].products[item.product_name]) {
         acc[date].products[item.product_name] = { cost: 0, quantity: 0, saleValue: 0 };
       }
       acc[date].products[item.product_name].cost += item.total_cost || 0;
       acc[date].products[item.product_name].quantity += item.quantity_produced || 0;
-      acc[date].products[item.product_name].saleValue += (item.total_cost || 0) * 1.4;
+      acc[date].products[item.product_name].saleValue += saleValue;
       
       return acc;
     }, {});
