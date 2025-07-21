@@ -90,52 +90,105 @@ serve(async (req) => {
       batch_date: item.batch_date
     })) || [];
 
+    // Calculate daily breakdowns for better analysis
+    const dailyProductionBreakdown = transformedProduction.reduce((acc, item) => {
+      const date = item.date;
+      if (!acc[date]) {
+        acc[date] = { totalCost: 0, totalQuantity: 0, products: {}, saleValue: 0 };
+      }
+      acc[date].totalCost += item.total_cost || 0;
+      acc[date].totalQuantity += item.quantity_produced || 0;
+      acc[date].saleValue += (item.total_cost || 0) * 1.4; // 40% markup
+      
+      if (!acc[date].products[item.product_name]) {
+        acc[date].products[item.product_name] = { cost: 0, quantity: 0, saleValue: 0 };
+      }
+      acc[date].products[item.product_name].cost += item.total_cost || 0;
+      acc[date].products[item.product_name].quantity += item.quantity_produced || 0;
+      acc[date].products[item.product_name].saleValue += (item.total_cost || 0) * 1.4;
+      
+      return acc;
+    }, {});
+
+    const dailyExpiredBreakdown = transformedExpired.reduce((acc, item) => {
+      const date = item.removal_date;
+      if (!acc[date]) {
+        acc[date] = { totalLoss: 0, totalQuantity: 0, products: {}, saleValueLoss: 0 };
+      }
+      acc[date].totalLoss += item.total_cost_loss || 0;
+      acc[date].totalQuantity += parseFloat(item.quantity || '0');
+      acc[date].saleValueLoss += (item.total_cost_loss || 0) * 1.4; // Sale value loss
+      
+      if (!acc[date].products[item.product_name]) {
+        acc[date].products[item.product_name] = { loss: 0, quantity: 0, saleValueLoss: 0 };
+      }
+      acc[date].products[item.product_name].loss += item.total_cost_loss || 0;
+      acc[date].products[item.product_name].quantity += parseFloat(item.quantity || '0');
+      acc[date].products[item.product_name].saleValueLoss += (item.total_cost_loss || 0) * 1.4;
+      
+      return acc;
+    }, {});
+
     // Prepare data for AI analysis
     const analysisPrompt = `
 Analyze this production and expired stock data to provide actionable insights for production optimization:
 
-PRODUCTION DATA:
+DAILY PRODUCTION BREAKDOWN:
+${JSON.stringify(dailyProductionBreakdown, null, 2)}
+
+DAILY EXPIRED STOCK BREAKDOWN:
+${JSON.stringify(dailyExpiredBreakdown, null, 2)}
+
+PRODUCTION DATA DETAILS:
 ${JSON.stringify(transformedProduction, null, 2)}
 
-EXPIRED STOCK DATA:
+EXPIRED STOCK DATA DETAILS:
 ${JSON.stringify(transformedExpired, null, 2)}
 
 DATE RANGE: ${dateRange.from} to ${dateRange.to}
 
-Please provide a comprehensive analysis including:
+Please provide a comprehensive DAILY-FOCUSED analysis including:
 
-1. **OVERPRODUCTION ANALYSIS**: Which products are being produced in excess (high expired quantities relative to production)?
+1. **DAILY OVERPRODUCTION ANALYSIS**: 
+   - Day-by-day breakdown of which products are being produced in excess
+   - Daily expired quantities relative to daily production
+   - Identify worst performing days
 
 2. **DAY-OF-WEEK PATTERNS**: 
-   - Which days of the week show highest production vs expired ratios?
-   - Are there specific days when certain products expire more?
-   - Recommended production schedule adjustments by day
+   - Daily production vs expired ratios for each day
+   - Specific days when certain products expire more
+   - Daily recommended production schedule adjustments
 
-3. **PRODUCT-SPECIFIC RECOMMENDATIONS**:
-   - Products to reduce production for
-   - Products to increase production for
-   - Optimal production quantities by product
+3. **DAILY PRODUCT-SPECIFIC RECOMMENDATIONS**:
+   - Daily optimal production quantities by product
+   - Products to reduce/increase production for on specific days
+   - Day-specific production targets
 
-4. **SALE VALUE IMPACT ANALYSIS**:
-   - Calculate estimated sale value of production (assume 40% markup on production cost)
-   - Total financial loss from expired products in sale value terms (in South African Rand - ZAR)
-   - Lost revenue potential from expired stock
-   - Cost savings and revenue recovery potential from optimization
-   - ROI projections for recommended changes
+4. **DAILY SALE VALUE IMPACT ANALYSIS**:
+   - Day-by-day estimated sale value of production (40% markup on production cost)
+   - Daily financial loss from expired products in sale value terms (ZAR)
+   - Daily lost revenue potential from expired stock
+   - Daily cost savings and revenue recovery potential
 
-5. **WEEKLY PRODUCTION PROPOSAL**:
-   - Day-by-day production recommendations for the upcoming week
+5. **WEEKLY PRODUCTION PROPOSAL WITH DAILY BREAKDOWN**:
    - Monday through Sunday specific production quantities by product
-   - Rationale for each day's production plan
-   - Expected sale values for each day's production
+   - Daily expected sale values for each day's production plan
+   - Daily rationale for each day's production recommendations
+   - Daily target reductions to minimize waste
 
-6. **TIME-OF-MONTH PATTERNS**: Any monthly trends affecting production efficiency
+6. **DAILY PERFORMANCE METRICS**:
+   - Daily efficiency ratios
+   - Daily waste percentages
+   - Daily sale value targets vs losses
 
-7. **STAFF PERFORMANCE**: Which staff members have better production efficiency ratios
+7. **DAILY ACTIONABLE RECOMMENDATIONS**: 
+   - Specific daily production adjustments
+   - Daily monitoring targets
+   - Day-specific operational changes
 
-8. **ACTIONABLE RECOMMENDATIONS**: Specific, measurable steps to reduce waste and optimize production
+IMPORTANT: All calculations, recommendations, and metrics must be presented on a DAILY basis, not aggregated. Show daily figures, daily targets, daily losses, and daily improvements. All currency amounts in South African Rand (ZAR).
 
-Format the response as a professional report that can be printed and used for production meetings. Include specific numbers, percentages, and clear action items. All currency amounts should be referenced in South African Rand (ZAR). Focus on sale value impact rather than just production costs.
+Format as a professional daily operations report for production meetings.
 `;
 
     // Call OpenRouter API
