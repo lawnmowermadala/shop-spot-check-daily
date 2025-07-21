@@ -116,18 +116,26 @@ Please provide a comprehensive analysis including:
    - Products to increase production for
    - Optimal production quantities by product
 
-4. **COST IMPACT ANALYSIS**:
-   - Total financial loss from expired products (in South African Rand - ZAR)
-   - Cost savings potential from optimization
+4. **SALE VALUE IMPACT ANALYSIS**:
+   - Calculate estimated sale value of production (assume 40% markup on production cost)
+   - Total financial loss from expired products in sale value terms (in South African Rand - ZAR)
+   - Lost revenue potential from expired stock
+   - Cost savings and revenue recovery potential from optimization
    - ROI projections for recommended changes
 
-5. **TIME-OF-MONTH PATTERNS**: Any monthly trends affecting production efficiency
+5. **WEEKLY PRODUCTION PROPOSAL**:
+   - Day-by-day production recommendations for the upcoming week
+   - Monday through Sunday specific production quantities by product
+   - Rationale for each day's production plan
+   - Expected sale values for each day's production
 
-6. **STAFF PERFORMANCE**: Which staff members have better production efficiency ratios
+6. **TIME-OF-MONTH PATTERNS**: Any monthly trends affecting production efficiency
 
-7. **ACTIONABLE RECOMMENDATIONS**: Specific, measurable steps to reduce waste and optimize production
+7. **STAFF PERFORMANCE**: Which staff members have better production efficiency ratios
 
-Format the response as a professional report that can be printed and used for production meetings. Include specific numbers, percentages, and clear action items. All currency amounts should be referenced in South African Rand (ZAR).
+8. **ACTIONABLE RECOMMENDATIONS**: Specific, measurable steps to reduce waste and optimize production
+
+Format the response as a professional report that can be printed and used for production meetings. Include specific numbers, percentages, and clear action items. All currency amounts should be referenced in South African Rand (ZAR). Focus on sale value impact rather than just production costs.
 `;
 
     // Call OpenRouter API
