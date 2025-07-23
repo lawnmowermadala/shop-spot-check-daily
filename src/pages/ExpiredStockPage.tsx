@@ -13,10 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
-import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
 
-// Types
 interface ExpiredItem {
   id: string;
   product_name: string;
@@ -49,7 +47,6 @@ interface ProductSummary {
 
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
-  const [date, setDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [isBatchCalendarOpen, setIsBatchCalendarOpen] = useState(false);
@@ -62,6 +59,7 @@ const ExpiredStockPage = () => {
     key: 'total_cost_loss',
     direction: 'desc',
   });
+
   const [formData, setFormData] = useState({
     productId: '',
     productName: '',
@@ -85,8 +83,8 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Fetch expired items with product details
-  const { data: expiredItems = [], isLoading } = useQuery({
+  // Fetch ALL expired items with product details
+  const { data: allExpiredItems = [], isLoading } = useQuery({
     queryKey: ['expired-items'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -103,7 +101,7 @@ const ExpiredStockPage = () => {
   });
 
   // Sort items
-  const sortedItems = [...expiredItems].sort((a, b) => {
+  const sortedItems = [...allExpiredItems].sort((a, b) => {
     if (a[sortConfig.key] < b[sortConfig.key]) {
       return sortConfig.direction === 'asc' ? -1 : 1;
     }
@@ -113,7 +111,7 @@ const ExpiredStockPage = () => {
     return 0;
   });
 
-  // Get filtered items based on time range
+  // Filter items based on time range
   const getFilteredItems = () => {
     const now = new Date();
     let startDate, endDate;
@@ -136,7 +134,7 @@ const ExpiredStockPage = () => {
           startDate = startOfDay(dateRange.from);
           endDate = endOfDay(dateRange.to);
         } else {
-          return sortedItems; // Return all items if no custom range selected
+          return sortedItems;
         }
         break;
       default:
@@ -218,7 +216,6 @@ const ExpiredStockPage = () => {
           selling_price: parseFloat(formData.sellingPrice),
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
-          // Let the database calculate total_cost_loss
         });
 
       if (error) throw error;
@@ -256,7 +253,6 @@ const ExpiredStockPage = () => {
           selling_price: updatedItem.selling_price,
           batch_date: format(new Date(updatedItem.batch_date), 'yyyy-MM-dd'),
           removal_date: format(new Date(updatedItem.removal_date), 'yyyy-MM-dd')
-          // Let the database calculate total_cost_loss
         })
         .eq('id', updatedItem.id);
 
@@ -290,6 +286,51 @@ const ExpiredStockPage = () => {
       toast.error(error.message);
     }
   });
+
+  // AI Analysis function
+  const analyzeExpiredItems = async () => {
+    try {
+      if (allExpiredItems.length === 0) {
+        throw new Error('No expired items to analyze');
+      }
+
+      const response = await fetch('/api/analyze-expired', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: allExpiredItems,
+          timeRange,
+          dateRange
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Analysis failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Analysis error:', error);
+      throw error;
+    }
+  };
+
+  const { data: analysis, isLoading: isAnalyzing, refetch: runAnalysis } = useQuery({
+    queryKey: ['expired-analysis'],
+    queryFn: analyzeExpiredItems,
+    enabled: false,
+    retry: false,
+  });
+
+  const handleAnalyze = () => {
+    toast.promise(runAnalysis(), {
+      loading: 'Analyzing expired items...',
+      success: 'Analysis completed!',
+      error: (err) => err.message || 'Failed to analyze',
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -843,8 +884,39 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
-      {/* AI Production Analysis Report */}
-      <ProductionAnalysisReport />
+      {/* AI Analysis Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Production Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Get AI-powered insights about your expired products and waste patterns.
+            </p>
+            
+            <Button 
+              onClick={handleAnalyze}
+              disabled={isAnalyzing || allExpiredItems.length === 0}
+            >
+              {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+            </Button>
+
+            {analysis && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                <h3 className="font-medium mb-2">Analysis Results</h3>
+                <div className="space-y-2">
+                  <p><strong>Total Items Analyzed:</strong> {analysis.totalItems}</p>
+                  <p><strong>Most Common Product:</strong> {analysis.mostCommonProduct?.name || 'N/A'} ({analysis.mostCommonProduct?.count || 0} occurrences)</p>
+                  <p><strong>Highest Cost Product:</strong> {analysis.highestCostProduct?.name || 'N/A'} (R{analysis.highestCostProduct?.totalLoss?.toFixed(2) || '0.00'})</p>
+                  <p><strong>Time Pattern:</strong> {analysis.timePattern || 'No clear pattern detected'}</p>
+                  <p><strong>Recommendations:</strong> {analysis.recommendations || 'No specific recommendations'}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       
       <Navigation />
     </div>
