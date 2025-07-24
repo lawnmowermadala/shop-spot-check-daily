@@ -45,22 +45,6 @@ interface ProductSummary {
   items: ExpiredItem[];
 }
 
-interface AnalysisResult {
-  totalItems: number;
-  mostCommonProduct: {
-    name: string;
-    code: string;
-    count: number;
-  } | null;
-  highestCostProduct: {
-    name: string;
-    totalLoss: number;
-  } | null;
-  timePattern: string;
-  recommendations: string;
-  insights: string;
-}
-
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,8 +59,6 @@ const ExpiredStockPage = () => {
     key: 'total_cost_loss',
     direction: 'desc',
   });
-  const [openAiApiKey, setOpenAiApiKey] = useState('');
-  const [isApiKeyValid, setIsApiKeyValid] = useState(false);
 
   const [formData, setFormData] = useState({
     productId: '',
@@ -305,47 +287,9 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Verify OpenAI API Key
-  const verifyApiKey = async (key: string) => {
-    try {
-      const response = await fetch('https://api.openai.com/v1/models', {
-        headers: {
-          'Authorization': `Bearer ${key}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  // Handle API Key submission
-  const handleApiKeySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!openAiApiKey) {
-      toast.error('Please enter an API key');
-      return;
-    }
-
-    const isValid = await verifyApiKey(openAiApiKey);
-    setIsApiKeyValid(isValid);
-    
-    if (isValid) {
-      toast.success('API key validated successfully!');
-      localStorage.setItem('openAiApiKey', openAiApiKey);
-    } else {
-      toast.error('Invalid API key. Please check and try again.');
-    }
-  };
-
   // AI Analysis function
   const analyzeExpiredItems = async () => {
     try {
-      if (!isApiKeyValid) {
-        throw new Error('Please provide a valid OpenAI API key first');
-      }
-
       if (allExpiredItems.length === 0) {
         throw new Error('No expired items to analyze');
       }
@@ -354,32 +298,27 @@ const ExpiredStockPage = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openAiApiKey}`
         },
         body: JSON.stringify({
           items: allExpiredItems,
           timeRange,
-          dateRange: dateRange ? {
-            from: dateRange.from?.toISOString(),
-            to: dateRange.to?.toISOString()
-          } : null
+          dateRange
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Analysis failed');
+        throw new Error('Analysis failed');
       }
 
       return await response.json();
     } catch (error) {
       console.error('Analysis error:', error);
-      throw error instanceof Error ? error : new Error('Analysis failed');
+      throw error;
     }
   };
 
   const { data: analysis, isLoading: isAnalyzing, refetch: runAnalysis } = useQuery({
-    queryKey: ['expired-analysis', timeRange, dateRange],
+    queryKey: ['expired-analysis'],
     queryFn: analyzeExpiredItems,
     enabled: false,
     retry: false,
@@ -388,8 +327,8 @@ const ExpiredStockPage = () => {
   const handleAnalyze = () => {
     toast.promise(runAnalysis(), {
       loading: 'Analyzing expired items...',
-      success: (data) => data?.message || 'Analysis completed successfully!',
-      error: (err: Error) => err.message || 'Failed to analyze data',
+      success: 'Analysis completed!',
+      error: (err) => err.message || 'Failed to analyze',
     });
   };
 
@@ -952,80 +891,28 @@ const ExpiredStockPage = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {!isApiKeyValid ? (
-              <form onSubmit={handleApiKeySubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
-                  <Input
-                    type="password"
-                    placeholder="Enter your OpenAI API key"
-                    value={openAiApiKey}
-                    onChange={(e) => setOpenAiApiKey(e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Your API key is used only for this analysis and is not stored on our servers.
-                  </p>
-                </div>
-                <Button type="submit" className="w-full">
-                  Validate API Key
-                </Button>
-              </form>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                  <p className="text-sm text-green-600">API Key Validated</p>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setIsApiKeyValid(false)}
-                    className="ml-auto"
-                  >
-                    Change Key
-                  </Button>
-                </div>
-                
-                <p className="text-sm text-gray-600">
-                  Get AI-powered insights about your expired products and waste patterns.
-                </p>
-                
-                <Button 
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing || allExpiredItems.length === 0}
-                  className="w-full"
-                >
-                  {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
-                </Button>
+            <p className="text-sm text-gray-600">
+              Get AI-powered insights about your expired products and waste patterns.
+            </p>
+            
+            <Button 
+              onClick={handleAnalyze}
+              disabled={isAnalyzing || allExpiredItems.length === 0}
+            >
+              {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+            </Button>
 
-                {analysis && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                    <h3 className="font-medium mb-2">Analysis Results</h3>
-                    <div className="space-y-2">
-                      <p><strong>Total Items Analyzed:</strong> {analysis.data.totalItems}</p>
-                      {analysis.data.mostCommonProduct && (
-                        <p>
-                          <strong>Most Common Product:</strong> {analysis.data.mostCommonProduct.name} 
-                          ({analysis.data.mostCommonProduct.count} occurrences)
-                        </p>
-                      )}
-                      {analysis.data.highestCostProduct && (
-                        <p>
-                          <strong>Highest Cost Product:</strong> {analysis.data.highestCostProduct.name} 
-                          (R{analysis.data.highestCostProduct.totalLoss.toFixed(2)})
-                        </p>
-                      )}
-                      <p><strong>Time Pattern:</strong> {analysis.data.timePattern}</p>
-                      <p><strong>Recommendations:</strong> {analysis.data.recommendations}</p>
-                      {analysis.data.insights && (
-                        <div className="mt-4 p-3 bg-blue-50 rounded">
-                          <h4 className="font-medium text-blue-800">Additional Insights</h4>
-                          <p className="mt-1">{analysis.data.insights}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
+            {analysis && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                <h3 className="font-medium mb-2">Analysis Results</h3>
+                <div className="space-y-2">
+                  <p><strong>Total Items Analyzed:</strong> {analysis.totalItems}</p>
+                  <p><strong>Most Common Product:</strong> {analysis.mostCommonProduct?.name || 'N/A'} ({analysis.mostCommonProduct?.count || 0} occurrences)</p>
+                  <p><strong>Highest Cost Product:</strong> {analysis.highestCostProduct?.name || 'N/A'} (R{analysis.highestCostProduct?.totalLoss?.toFixed(2) || '0.00'})</p>
+                  <p><strong>Time Pattern:</strong> {analysis.timePattern || 'No clear pattern detected'}</p>
+                  <p><strong>Recommendations:</strong> {analysis.recommendations || 'No specific recommendations'}</p>
+                </div>
+              </div>
             )}
           </div>
         </CardContent>
