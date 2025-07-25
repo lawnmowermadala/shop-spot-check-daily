@@ -28,16 +28,6 @@ interface ExpiredItem {
   category?: string;
 }
 
-interface AnalysisResult {
-  success: boolean;
-  data?: {
-    analysis: string;
-    totalItems: number;
-    timeRange: string;
-  };
-  message: string;
-}
-
 const ExpiredStockPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -104,6 +94,24 @@ const ExpiredStockPage = () => {
     },
   });
 
+  // Get all expired items for analysis
+  const { data: allExpiredItems = [] } = useQuery<ExpiredItem[]>({
+    queryKey: ['allExpiredItems'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .lte('expiry_date', format(new Date(), 'yyyy-MM-dd'))
+        .order('expiry_date', { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data;
+    },
+  });
+
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -118,6 +126,7 @@ const ExpiredStockPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expiredItems'] });
+      queryClient.invalidateQueries({ queryKey: ['allExpiredItems'] });
       toast.success('Item deleted successfully');
     },
     onError: (error: Error) => {
@@ -170,25 +179,7 @@ const ExpiredStockPage = () => {
     }
   };
 
-  // Get all expired items for analysis
-  const allExpiredItems = useQuery<ExpiredItem[]>({
-    queryKey: ['allExpiredItems'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('*')
-        .lte('expiry_date', format(new Date(), 'yyyy-MM-dd'))
-        .order('expiry_date', { ascending: false });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data;
-    },
-  });
-
-  // Analyze expired items
+  // Handle analysis
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setAnalysisError(null);
@@ -198,14 +189,14 @@ const ExpiredStockPage = () => {
         throw new Error('AI service is still loading. Please try again in a moment.');
       }
 
-      if (allExpiredItems.data?.length === 0) {
+      if (allExpiredItems.length === 0) {
         throw new Error('No expired items to analyze');
       }
 
       const prompt = `Analyze these expired stock items:
-      - Total items: ${allExpiredItems.data?.length}
+      - Total items: ${allExpiredItems.length}
       - Time range: ${timeRange}
-      - Sample items: ${JSON.stringify(allExpiredItems.data?.slice(0, 3))}
+      - Sample items: ${JSON.stringify(allExpiredItems.slice(0, 3))}
       
       Provide a detailed analysis with:
       1. Summary of patterns and trends
@@ -220,9 +211,7 @@ const ExpiredStockPage = () => {
         model: selectedModel
       });
 
-      // Store the full report for display and printing
       setAnalysisReport(response);
-
       toast.success('Analysis completed successfully');
     } catch (error) {
       console.error('Analysis error:', error);
@@ -256,7 +245,7 @@ const ExpiredStockPage = () => {
           </div>
           
           <div class="summary">
-            <p><strong>Total Items Analyzed:</strong> ${allExpiredItems.data?.length || 0}</p>
+            <p><strong>Total Items Analyzed:</strong> ${allExpiredItems.length}</p>
             <p><strong>Time Range:</strong> ${timeRange}</p>
           </div>
           
@@ -268,12 +257,14 @@ const ExpiredStockPage = () => {
     `;
 
     const printWindow = window.open('', '_blank');
-    printWindow?.document.write(printContent);
-    printWindow?.document.close();
-    printWindow?.focus();
-    setTimeout(() => {
-      printWindow?.print();
-    }, 500);
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
   };
 
   return (
@@ -446,7 +437,7 @@ const ExpiredStockPage = () => {
 
                 <Button
                   onClick={handleAnalyze}
-                  disabled={isAnalyzing || (allExpiredItems.data?.length || 0) === 0}
+                  disabled={isAnalyzing || allExpiredItems.length === 0}
                   className="w-full"
                 >
                   {isAnalyzing ? (
@@ -469,8 +460,16 @@ const ExpiredStockPage = () => {
                   <div className="mt-4 space-y-4">
                     <div className="p-4 bg-blue-50 rounded-md border border-blue-200">
                       <h4 className="font-medium text-blue-800 mb-2">Analysis Results</h4>
-                      <div className="whitespace-pre-wrap prose max-w-none">
-                        {analysisReport}
+                      <div className="whitespace-pre-wrap text-sm">
+                        {analysisReport.split('\n').map((line, i) => (
+                          <p key={i} className="mb-2">
+                            {line.startsWith('##') ? (
+                              <strong className="text-lg block mt-4">{line.replace('##', '')}</strong>
+                            ) : (
+                              line
+                            )}
+                          </p>
+                        ))}
                       </div>
                     </div>
                   </div>
