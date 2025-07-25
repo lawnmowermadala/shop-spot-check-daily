@@ -15,175 +15,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateRangePicker } from '@/components/DateRangePicker';
 import Navigation from '@/components/Navigation';
 
-interface ExpiredItem {
-  id: string;
-  product_name: string;
-  batch_number: string;
-  expiry_date: string;
-  quantity: number;
-  unit: string;
-  reason?: string;
-  cost_per_unit: number;
-  supplier_name?: string;
-  category?: string;
-}
+// ... (keep all your existing interfaces)
 
 const ExpiredStockPage = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
-  const [timeRange, setTimeRange] = useState<string>('this month');
-  const [selectedModel, setSelectedModel] = useState<string>('gpt-4.1');
-  const [isPuterLoaded, setIsPuterLoaded] = useState(false);
+  // ... (keep all your existing state and queries)
+
+  // Add this state for the analysis report
   const [analysisReport, setAnalysisReport] = useState<string>('');
-  const [analysisError, setAnalysisError] = useState<Error | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const queryClient = useQueryClient();
-
-  // Load Puter.js
-  useEffect(() => {
-    const loadPuter = async () => {
-      try {
-        // @ts-ignore
-        await window.puter?.promise;
-        setIsPuterLoaded(true);
-      } catch (error) {
-        console.error('Failed to load Puter.js:', error);
-        setIsPuterLoaded(false);
-      }
-    };
-
-    if (typeof window !== 'undefined' && !window.puter) {
-      const script = document.createElement('script');
-      script.src = 'https://js.puter.com/v2/';
-      script.async = true;
-      document.body.appendChild(script);
-      script.onload = loadPuter;
-    } else {
-      loadPuter();
-    }
-  }, []);
-
-  // Fetch expired items
-  const { data: expiredItems = [], isLoading } = useQuery<ExpiredItem[]>({
-    queryKey: ['expiredItems', dateRange],
-    queryFn: async () => {
-      let query = supabase
-        .from('inventory')
-        .select('*')
-        .lte('expiry_date', format(new Date(), 'yyyy-MM-dd'))
-        .order('expiry_date', { ascending: false });
-
-      if (dateRange?.from) {
-        query = query.gte('expiry_date', format(dateRange.from, 'yyyy-MM-dd'));
-      }
-      if (dateRange?.to) {
-        query = query.lte('expiry_date', format(dateRange.to, 'yyyy-MM-dd'));
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data;
-    },
-  });
-
-  // Get all expired items for analysis
-  const { data: allExpiredItems = [] } = useQuery<ExpiredItem[]>({
-    queryKey: ['allExpiredItems'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('*')
-        .lte('expiry_date', format(new Date(), 'yyyy-MM-dd'))
-        .order('expiry_date', { ascending: false });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data;
-    },
-  });
-
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('inventory')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expiredItems'] });
-      queryClient.invalidateQueries({ queryKey: ['allExpiredItems'] });
-      toast.success('Item deleted successfully');
-    },
-    onError: (error: Error) => {
-      toast.error(`Error deleting item: ${error.message}`);
-    },
-  });
-
-  // Filter items based on search term
-  const filteredItems = expiredItems.filter(item =>
-    item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.batch_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Calculate total loss
-  const totalLoss = filteredItems.reduce(
-    (sum, item) => sum + item.quantity * item.cost_per_unit,
-    0
-  );
-
-  // Handle time range changes
-  const handleTimeRangeChange = (range: string) => {
-    setTimeRange(range);
-    const today = new Date();
-
-    switch (range) {
-      case 'today':
-        setDateRange({
-          from: startOfDay(today),
-          to: endOfDay(today),
-        });
-        break;
-      case 'this week':
-        setDateRange({
-          from: startOfWeek(today),
-          to: endOfWeek(today),
-        });
-        break;
-      case 'this month':
-        setDateRange({
-          from: startOfMonth(today),
-          to: endOfMonth(today),
-        });
-        break;
-      case 'custom':
-        // Custom range is handled by the date picker
-        break;
-      default:
-        setDateRange(undefined);
-    }
-  };
-
-  // Handle analysis
-  const handleAnalyze = async () => {
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-
+  // Update your analyzeExpiredItems function
+  const analyzeExpiredItems = async () => {
     try {
       if (!isPuterLoaded) {
         throw new Error('AI service is still loading. Please try again in a moment.');
@@ -211,19 +52,25 @@ const ExpiredStockPage = () => {
         model: selectedModel
       });
 
+      // Store the full report for display and printing
       setAnalysisReport(response);
-      toast.success('Analysis completed successfully');
+
+      return {
+        success: true,
+        data: {
+          analysis: response,
+          totalItems: allExpiredItems.length,
+          timeRange: timeRange
+        },
+        message: 'Analysis completed successfully'
+      };
     } catch (error) {
       console.error('Analysis error:', error);
-      const err = error instanceof Error ? error : new Error('Analysis failed');
-      setAnalysisError(err);
-      toast.error(`Analysis failed: ${err.message}`);
-    } finally {
-      setIsAnalyzing(false);
+      throw error instanceof Error ? error : new Error('Analysis failed');
     }
   };
 
-  // Print the analysis report
+  // Add this function to print the analysis report
   const printAnalysisReport = () => {
     const printContent = `
       <html>
@@ -257,132 +104,20 @@ const ExpiredStockPage = () => {
     `;
 
     const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
-    }
+    printWindow?.document.write(printContent);
+    printWindow?.document.close();
+    printWindow?.focus();
+    setTimeout(() => {
+      printWindow?.print();
+    }, 500);
   };
 
+  // Update your AI Analysis section in the JSX
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
-      <Card>
-        <CardHeader>
-          <CardTitle>Expired Stock</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search products..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select onValueChange={handleTimeRangeChange} value={timeRange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select time range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="this week">This Week</SelectItem>
-                  <SelectItem value="this month">This Month</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-              {timeRange === 'custom' && (
-                <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
-              )}
-            </div>
-          </div>
+      {/* ... (keep all your existing JSX) */}
 
-          {isLoading ? (
-            <div className="flex justify-center items-center h-32">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : (
-            <>
-              <div className="mb-4">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                  <span className="font-medium">
-                    Total Loss: ${totalLoss.toFixed(2)} ({filteredItems.length} items)
-                  </span>
-                </div>
-              </div>
-
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Batch</TableHead>
-                      <TableHead>Expiry Date</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Loss</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredItems.length > 0 ? (
-                      filteredItems.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">
-                            {item.product_name}
-                          </TableCell>
-                          <TableCell>{item.batch_number}</TableCell>
-                          <TableCell>
-                            {format(parseISO(item.expiry_date), 'PP')}
-                          </TableCell>
-                          <TableCell>
-                            {item.quantity} {item.unit}
-                          </TableCell>
-                          <TableCell>{item.supplier_name || '-'}</TableCell>
-                          <TableCell>
-                            ${(item.quantity * item.cost_per_unit).toFixed(2)}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deleteMutation.mutate(item.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              {deleteMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              )}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="h-24 text-center text-muted-foreground"
-                        >
-                          No expired items found
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* AI Analysis Section */}
+      {/* Updated AI Analysis Section */}
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -436,7 +171,7 @@ const ExpiredStockPage = () => {
                 </p>
 
                 <Button
-                  onClick={handleAnalyze}
+                  onClick={() => handleAnalyze()}
                   disabled={isAnalyzing || allExpiredItems.length === 0}
                   className="w-full"
                 >
@@ -460,16 +195,8 @@ const ExpiredStockPage = () => {
                   <div className="mt-4 space-y-4">
                     <div className="p-4 bg-blue-50 rounded-md border border-blue-200">
                       <h4 className="font-medium text-blue-800 mb-2">Analysis Results</h4>
-                      <div className="whitespace-pre-wrap text-sm">
-                        {analysisReport.split('\n').map((line, i) => (
-                          <p key={i} className="mb-2">
-                            {line.startsWith('##') ? (
-                              <strong className="text-lg block mt-4">{line.replace('##', '')}</strong>
-                            ) : (
-                              line
-                            )}
-                          </p>
-                        ))}
+                      <div className="whitespace-pre-wrap prose max-w-none">
+                        {analysisReport}
                       </div>
                     </div>
                   </div>
