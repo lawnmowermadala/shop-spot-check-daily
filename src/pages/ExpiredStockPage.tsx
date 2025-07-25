@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
+import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
 
 interface ExpiredItem {
@@ -23,7 +24,7 @@ interface ExpiredItem {
   removal_date: string;
   product_id?: string;
   selling_price: number;
-  total_cost_loss: number;
+  total_selling_value: number;
   created_at?: string;
   products?: {
     name: string;
@@ -41,24 +42,8 @@ interface ProductSummary {
   name: string;
   code: string;
   totalQuantity: number;
-  totalLoss: number;
+  totalValue: number;
   items: ExpiredItem[];
-}
-
-interface AnalysisResult {
-  totalItems: number;
-  mostCommonProduct: {
-    name: string;
-    code: string;
-    count: number;
-  } | null;
-  highestCostProduct: {
-    name: string;
-    totalLoss: number;
-  } | null;
-  timePattern: string;
-  recommendations: string;
-  insights: string;
 }
 
 const ExpiredStockPage = () => {
@@ -72,13 +57,9 @@ const ExpiredStockPage = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [reportView, setReportView] = useState<'summary' | 'detailed'>('summary');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpiredItem; direction: 'asc' | 'desc' }>({
-    key: 'total_cost_loss',
+    key: 'removal_date',
     direction: 'desc',
   });
-  const [selectedModel, setSelectedModel] = useState('gpt-4.1-nano');
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-
   const [formData, setFormData] = useState({
     productId: '',
     productName: '',
@@ -87,23 +68,24 @@ const ExpiredStockPage = () => {
     batchDate: new Date(),
     removalDate: new Date(),
   });
+  const [analysisResult, setAnalysisResult] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   // Fetch products
-  const { data: products = [] } = useQuery({
+  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products')
         .select('*')
         .order('name');
-      
       if (error) throw error;
       return data as Product[];
     }
   });
 
-  // Fetch ALL expired items with product details
-  const { data: allExpiredItems = [], isLoading } = useQuery({
+  // Fetch expired items with calculated selling value
+  const { data: expiredItems = [], isLoading: isLoadingExpiredItems } = useQuery({
     queryKey: ['expired-items'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -111,16 +93,17 @@ const ExpiredStockPage = () => {
         .select(`
           *,
           products (name, code)
-        `)
-        .order('removal_date', { ascending: false });
-      
+        `);
       if (error) throw error;
-      return data as ExpiredItem[];
+      return (data as ExpiredItem[]).map(item => ({
+        ...item,
+        total_selling_value: item.selling_price * parseFloat(item.quantity)
+      }));
     }
   });
 
   // Sort items
-  const sortedItems = [...allExpiredItems].sort((a, b) => {
+  const sortedItems = [...expiredItems].sort((a, b) => {
     if (a[sortConfig.key] < b[sortConfig.key]) {
       return sortConfig.direction === 'asc' ? -1 : 1;
     }
@@ -130,7 +113,7 @@ const ExpiredStockPage = () => {
     return 0;
   });
 
-  // Filter items based on time range
+  // Filter items by time range
   const getFilteredItems = () => {
     const now = new Date();
     let startDate, endDate;
@@ -169,7 +152,7 @@ const ExpiredStockPage = () => {
 
   const filteredItems = getFilteredItems();
 
-  // Group items by product for summary view
+  // Group items by product
   const getProductSummaries = (items: ExpiredItem[]): ProductSummary[] => {
     const productMap = new Map<string, ProductSummary>();
     
@@ -183,14 +166,14 @@ const ExpiredStockPage = () => {
           name: productName,
           code: productCode,
           totalQuantity: 0,
-          totalLoss: 0,
+          totalValue: 0,
           items: []
         });
       }
       
       const summary = productMap.get(key)!;
       summary.totalQuantity += parseFloat(item.quantity) || 0;
-      summary.totalLoss += item.total_cost_loss || 0;
+      summary.totalValue += item.total_selling_value || 0;
       summary.items.push(item);
     });
     
@@ -199,13 +182,93 @@ const ExpiredStockPage = () => {
 
   const productSummaries = getProductSummaries(filteredItems);
 
-  // Request sort
-  const requestSort = (key: keyof ExpiredItem) => {
-    let direction: 'asc' | 'desc' = 'desc';
-    if (sortConfig.key === key && sortConfig.direction === 'desc') {
-      direction = 'asc';
+  // Analyze data with DeepSeek API
+  const analyzeDataWithDeepSeek = async () => {
+    setIsAnalyzing(true);
+    setAnalysisResult('');
+    
+    try {
+      // Prepare the data for analysis
+      const analysisData = {
+        timeRange,
+        totalItems: filteredItems.length,
+        totalQuantity: filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0),
+        totalValue: filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0),
+        topProducts: productSummaries
+          .sort((a, b) => b.totalValue - a.totalValue)
+          .slice(0, 5)
+          .map(p => ({
+            name: p.name,
+            quantity: p.totalQuantity,
+            value: p.totalValue
+          })),
+        recentItems: filteredItems
+          .sort((a, b) => new Date(b.removal_date).getTime() - new Date(a.removal_date).getTime())
+          .slice(0, 5)
+          .map(i => ({
+            name: i.product_name,
+            date: i.removal_date,
+            quantity: i.quantity,
+            value: i.total_selling_value
+          }))
+      };
+
+      // Create the prompt for DeepSeek
+      const prompt = `
+        Analyze this expired stock data and provide insights and recommendations:
+        
+        Time Range: ${analysisData.timeRange}
+        Total Items Expired: ${analysisData.totalItems}
+        Total Quantity Lost: ${analysisData.totalQuantity}
+        Total Financial Impact: R${analysisData.totalValue.toFixed(2)}
+        
+        Top 5 Products by Loss:
+        ${analysisData.topProducts.map(p => `- ${p.name}: ${p.quantity} units (R${p.value.toFixed(2)})`).join('\n')}
+        
+        Recent Expired Items:
+        ${analysisData.recentItems.map(i => `- ${i.name} expired on ${i.date}: ${i.quantity} units (R${i.value.toFixed(2)})`).join('\n')}
+        
+        Please provide:
+        1. Key insights about the patterns in expired products
+        2. Recommendations to reduce waste
+        3. Potential inventory management improvements
+        4. Any seasonal trends you notice
+        5. Financial impact analysis
+        
+        Format your response with clear headings and bullet points.
+      `;
+
+      // Load the Puter.js script dynamically if not already loaded
+      if (!window.puter) {
+        const script = document.createElement('script');
+        script.src = 'https://js.puter.com/v2/';
+        document.body.appendChild(script);
+        
+        await new Promise((resolve) => {
+          script.onload = resolve;
+        });
+      }
+
+      // Call DeepSeek API
+      const response = await puter.ai.chat(prompt, {
+        model: 'deepseek-reasoner',
+        stream: true
+      });
+
+      // Process streaming response
+      let result = '';
+      for await (const part of response) {
+        if (part?.text) {
+          result += part.text;
+          setAnalysisResult(result);
+        }
+      }
+    } catch (error) {
+      console.error('DeepSeek analysis error:', error);
+      toast.error('Failed to analyze data with DeepSeek');
+    } finally {
+      setIsAnalyzing(false);
     }
-    setSortConfig({ key, direction });
   };
 
   // Handle product selection
@@ -219,12 +282,16 @@ const ExpiredStockPage = () => {
     setIsProductDropdownOpen(false);
   };
 
-  // Add expired item mutation
+  // Add expired item
   const addExpiredItem = useMutation({
     mutationFn: async () => {
       if (!formData.productId || !formData.quantity || !formData.sellingPrice) {
         throw new Error('Please fill all required fields');
       }
+
+      const quantity = parseFloat(formData.quantity);
+      const sellingPrice = parseFloat(formData.sellingPrice);
+      const total_selling_value = quantity * sellingPrice;
 
       const { error } = await supabase
         .from('expired_items')
@@ -232,7 +299,8 @@ const ExpiredStockPage = () => {
           product_id: formData.productId,
           product_name: formData.productName,
           quantity: formData.quantity,
-          selling_price: parseFloat(formData.sellingPrice),
+          selling_price: sellingPrice,
+          total_selling_value: total_selling_value,
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
         });
@@ -256,12 +324,16 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Update expired item mutation
+  // Update expired item
   const updateExpiredItem = useMutation({
     mutationFn: async (updatedItem: ExpiredItem) => {
       if (!updatedItem.product_id || !updatedItem.quantity || !updatedItem.selling_price) {
         throw new Error('Please fill all required fields');
       }
+
+      const quantity = parseFloat(updatedItem.quantity);
+      const sellingPrice = updatedItem.selling_price;
+      const total_selling_value = quantity * sellingPrice;
 
       const { error } = await supabase
         .from('expired_items')
@@ -269,7 +341,8 @@ const ExpiredStockPage = () => {
           product_id: updatedItem.product_id,
           product_name: updatedItem.product_name,
           quantity: updatedItem.quantity,
-          selling_price: updatedItem.selling_price,
+          selling_price: sellingPrice,
+          total_selling_value: total_selling_value,
           batch_date: format(new Date(updatedItem.batch_date), 'yyyy-MM-dd'),
           removal_date: format(new Date(updatedItem.removal_date), 'yyyy-MM-dd')
         })
@@ -287,14 +360,13 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Delete expired item mutation
+  // Delete expired item
   const deleteExpiredItem = useMutation({
     mutationFn: async (itemId: string) => {
       const { error } = await supabase
         .from('expired_items')
         .delete()
         .eq('id', itemId);
-      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -305,89 +377,6 @@ const ExpiredStockPage = () => {
       toast.error(error.message);
     }
   });
-
-  // AI Analysis function using Puter.js
-  const analyzeExpiredItems = async () => {
-    setIsAnalyzing(true);
-    try {
-      if (allExpiredItems.length === 0) {
-        throw new Error('No expired items to analyze');
-      }
-
-      // Load Puter.js dynamically
-      const script = document.createElement('script');
-      script.src = 'https://js.puter.com/v2/';
-      script.async = true;
-      document.body.appendChild(script);
-
-      await new Promise((resolve) => {
-        script.onload = resolve;
-      });
-
-      // Prepare the prompt for analysis
-      const prompt = `
-        Analyze this expired stock data and provide insights:
-        
-        Time Range: ${timeRange}
-        Total Items: ${allExpiredItems.length}
-        Products: ${products.length}
-        
-        Data Summary:
-        - Total financial loss: R${allExpiredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
-        - Most common expired products: ${productSummaries.slice(0, 3).map(p => p.name).join(', ')}
-        
-        Please provide:
-        1. Total items analyzed
-        2. Most common product (name and count)
-        3. Highest cost product (name and total loss)
-        4. Any time patterns in expirations
-        5. Recommendations to reduce waste
-        6. Additional insights
-        
-        Return the response as a JSON object with these properties:
-        - totalItems
-        - mostCommonProduct (object with name, code, count)
-        - highestCostProduct (object with name, totalLoss)
-        - timePattern
-        - recommendations
-        - insights
-      `;
-
-      // Call Puter.js AI
-      // @ts-ignore - Puter.js is loaded dynamically
-      const response = await puter.ai.chat(prompt, { model: selectedModel });
-
-      try {
-        // Try to parse the response as JSON
-        const parsedResponse = JSON.parse(response);
-        setAnalysis(parsedResponse);
-        toast.success("Analysis completed successfully!");
-      } catch (e) {
-        // If parsing fails, create a basic analysis object from the text
-        setAnalysis({
-          totalItems: allExpiredItems.length,
-          mostCommonProduct: productSummaries.length > 0 ? {
-            name: productSummaries[0].name,
-            code: productSummaries[0].code,
-            count: productSummaries[0].items.length
-          } : null,
-          highestCostProduct: productSummaries.length > 0 ? {
-            name: productSummaries[0].name,
-            totalLoss: productSummaries[0].totalLoss
-          } : null,
-          timePattern: "No clear pattern detected",
-          recommendations: "Review inventory management practices",
-          insights: response
-        });
-        toast.success("Analysis completed with text response!");
-      }
-    } catch (error) {
-      console.error('Analysis error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to analyze data');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -422,149 +411,173 @@ const ExpiredStockPage = () => {
     });
   };
 
-  // Print report function
+  // Optimized print function
   const handlePrint = () => {
+    const totalValue = filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0);
+    const totalQuantity = filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
+    const totalProducts = filteredItems.length;
+    const avgValuePerProduct = totalProducts > 0 ? totalValue / totalProducts : 0;
+
     const printContent = `
       <html>
         <head>
           <title>Expired Stock Report</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1, h2, h3 { color: #333; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
-            .summary-item { border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
-            .summary-value { font-size: 1.5rem; font-weight: bold; margin-top: 5px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .product-group { margin-top: 30px; }
-            .product-header { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+            @page { size: A4; margin: 10mm; }
+            body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; }
+            h1 { font-size: 18px; margin: 5px 0; }
+            h2 { font-size: 16px; margin: 5px 0; }
+            .header { text-align: center; margin-bottom: 10px; }
+            .summary-grid { 
+              display: grid; 
+              grid-template-columns: repeat(4, 1fr); 
+              gap: 10px; 
+              margin-bottom: 15px;
+            }
+            .summary-item { 
+              border: 1px solid #ddd; 
+              padding: 8px; 
+              border-radius: 3px; 
+              text-align: center; 
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-top: 10px; 
+              font-size: 11px;
+              page-break-inside: avoid;
+            }
+            th, td { 
+              border: 1px solid #ddd; 
+              padding: 4px; 
+              text-align: left; 
+            }
             .text-red { color: #dc3545; }
-            .text-bold { font-weight: bold; }
-            .page-break { page-break-after: always; }
+            .no-break { page-break-inside: avoid; }
+            .analysis { 
+              margin-top: 20px; 
+              padding: 10px; 
+              border: 1px solid #eee; 
+              border-radius: 5px; 
+              background-color: #f9f9f9;
+              white-space: pre-wrap;
+            }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>Expired Stock Report</h1>
-            <h3>${format(new Date(), 'PPPP')}</h3>
-            <h2>${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} Summary</h2>
+          <div class="header no-break">
+            <h1>Expired Stock Report - ${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)}</h1>
+            <div>Generated: ${format(new Date(), 'PPPPp')}</div>
           </div>
           
-          <div class="summary">
+          <div class="summary-grid no-break">
             <div class="summary-item">
-              <div>Total Items Lost</div>
-              <div class="summary-value">${filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}</div>
+              <div>Products Expired</div>
+              <div class="text-red">${totalProducts}</div>
             </div>
             <div class="summary-item">
-              <div>Total Financial Loss</div>
-              <div class="summary-value text-red">R${filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}</div>
+              <div>Total Units Lost</div>
+              <div class="text-red">${totalQuantity}</div>
             </div>
             <div class="summary-item">
-              <div>Average Loss Per Item</div>
-              <div class="summary-value">R${filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}</div>
+              <div>Potential Sales Value</div>
+              <div class="text-red">R${totalValue.toFixed(2)}</div>
+            </div>
+            <div class="summary-item">
+              <div>Avg Value Per Product</div>
+              <div class="text-red">R${avgValuePerProduct.toFixed(2)}</div>
             </div>
           </div>
           
-          <h2>${reportView === 'summary' ? 'Product Summary' : 'Detailed Items'}</h2>
+          <h2 class="no-break">${reportView === 'summary' ? 'Product Summary' : 'Expired Items Details'}</h2>
           
           ${reportView === 'summary' ? `
-            <table>
+            <table class="no-break">
               <thead>
                 <tr>
-                  <th>Product Code</th>
-                  <th>Product Name</th>
-                  <th>Total Quantity</th>
-                  <th>Total Loss (ZAR)</th>
+                  <th>Product</th>
+                  <th>Code</th>
+                  <th>Units</th>
+                  <th>Total Value</th>
                 </tr>
               </thead>
               <tbody>
                 ${productSummaries.map(summary => `
                   <tr>
-                    <td>${summary.code}</td>
                     <td>${summary.name}</td>
+                    <td>${summary.code}</td>
                     <td>${summary.totalQuantity}</td>
-                    <td class="text-red">R${summary.totalLoss.toFixed(2)}</td>
+                    <td class="text-red">R${summary.totalValue.toFixed(2)}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
           ` : `
-             <table>
-               <thead>
-                 <tr>
-                   <th>Production Date</th>
-                   <th>Removal Date</th>
-                   <th>Product Code</th>
-                   <th>Product Name</th>
-                   <th>Quantity</th>
-                   <th>Unit Price</th>
-                   <th>Total Loss</th>
-                 </tr>
-               </thead>
+            <table class="no-break">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Code</th>
+                  <th>Prod Date</th>
+                  <th>Expiry</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
               <tbody>
-                 ${filteredItems.map(item => `
-                   <tr>
-                     <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
-                     <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
-                     <td>${item.products?.code || 'N/A'}</td>
-                     <td>${item.product_name}</td>
-                     <td>${item.quantity}</td>
-                     <td>R${item.selling_price?.toFixed(2)}</td>
-                     <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
-                   </tr>
-                 `).join('')}
+                ${filteredItems.map(item => `
+                  <tr>
+                    <td>${item.product_name}</td>
+                    <td>${item.products?.code || 'N/A'}</td>
+                    <td>${format(parseISO(item.batch_date), 'MMM d')}</td>
+                    <td>${format(parseISO(item.removal_date), 'MMM d')}</td>
+                    <td>${item.quantity}</td>
+                    <td>R${item.selling_price?.toFixed(2)}</td>
+                    <td class="text-red">R${item.total_selling_value?.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
               </tbody>
             </table>
           `}
           
-          ${reportView === 'summary' ? `
-            <div class="page-break"></div>
-            <h2>Detailed Breakdown by Product</h2>
-            ${productSummaries.map(summary => `
-              <div class="product-group">
-                <div class="product-header">
-                  <h3>${summary.name} (${summary.code})</h3>
-                  <div>Total: ${summary.totalQuantity} units | R${summary.totalLoss.toFixed(2)}</div>
-                </div>
-                <table>
-                  <thead>
-                     <tr>
-                      <th>Production Date</th>
-                      <th>Removal Date</th>
-                      <th>Quantity</th>
-                      <th>Unit Price</th>
-                      <th>Total Loss</th>
-                     </tr>
-                  </thead>
-                  <tbody>
-                     ${summary.items.map(item => `
-                       <tr>
-                         <td>${format(parseISO(item.batch_date), 'MMM d, yyyy')}</td>
-                         <td>${format(parseISO(item.removal_date), 'MMM d, yyyy')}</td>
-                         <td>${item.quantity}</td>
-                         <td>R${item.selling_price?.toFixed(2)}</td>
-                         <td class="text-red">R${item.total_cost_loss?.toFixed(2)}</td>
-                       </tr>
-                     `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            `).join('')}
+          ${analysisResult ? `
+            <h2 class="no-break">AI Analysis</h2>
+            <div class="analysis no-break">${analysisResult}</div>
           ` : ''}
         </body>
       </html>
     `;
 
     const printWindow = window.open('', '_blank');
-    printWindow?.document.write(printContent);
-    printWindow?.document.close();
-    printWindow?.focus();
-    setTimeout(() => {
-      printWindow?.print();
-    }, 500);
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    }
   };
+
+  const requestSort = (key: keyof ExpiredItem) => {
+    let direction: 'asc' | 'desc' = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  if (isLoadingProducts || isLoadingExpiredItems) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading expired stock data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
@@ -630,36 +643,63 @@ const ExpiredStockPage = () => {
           >
             Print Report
           </Button>
+          <Button 
+            variant="default" 
+            onClick={analyzeDataWithDeepSeek}
+            disabled={isAnalyzing || filteredItems.length === 0}
+          >
+            {isAnalyzing ? "Analyzing..." : "AI Analysis"}
+          </Button>
         </div>
       </div>
 
-      {/* Loss Summary */}
+      {/* Sales Value Summary */}
       <Card className="bg-red-50 border-red-200">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600">Total Items Lost ({timeRange})</p>
+              <p className="text-sm text-gray-600">Products Expired</p>
+              <p className="text-2xl font-bold text-red-600">
+                {filteredItems.length}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Total Units Lost</p>
               <p className="text-2xl font-bold text-red-600">
                 {filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0)}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Total Financial Loss ({timeRange})</p>
+              <p className="text-sm text-gray-600">Potential Sales Value</p>
               <p className="text-2xl font-bold text-red-600">
-                R{filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
+                R{filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0).toFixed(2)}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Average Loss Per Item ({timeRange})</p>
+              <p className="text-sm text-gray-600">Avg Value Per Product</p>
               <p className="text-2xl font-bold text-red-600">
-                R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}
+                R{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0) / filteredItems.length).toFixed(2) : '0.00'}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
       
-      {/* Add/Edit Expired Item Form */}
+      {/* AI Analysis Results */}
+      {analysisResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle>AI Analysis Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 bg-gray-50 rounded-md whitespace-pre-wrap">
+              {analysisResult}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Add/Edit Form */}
       <Card>
         <CardHeader>
           <CardTitle>{editingItem ? 'Edit Expired Item' : 'Log Expired Item'}</CardTitle>
@@ -731,7 +771,7 @@ const ExpiredStockPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Selling Price Per Unit (ZAR) *</label>
+                <label className="block text-sm font-medium mb-1">Selling Price (ZAR) *</label>
                 <Input
                   type="number"
                   step="0.01"
@@ -824,9 +864,7 @@ const ExpiredStockPage = () => {
           <CardTitle>Expired Items History ({timeRange})</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-4">Loading expired items...</div>
-          ) : filteredItems.length > 0 ? (
+          {filteredItems.length > 0 ? (
             <div className="overflow-x-auto">
               {reportView === 'summary' ? (
                 <Table>
@@ -837,9 +875,9 @@ const ExpiredStockPage = () => {
                       <TableHead>Total Quantity</TableHead>
                       <TableHead 
                         className="cursor-pointer"
-                        onClick={() => requestSort('total_cost_loss')}
+                        onClick={() => requestSort('total_selling_value')}
                       >
-                        Total Loss (ZAR) {sortConfig.key === 'total_cost_loss' && (
+                        Total Value (ZAR) {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -853,7 +891,7 @@ const ExpiredStockPage = () => {
                         <TableCell>{summary.name}</TableCell>
                         <TableCell>{summary.totalQuantity}</TableCell>
                         <TableCell className="font-semibold text-red-600">
-                          R{summary.totalLoss.toFixed(2)}
+                          R{summary.totalValue.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button 
@@ -862,7 +900,6 @@ const ExpiredStockPage = () => {
                             className="text-blue-500 hover:text-blue-700"
                             onClick={() => {
                               setReportView('detailed');
-                              // Scroll to the first item of this product
                               setTimeout(() => {
                                 document.getElementById(`product-${summary.code}`)?.scrollIntoView();
                               }, 100);
@@ -878,18 +915,39 @@ const ExpiredStockPage = () => {
               ) : (
                 <Table>
                   <TableHeader>
-                     <TableRow>
-                       <TableHead>Production Date</TableHead>
-                       <TableHead>Removal Date</TableHead>
-                       <TableHead>Product Code</TableHead>
-                       <TableHead>Product Name</TableHead>
-                       <TableHead>Quantity</TableHead>
-                       <TableHead>Unit Price</TableHead>
+                    <TableRow>
                       <TableHead 
                         className="cursor-pointer"
-                        onClick={() => requestSort('total_cost_loss')}
+                        onClick={() => requestSort('product_name')}
                       >
-                        Total Loss (ZAR) {sortConfig.key === 'total_cost_loss' && (
+                        Product {sortConfig.key === 'product_name' && (
+                          sortConfig.direction === 'asc' ? '↑' : '↓'
+                        )}
+                      </TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead 
+                        className="cursor-pointer"
+                        onClick={() => requestSort('batch_date')}
+                      >
+                        Prod Date {sortConfig.key === 'batch_date' && (
+                          sortConfig.direction === 'asc' ? '↑' : '↓'
+                        )}
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer"
+                        onClick={() => requestSort('removal_date')}
+                      >
+                        Expiry {sortConfig.key === 'removal_date' && (
+                          sortConfig.direction === 'asc' ? '↑' : '↓'
+                        )}
+                      </TableHead>
+                      <TableHead>Qty</TableHead>
+                      <TableHead>Unit Price</TableHead>
+                      <TableHead 
+                        className="cursor-pointer"
+                        onClick={() => requestSort('total_selling_value')}
+                      >
+                        Total {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -898,15 +956,15 @@ const ExpiredStockPage = () => {
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map(item => (
-                       <TableRow key={item.id} id={`product-${item.products?.code || 'N/A'}`}>
-                         <TableCell>{format(parseISO(item.batch_date), 'MMM d, yyyy')}</TableCell>
-                         <TableCell>{format(parseISO(item.removal_date), 'MMM d, yyyy')}</TableCell>
-                         <TableCell className="font-mono">{item.products?.code || 'N/A'}</TableCell>
-                         <TableCell>{item.product_name}</TableCell>
-                         <TableCell>{item.quantity}</TableCell>
-                         <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
+                      <TableRow key={item.id} id={`product-${item.products?.code || 'N/A'}`}>
+                        <TableCell>{item.product_name}</TableCell>
+                        <TableCell className="font-mono">{item.products?.code || 'N/A'}</TableCell>
+                        <TableCell>{format(parseISO(item.batch_date), 'MMM d')}</TableCell>
+                        <TableCell>{format(parseISO(item.removal_date), 'MMM d')}</TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell>R{item.selling_price?.toFixed(2)}</TableCell>
                         <TableCell className="font-semibold text-red-600">
-                          R{item.total_cost_loss?.toFixed(2)}
+                          R{item.total_selling_value?.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button 
@@ -941,77 +999,7 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
-      {/* AI Analysis Section with Puter.js */}
-      <Card>
-        <CardHeader>
-          <CardTitle>AI Production Analysis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Select AI Model</label>
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select AI model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
-                  <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
-                  <SelectItem value="gpt-4.5-preview">GPT-4.5 Preview</SelectItem>
-                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                  <SelectItem value="o1-mini">o1-mini</SelectItem>
-                  <SelectItem value="o3-mini">o3-mini</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-gray-500 mt-1">
-                Using Puter.js for free AI analysis - no API key required.
-              </p>
-            </div>
-            
-            <p className="text-sm text-gray-600">
-              Get AI-powered insights about your expired products and waste patterns.
-            </p>
-            
-            <Button 
-              onClick={analyzeExpiredItems}
-              disabled={isAnalyzing || allExpiredItems.length === 0}
-              className="w-full"
-            >
-              {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
-            </Button>
-
-            {analysis && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                <h3 className="font-medium mb-2">Analysis Results</h3>
-                <div className="space-y-2">
-                  <p><strong>Total Items Analyzed:</strong> {analysis.totalItems}</p>
-                  {analysis.mostCommonProduct && (
-                    <p>
-                      <strong>Most Common Product:</strong> {analysis.mostCommonProduct.name} 
-                      ({analysis.mostCommonProduct.count} occurrences)
-                    </p>
-                  )}
-                  {analysis.highestCostProduct && (
-                    <p>
-                      <strong>Highest Cost Product:</strong> {analysis.highestCostProduct.name} 
-                      (R{analysis.highestCostProduct.totalLoss.toFixed(2)})
-                    </p>
-                  )}
-                  <p><strong>Time Pattern:</strong> {analysis.timePattern}</p>
-                  <p><strong>Recommendations:</strong> {analysis.recommendations}</p>
-                  {analysis.insights && (
-                    <div className="mt-4 p-3 bg-blue-50 rounded">
-                      <h4 className="font-medium text-blue-800">Additional Insights</h4>
-                      <p className="mt-1">{analysis.insights}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      
+      <ProductionAnalysisReport />
       <Navigation />
     </div>
   );
