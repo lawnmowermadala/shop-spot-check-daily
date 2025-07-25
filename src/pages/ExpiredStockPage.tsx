@@ -75,8 +75,9 @@ const ExpiredStockPage = () => {
     key: 'total_cost_loss',
     direction: 'desc',
   });
-  const [openAiApiKey, setOpenAiApiKey] = useState('');
-  const [isApiKeyValid, setIsApiKeyValid] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gpt-4.1-nano');
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [formData, setFormData] = useState({
     productId: '',
@@ -305,92 +306,87 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Verify OpenAI API Key
-  const verifyApiKey = async (key: string) => {
-    try {
-      const response = await fetch('https://api.openai.com/v1/models', {
-        headers: {
-          'Authorization': `Bearer ${key}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  // Handle API Key submission
-  const handleApiKeySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!openAiApiKey) {
-      toast.error('Please enter an API key');
-      return;
-    }
-
-    const isValid = await verifyApiKey(openAiApiKey);
-    setIsApiKeyValid(isValid);
-    
-    if (isValid) {
-      toast.success('API key validated successfully!');
-      localStorage.setItem('openAiApiKey', openAiApiKey);
-    } else {
-      toast.error('Invalid API key. Please check and try again.');
-    }
-  };
-
-  // AI Analysis function
+  // AI Analysis function using Puter.js
   const analyzeExpiredItems = async () => {
+    setIsAnalyzing(true);
     try {
-      if (!isApiKeyValid) {
-        throw new Error('Please provide a valid OpenAI API key first');
-      }
-
       if (allExpiredItems.length === 0) {
         throw new Error('No expired items to analyze');
       }
 
-      const response = await fetch('/api/analyze-expired', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openAiApiKey}`
-        },
-        body: JSON.stringify({
-          items: allExpiredItems,
-          timeRange,
-          dateRange: dateRange ? {
-            from: dateRange.from?.toISOString(),
-            to: dateRange.to?.toISOString()
-          } : null
-        }),
+      // Load Puter.js dynamically
+      const script = document.createElement('script');
+      script.src = 'https://js.puter.com/v2/';
+      script.async = true;
+      document.body.appendChild(script);
+
+      await new Promise((resolve) => {
+        script.onload = resolve;
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Analysis failed');
-      }
+      // Prepare the prompt for analysis
+      const prompt = `
+        Analyze this expired stock data and provide insights:
+        
+        Time Range: ${timeRange}
+        Total Items: ${allExpiredItems.length}
+        Products: ${products.length}
+        
+        Data Summary:
+        - Total financial loss: R${allExpiredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
+        - Most common expired products: ${productSummaries.slice(0, 3).map(p => p.name).join(', ')}
+        
+        Please provide:
+        1. Total items analyzed
+        2. Most common product (name and count)
+        3. Highest cost product (name and total loss)
+        4. Any time patterns in expirations
+        5. Recommendations to reduce waste
+        6. Additional insights
+        
+        Return the response as a JSON object with these properties:
+        - totalItems
+        - mostCommonProduct (object with name, code, count)
+        - highestCostProduct (object with name, totalLoss)
+        - timePattern
+        - recommendations
+        - insights
+      `;
 
-      return await response.json();
+      // Call Puter.js AI
+      // @ts-ignore - Puter.js is loaded dynamically
+      const response = await puter.ai.chat(prompt, { model: selectedModel });
+
+      try {
+        // Try to parse the response as JSON
+        const parsedResponse = JSON.parse(response);
+        setAnalysis(parsedResponse);
+        toast.success("Analysis completed successfully!");
+      } catch (e) {
+        // If parsing fails, create a basic analysis object from the text
+        setAnalysis({
+          totalItems: allExpiredItems.length,
+          mostCommonProduct: productSummaries.length > 0 ? {
+            name: productSummaries[0].name,
+            code: productSummaries[0].code,
+            count: productSummaries[0].items.length
+          } : null,
+          highestCostProduct: productSummaries.length > 0 ? {
+            name: productSummaries[0].name,
+            totalLoss: productSummaries[0].totalLoss
+          } : null,
+          timePattern: "No clear pattern detected",
+          recommendations: "Review inventory management practices",
+          insights: response
+        });
+        toast.success("Analysis completed with text response!");
+      }
     } catch (error) {
       console.error('Analysis error:', error);
-      throw error instanceof Error ? error : new Error('Analysis failed');
+      toast.error(error instanceof Error ? error.message : 'Failed to analyze data');
+    } finally {
+      setIsAnalyzing(false);
     }
-  };
-
-  const { data: analysis, isLoading: isAnalyzing, refetch: runAnalysis } = useQuery({
-    queryKey: ['expired-analysis', timeRange, dateRange],
-    queryFn: analyzeExpiredItems,
-    enabled: false,
-    retry: false,
-  });
-
-  const handleAnalyze = () => {
-    toast.promise(runAnalysis(), {
-      loading: 'Analyzing expired items...',
-      success: (data) => data?.message || 'Analysis completed successfully!',
-      error: (err: Error) => err.message || 'Failed to analyze data',
-    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -945,87 +941,72 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
-      {/* AI Analysis Section */}
+      {/* AI Analysis Section with Puter.js */}
       <Card>
         <CardHeader>
           <CardTitle>AI Production Analysis</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {!isApiKeyValid ? (
-              <form onSubmit={handleApiKeySubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
-                  <Input
-                    type="password"
-                    placeholder="Enter your OpenAI API key"
-                    value={openAiApiKey}
-                    onChange={(e) => setOpenAiApiKey(e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Your API key is used only for this analysis and is not stored on our servers.
-                  </p>
-                </div>
-                <Button type="submit" className="w-full">
-                  Validate API Key
-                </Button>
-              </form>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                  <p className="text-sm text-green-600">API Key Validated</p>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setIsApiKeyValid(false)}
-                    className="ml-auto"
-                  >
-                    Change Key
-                  </Button>
-                </div>
-                
-                <p className="text-sm text-gray-600">
-                  Get AI-powered insights about your expired products and waste patterns.
-                </p>
-                
-                <Button 
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing || allExpiredItems.length === 0}
-                  className="w-full"
-                >
-                  {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
-                </Button>
+            <div>
+              <label className="block text-sm font-medium mb-1">Select AI Model</label>
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select AI model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
+                  <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
+                  <SelectItem value="gpt-4.5-preview">GPT-4.5 Preview</SelectItem>
+                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                  <SelectItem value="o1-mini">o1-mini</SelectItem>
+                  <SelectItem value="o3-mini">o3-mini</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-500 mt-1">
+                Using Puter.js for free AI analysis - no API key required.
+              </p>
+            </div>
+            
+            <p className="text-sm text-gray-600">
+              Get AI-powered insights about your expired products and waste patterns.
+            </p>
+            
+            <Button 
+              onClick={analyzeExpiredItems}
+              disabled={isAnalyzing || allExpiredItems.length === 0}
+              className="w-full"
+            >
+              {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+            </Button>
 
-                {analysis && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                    <h3 className="font-medium mb-2">Analysis Results</h3>
-                    <div className="space-y-2">
-                      <p><strong>Total Items Analyzed:</strong> {analysis.data.totalItems}</p>
-                      {analysis.data.mostCommonProduct && (
-                        <p>
-                          <strong>Most Common Product:</strong> {analysis.data.mostCommonProduct.name} 
-                          ({analysis.data.mostCommonProduct.count} occurrences)
-                        </p>
-                      )}
-                      {analysis.data.highestCostProduct && (
-                        <p>
-                          <strong>Highest Cost Product:</strong> {analysis.data.highestCostProduct.name} 
-                          (R{analysis.data.highestCostProduct.totalLoss.toFixed(2)})
-                        </p>
-                      )}
-                      <p><strong>Time Pattern:</strong> {analysis.data.timePattern}</p>
-                      <p><strong>Recommendations:</strong> {analysis.data.recommendations}</p>
-                      {analysis.data.insights && (
-                        <div className="mt-4 p-3 bg-blue-50 rounded">
-                          <h4 className="font-medium text-blue-800">Additional Insights</h4>
-                          <p className="mt-1">{analysis.data.insights}</p>
-                        </div>
-                      )}
+            {analysis && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                <h3 className="font-medium mb-2">Analysis Results</h3>
+                <div className="space-y-2">
+                  <p><strong>Total Items Analyzed:</strong> {analysis.totalItems}</p>
+                  {analysis.mostCommonProduct && (
+                    <p>
+                      <strong>Most Common Product:</strong> {analysis.mostCommonProduct.name} 
+                      ({analysis.mostCommonProduct.count} occurrences)
+                    </p>
+                  )}
+                  {analysis.highestCostProduct && (
+                    <p>
+                      <strong>Highest Cost Product:</strong> {analysis.highestCostProduct.name} 
+                      (R{analysis.highestCostProduct.totalLoss.toFixed(2)})
+                    </p>
+                  )}
+                  <p><strong>Time Pattern:</strong> {analysis.timePattern}</p>
+                  <p><strong>Recommendations:</strong> {analysis.recommendations}</p>
+                  {analysis.insights && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded">
+                      <h4 className="font-medium text-blue-800">Additional Insights</h4>
+                      <p className="mt-1">{analysis.insights}</p>
                     </div>
-                  </div>
-                )}
-              </>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </CardContent>
