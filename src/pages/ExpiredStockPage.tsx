@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, CheckCircle, Loader2 } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
@@ -13,10 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
-import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
 
-// Types
 interface ExpiredItem {
   id: string;
   product_name: string;
@@ -47,9 +45,28 @@ interface ProductSummary {
   items: ExpiredItem[];
 }
 
+interface AnalysisResult {
+  success: boolean;
+  data: {
+    analysis: string;
+    totalItems: number;
+    timeRange: string;
+  };
+  message: string;
+}
+
+declare global {
+  interface Window {
+    puter: {
+      ai: {
+        chat: (prompt: string, options?: { model?: string, stream?: boolean }) => Promise<string>;
+      };
+    };
+  }
+}
+
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
-  const [date, setDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [isBatchCalendarOpen, setIsBatchCalendarOpen] = useState(false);
@@ -62,6 +79,9 @@ const ExpiredStockPage = () => {
     key: 'total_cost_loss',
     direction: 'desc',
   });
+  const [isPuterLoaded, setIsPuterLoaded] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gpt-4.1');
+
   const [formData, setFormData] = useState({
     productId: '',
     productName: '',
@@ -70,6 +90,21 @@ const ExpiredStockPage = () => {
     batchDate: new Date(),
     removalDate: new Date(),
   });
+
+  // Load Puter.js
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (window.puter) {
+        setIsPuterLoaded(true);
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://js.puter.com/v2/';
+        script.onload = () => setIsPuterLoaded(true);
+        script.onerror = () => console.error('Failed to load Puter.js');
+        document.head.appendChild(script);
+      }
+    }
+  }, []);
 
   // Fetch products
   const { data: products = [] } = useQuery({
@@ -85,8 +120,8 @@ const ExpiredStockPage = () => {
     }
   });
 
-  // Fetch expired items with product details
-  const { data: expiredItems = [], isLoading } = useQuery({
+  // Fetch ALL expired items with product details
+  const { data: allExpiredItems = [], isLoading } = useQuery({
     queryKey: ['expired-items'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -103,7 +138,7 @@ const ExpiredStockPage = () => {
   });
 
   // Sort items
-  const sortedItems = [...expiredItems].sort((a, b) => {
+  const sortedItems = [...allExpiredItems].sort((a, b) => {
     if (a[sortConfig.key] < b[sortConfig.key]) {
       return sortConfig.direction === 'asc' ? -1 : 1;
     }
@@ -113,7 +148,7 @@ const ExpiredStockPage = () => {
     return 0;
   });
 
-  // Get filtered items based on time range
+  // Filter items based on time range
   const getFilteredItems = () => {
     const now = new Date();
     let startDate, endDate;
@@ -136,7 +171,7 @@ const ExpiredStockPage = () => {
           startDate = startOfDay(dateRange.from);
           endDate = endOfDay(dateRange.to);
         } else {
-          return sortedItems; // Return all items if no custom range selected
+          return sortedItems;
         }
         break;
       default:
@@ -218,7 +253,6 @@ const ExpiredStockPage = () => {
           selling_price: parseFloat(formData.sellingPrice),
           batch_date: format(formData.batchDate, 'yyyy-MM-dd'),
           removal_date: format(formData.removalDate, 'yyyy-MM-dd')
-          // Let the database calculate total_cost_loss
         });
 
       if (error) throw error;
@@ -256,7 +290,6 @@ const ExpiredStockPage = () => {
           selling_price: updatedItem.selling_price,
           batch_date: format(new Date(updatedItem.batch_date), 'yyyy-MM-dd'),
           removal_date: format(new Date(updatedItem.removal_date), 'yyyy-MM-dd')
-          // Let the database calculate total_cost_loss
         })
         .eq('id', updatedItem.id);
 
@@ -290,6 +323,66 @@ const ExpiredStockPage = () => {
       toast.error(error.message);
     }
   });
+
+  // AI Analysis function using Puter.js
+  const analyzeExpiredItems = async () => {
+    try {
+      if (!isPuterLoaded) {
+        throw new Error('AI service is still loading. Please try again in a moment.');
+      }
+
+      if (allExpiredItems.length === 0) {
+        throw new Error('No expired items to analyze');
+      }
+
+      // Prepare the prompt
+      const prompt = `Analyze these expired stock items:
+      - Total items: ${allExpiredItems.length}
+      - Time range: ${timeRange}
+      - Sample items: ${JSON.stringify(allExpiredItems.slice(0, 3))}
+      
+      Provide a detailed analysis with:
+      1. Summary of patterns and trends
+      2. Top 3 problematic products with reasons
+      3. Specific recommendations to reduce waste
+      4. Any seasonal trends detected
+      5. Cost-saving opportunities
+      
+      Format the response with clear sections and bullet points.`;
+
+      const response = await window.puter.ai.chat(prompt, { 
+        model: selectedModel
+      });
+
+      return {
+        success: true,
+        data: {
+          analysis: response,
+          totalItems: allExpiredItems.length,
+          timeRange: timeRange
+        },
+        message: 'Analysis completed successfully'
+      };
+    } catch (error) {
+      console.error('Analysis error:', error);
+      throw error instanceof Error ? error : new Error('Analysis failed');
+    }
+  };
+
+  const { data: analysis, isLoading: isAnalyzing, error: analysisError, refetch: runAnalysis } = useQuery({
+    queryKey: ['expired-analysis', timeRange, dateRange, selectedModel],
+    queryFn: analyzeExpiredItems,
+    enabled: false,
+    retry: false,
+  });
+
+  const handleAnalyze = () => {
+    toast.promise(runAnalysis(), {
+      loading: 'Analyzing expired items...',
+      success: (data) => data?.message || 'Analysis completed successfully!',
+      error: (err: Error) => err.message || 'Failed to analyze data',
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -843,8 +936,93 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
-      {/* AI Production Analysis Report */}
-      <ProductionAnalysisReport />
+      {/* AI Analysis Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Production Analysis (Free)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {!isPuterLoaded ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading AI service...</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 bg-green-50 p-2 rounded-md">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-sm text-green-700">AI Service Ready</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">AI Model</label>
+                    <Select value={selectedModel} onValueChange={setSelectedModel}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select AI Model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
+                        <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
+                        <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                        <SelectItem value="o3-mini">O3 Mini</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-600">
+                  Get free AI-powered insights about expired product patterns using Puter.js.
+                </p>
+
+                <Button
+                  onClick={() => handleAnalyze()}
+                  disabled={isAnalyzing || allExpiredItems.length === 0}
+                  className="w-full"
+                >
+                  {isAnalyzing ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Analyzing...</span>
+                    </div>
+                  ) : (
+                    'Run Free Analysis'
+                  )}
+                </Button>
+
+                {analysisError && (
+                  <div className="p-3 bg-red-50 rounded-md border border-red-200">
+                    <p className="text-red-600">{analysisError.message}</p>
+                  </div>
+                )}
+
+                {analysis && (
+                  <div className="mt-4 space-y-4">
+                    <div className="p-4 bg-blue-50 rounded-md border border-blue-200">
+                      <h4 className="font-medium text-blue-800 mb-2">Analysis Summary</h4>
+                      <div className="prose prose-sm max-w-none whitespace-pre-wrap">
+                        {analysis.data.analysis}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-3 bg-green-50 rounded-md border border-green-200">
+                        <h4 className="font-medium text-green-800">Total Items Analyzed</h4>
+                        <p className="text-2xl font-bold mt-1">{analysis.data.totalItems}</p>
+                      </div>
+                      <div className="p-3 bg-purple-50 rounded-md border border-purple-200">
+                        <h4 className="font-medium text-purple-800">Time Range</h4>
+                        <p className="text-lg mt-1 capitalize">{analysis.data.timeRange}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       
       <Navigation />
     </div>
