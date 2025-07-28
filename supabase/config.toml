@@ -1,4 +1,1 @@
 project_id = "jvxgcxqutakvulcombjn"
-
-[functions.production-analysis]
-verify_jwt = false

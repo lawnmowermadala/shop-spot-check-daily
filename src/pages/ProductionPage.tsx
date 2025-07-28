@@ -12,7 +12,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
 import RecipeEditModal from '@/components/RecipeEditModal';
-import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Types
@@ -1500,9 +1499,6 @@ const ProductionPage = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* AI Production Analysis Report */}
-      <ProductionAnalysisReport />
       
       {/* Recipe Edit Modal */}
       <RecipeEditModal
