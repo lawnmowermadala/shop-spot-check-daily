@@ -64,8 +64,7 @@ serve(async (req) => {
         quantity,
         total_cost_loss,
         removal_date,
-        batch_date,
-        selling_price
+        batch_date
       `)
       .gte('removal_date', dateRange.from)
       .lte('removal_date', dateRange.to);
@@ -88,123 +87,47 @@ serve(async (req) => {
       total_cost_loss: item.total_cost_loss,
       removal_date: item.removal_date,
       day_of_week: new Date(item.removal_date).toLocaleDateString('en-US', { weekday: 'long' }),
-      batch_date: item.batch_date,
-      selling_price: item.selling_price
+      batch_date: item.batch_date
     })) || [];
-
-    // Create selling price lookup from expired items
-    const sellingPriceLookup = transformedExpired.reduce((acc, item) => {
-      if (item.selling_price && !acc[item.product_name]) {
-        acc[item.product_name] = item.selling_price;
-      }
-      return acc;
-    }, {});
-
-    // Calculate daily breakdowns for better analysis
-    const dailyProductionBreakdown = transformedProduction.reduce((acc, item) => {
-      const date = item.date;
-      if (!acc[date]) {
-        acc[date] = { totalCost: 0, totalQuantity: 0, products: {}, saleValue: 0 };
-      }
-      acc[date].totalCost += item.total_cost || 0;
-      acc[date].totalQuantity += item.quantity_produced || 0;
-      
-      // Use actual selling price if available, otherwise fallback to 40% markup
-      const sellingPrice = sellingPriceLookup[item.product_name];
-      const saleValue = sellingPrice 
-        ? (item.quantity_produced || 0) * sellingPrice
-        : (item.total_cost || 0) * 1.4;
-      acc[date].saleValue += saleValue;
-      
-      if (!acc[date].products[item.product_name]) {
-        acc[date].products[item.product_name] = { cost: 0, quantity: 0, saleValue: 0 };
-      }
-      acc[date].products[item.product_name].cost += item.total_cost || 0;
-      acc[date].products[item.product_name].quantity += item.quantity_produced || 0;
-      acc[date].products[item.product_name].saleValue += saleValue;
-      
-      return acc;
-    }, {});
-
-    const dailyExpiredBreakdown = transformedExpired.reduce((acc, item) => {
-      const date = item.removal_date;
-      if (!acc[date]) {
-        acc[date] = { totalLoss: 0, totalQuantity: 0, products: {}, saleValueLoss: 0 };
-      }
-      acc[date].totalLoss += item.total_cost_loss || 0;
-      acc[date].totalQuantity += parseFloat(item.quantity || '0');
-      acc[date].saleValueLoss += (item.total_cost_loss || 0) * 1.4; // Sale value loss
-      
-      if (!acc[date].products[item.product_name]) {
-        acc[date].products[item.product_name] = { loss: 0, quantity: 0, saleValueLoss: 0 };
-      }
-      acc[date].products[item.product_name].loss += item.total_cost_loss || 0;
-      acc[date].products[item.product_name].quantity += parseFloat(item.quantity || '0');
-      acc[date].products[item.product_name].saleValueLoss += (item.total_cost_loss || 0) * 1.4;
-      
-      return acc;
-    }, {});
 
     // Prepare data for AI analysis
     const analysisPrompt = `
 Analyze this production and expired stock data to provide actionable insights for production optimization:
 
-DAILY PRODUCTION BREAKDOWN:
-${JSON.stringify(dailyProductionBreakdown, null, 2)}
-
-DAILY EXPIRED STOCK BREAKDOWN:
-${JSON.stringify(dailyExpiredBreakdown, null, 2)}
-
-PRODUCTION DATA DETAILS:
+PRODUCTION DATA:
 ${JSON.stringify(transformedProduction, null, 2)}
 
-EXPIRED STOCK DATA DETAILS:
+EXPIRED STOCK DATA:
 ${JSON.stringify(transformedExpired, null, 2)}
 
 DATE RANGE: ${dateRange.from} to ${dateRange.to}
 
-Please provide a comprehensive DAILY-FOCUSED analysis including:
+Please provide a comprehensive analysis including:
 
-1. **DAILY OVERPRODUCTION ANALYSIS**: 
-   - Day-by-day breakdown of which products are being produced in excess
-   - Daily expired quantities relative to daily production
-   - Identify worst performing days
+1. **OVERPRODUCTION ANALYSIS**: Which products are being produced in excess (high expired quantities relative to production)?
 
 2. **DAY-OF-WEEK PATTERNS**: 
-   - Daily production vs expired ratios for each day
-   - Specific days when certain products expire more
-   - Daily recommended production schedule adjustments
+   - Which days of the week show highest production vs expired ratios?
+   - Are there specific days when certain products expire more?
+   - Recommended production schedule adjustments by day
 
-3. **DAILY PRODUCT-SPECIFIC RECOMMENDATIONS**:
-   - Daily optimal production quantities by product
-   - Products to reduce/increase production for on specific days
-   - Day-specific production targets
+3. **PRODUCT-SPECIFIC RECOMMENDATIONS**:
+   - Products to reduce production for
+   - Products to increase production for
+   - Optimal production quantities by product
 
-4. **DAILY SALE VALUE IMPACT ANALYSIS**:
-   - Day-by-day estimated sale value of production (40% markup on production cost)
-   - Daily financial loss from expired products in sale value terms (ZAR)
-   - Daily lost revenue potential from expired stock
-   - Daily cost savings and revenue recovery potential
+4. **COST IMPACT ANALYSIS**:
+   - Total financial loss from expired products (in South African Rand - ZAR)
+   - Cost savings potential from optimization
+   - ROI projections for recommended changes
 
-5. **WEEKLY PRODUCTION PROPOSAL WITH DAILY BREAKDOWN**:
-   - Monday through Sunday specific production quantities by product
-   - Daily expected sale values for each day's production plan
-   - Daily rationale for each day's production recommendations
-   - Daily target reductions to minimize waste
+5. **TIME-OF-MONTH PATTERNS**: Any monthly trends affecting production efficiency
 
-6. **DAILY PERFORMANCE METRICS**:
-   - Daily efficiency ratios
-   - Daily waste percentages
-   - Daily sale value targets vs losses
+6. **STAFF PERFORMANCE**: Which staff members have better production efficiency ratios
 
-7. **DAILY ACTIONABLE RECOMMENDATIONS**: 
-   - Specific daily production adjustments
-   - Daily monitoring targets
-   - Day-specific operational changes
+7. **ACTIONABLE RECOMMENDATIONS**: Specific, measurable steps to reduce waste and optimize production
 
-IMPORTANT: All calculations, recommendations, and metrics must be presented on a DAILY basis, not aggregated. Show daily figures, daily targets, daily losses, and daily improvements. All currency amounts in South African Rand (ZAR).
-
-Format as a professional daily operations report for production meetings.
+Format the response as a professional report that can be printed and used for production meetings. Include specific numbers, percentages, and clear action items. All currency amounts should be referenced in South African Rand (ZAR).
 `;
 
     // Call OpenRouter API

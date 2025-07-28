@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
@@ -13,14 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
-import ProductionAnalysisReport from '@/components/ProductionAnalysisReport';
 import Navigation from '@/components/Navigation';
-
-declare global {
-  interface Window {
-    puter: any;
-  }
-}
 
 interface ExpiredItem {
   id: string;
@@ -74,26 +67,8 @@ const ExpiredStockPage = () => {
     batchDate: new Date(),
     removalDate: new Date(),
   });
-  const [analysisResult, setAnalysisResult] = useState<string>('');
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [puterLoaded, setPuterLoaded] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !window.puter) {
-      const script = document.createElement('script');
-      script.src = 'https://js.puter.com/v2/';
-      script.async = true;
-      script.onload = () => setPuterLoaded(true);
-      document.body.appendChild(script);
-
-      return () => {
-        document.body.removeChild(script);
-      };
-    } else if (window.puter) {
-      setPuterLoaded(true);
-    }
-  }, []);
-
+  // Fetch products
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
@@ -106,6 +81,7 @@ const ExpiredStockPage = () => {
     }
   });
 
+  // Fetch expired items with calculated selling value
   const { data: expiredItems = [], isLoading: isLoadingExpiredItems } = useQuery({
     queryKey: ['expired-items'],
     queryFn: async () => {
@@ -123,6 +99,7 @@ const ExpiredStockPage = () => {
     }
   });
 
+  // Sort items
   const sortedItems = [...expiredItems].sort((a, b) => {
     if (a[sortConfig.key] < b[sortConfig.key]) {
       return sortConfig.direction === 'asc' ? -1 : 1;
@@ -133,6 +110,7 @@ const ExpiredStockPage = () => {
     return 0;
   });
 
+  // Filter items by time range
   const getFilteredItems = () => {
     const now = new Date();
     let startDate, endDate;
@@ -171,6 +149,7 @@ const ExpiredStockPage = () => {
 
   const filteredItems = getFilteredItems();
 
+  // Group items by product
   const getProductSummaries = (items: ExpiredItem[]): ProductSummary[] => {
     const productMap = new Map<string, ProductSummary>();
     
@@ -200,85 +179,7 @@ const ExpiredStockPage = () => {
 
   const productSummaries = getProductSummaries(filteredItems);
 
-  const analyzeDataWithDeepSeek = async () => {
-    if (!puterLoaded) {
-      toast.error('Puter.js is still loading. Please try again in a moment.');
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setAnalysisResult('');
-    
-    try {
-      const analysisData = {
-        timeRange,
-        totalItems: filteredItems.length,
-        totalQuantity: filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0),
-        totalValue: filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0),
-        topProducts: productSummaries
-          .sort((a, b) => b.totalValue - a.totalValue)
-          .slice(0, 5)
-          .map(p => ({
-            name: p.name,
-            quantity: p.totalQuantity,
-            value: p.totalValue
-          })),
-        recentItems: filteredItems
-          .sort((a, b) => new Date(b.removal_date).getTime() - new Date(a.removal_date).getTime())
-          .slice(0, 5)
-          .map(i => ({
-            name: i.product_name,
-            date: i.removal_date,
-            quantity: i.quantity,
-            value: i.total_selling_value
-          }))
-      };
-
-      const prompt = `
-        Analyze this restaurant kitchen expired stock data and provide actionable insights:
-        
-        Time Range: ${analysisData.timeRange}
-        Total Items Expired: ${analysisData.totalItems}
-        Total Quantity Lost: ${analysisData.totalQuantity}
-        Total Financial Impact: R${analysisData.totalValue.toFixed(2)}
-        
-        Top 5 Wasted Products:
-        ${analysisData.topProducts.map(p => `- ${p.name}: ${p.quantity} units (R${p.value.toFixed(2)})`).join('\n')}
-        
-        Recent Expirations:
-        ${analysisData.recentItems.map(i => `- ${i.name} expired on ${i.date}: ${i.quantity} units (R${i.value.toFixed(2)})`).join('\n')}
-        
-        Provide:
-        1. Key waste patterns and trends
-        2. Specific reduction strategies
-        3. Inventory management improvements
-        4. Ordering/purchasing recommendations
-        5. Financial impact breakdown
-        6. Staff training suggestions
-        
-        Format with clear headings and bullet points. Be concise but thorough.
-      `;
-
-      const response = await window.puter.ai.chat(prompt, {
-        model: 'deepseek-reasoner',
-        stream: true
-      });
-
-      let result = '';
-      for await (const part of response) {
-        if (part?.text) {
-          result += part.text;
-          setAnalysisResult(result);
-        }
-      }
-    } catch (error) {
-      console.error('DeepSeek analysis error:', error);
-      toast.error('Failed to analyze data with DeepSeek');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
+  // Handle product selection
   const handleProductSelect = (productId: string, productName: string) => {
     setFormData({
       ...formData, 
@@ -289,6 +190,7 @@ const ExpiredStockPage = () => {
     setIsProductDropdownOpen(false);
   };
 
+  // Add expired item
   const addExpiredItem = useMutation({
     mutationFn: async () => {
       if (!formData.productId || !formData.quantity || !formData.sellingPrice) {
@@ -330,6 +232,7 @@ const ExpiredStockPage = () => {
     }
   });
 
+  // Update expired item
   const updateExpiredItem = useMutation({
     mutationFn: async (updatedItem: ExpiredItem) => {
       if (!updatedItem.product_id || !updatedItem.quantity || !updatedItem.selling_price) {
@@ -365,6 +268,7 @@ const ExpiredStockPage = () => {
     }
   });
 
+  // Delete expired item
   const deleteExpiredItem = useMutation({
     mutationFn: async (itemId: string) => {
       const { error } = await supabase
@@ -415,6 +319,7 @@ const ExpiredStockPage = () => {
     });
   };
 
+  // Optimized print function
   const handlePrint = () => {
     const totalValue = filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0);
     const totalQuantity = filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
@@ -457,14 +362,7 @@ const ExpiredStockPage = () => {
             }
             .text-red { color: #dc3545; }
             .no-break { page-break-inside: avoid; }
-            .analysis { 
-              margin-top: 20px; 
-              padding: 10px; 
-              border: 1px solid #eee; 
-              border-radius: 5px; 
-              background-color: #f9f9f9;
-              white-space: pre-wrap;
-            }
+            .signature { margin-top: 30px; text-align: right; font-style: italic; }
           </style>
         </head>
         <body>
@@ -483,7 +381,7 @@ const ExpiredStockPage = () => {
               <div class="text-red">${totalQuantity}</div>
             </div>
             <div class="summary-item">
-              <div>Potential Sales Value</div>
+              <div>Value of Product Sale</div>
               <div class="text-red">R${totalValue.toFixed(2)}</div>
             </div>
             <div class="summary-item">
@@ -501,7 +399,7 @@ const ExpiredStockPage = () => {
                   <th>Product</th>
                   <th>Code</th>
                   <th>Units</th>
-                  <th>Total Value</th>
+                  <th>Value of Product Sale</th>
                 </tr>
               </thead>
               <tbody>
@@ -525,7 +423,7 @@ const ExpiredStockPage = () => {
                   <th>Expiry</th>
                   <th>Qty</th>
                   <th>Unit Price</th>
-                  <th>Total</th>
+                  <th>Value of Product Sale</th>
                 </tr>
               </thead>
               <tbody>
@@ -544,10 +442,10 @@ const ExpiredStockPage = () => {
             </table>
           `}
           
-          ${analysisResult ? `
-            <h2 class="no-break">AI Analysis</h2>
-            <div class="analysis no-break">${analysisResult}</div>
-          ` : ''}
+          <div class="signature no-break">
+            Prepared by: Elton Niati AI Boot agent<br />
+            Date: ${format(new Date(), 'yyyy-MM-dd')}
+          </div>
         </body>
       </html>
     `;
@@ -593,6 +491,7 @@ const ExpiredStockPage = () => {
         Record and manage expired products to minimize waste and keep inventory accurate.
       </p>
 
+      {/* Report Controls */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="flex gap-2">
           <Button 
@@ -645,23 +544,10 @@ const ExpiredStockPage = () => {
           >
             Print Report
           </Button>
-          <Button 
-            variant="default" 
-            onClick={analyzeDataWithDeepSeek}
-            disabled={isAnalyzing || filteredItems.length === 0 || !puterLoaded}
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              'AI Analysis'
-            )}
-          </Button>
         </div>
       </div>
 
+      {/* Sales Value Summary */}
       <Card className="bg-red-50 border-red-200">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -678,7 +564,7 @@ const ExpiredStockPage = () => {
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600">Potential Sales Value</p>
+              <p className="text-sm text-gray-600">Value of Product Sale</p>
               <p className="text-2xl font-bold text-red-600">
                 R{filteredItems.reduce((sum, item) => sum + item.total_selling_value, 0).toFixed(2)}
               </p>
@@ -693,19 +579,7 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
       
-      {analysisResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle>AI Analysis Results</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="p-4 bg-gray-50 rounded-md whitespace-pre-wrap">
-              {analysisResult}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      
+      {/* Add/Edit Form */}
       <Card>
         <CardHeader>
           <CardTitle>{editingItem ? 'Edit Expired Item' : 'Log Expired Item'}</CardTitle>
@@ -864,6 +738,7 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
       
+      {/* Expired Items List */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
           <CardTitle>Expired Items History ({timeRange})</CardTitle>
@@ -882,7 +757,7 @@ const ExpiredStockPage = () => {
                         className="cursor-pointer"
                         onClick={() => requestSort('total_selling_value')}
                       >
-                        Total Value (ZAR) {sortConfig.key === 'total_selling_value' && (
+                        Value of Product Sale (ZAR) {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -952,7 +827,7 @@ const ExpiredStockPage = () => {
                         className="cursor-pointer"
                         onClick={() => requestSort('total_selling_value')}
                       >
-                        Total {sortConfig.key === 'total_selling_value' && (
+                        Value of Product Sale {sortConfig.key === 'total_selling_value' && (
                           sortConfig.direction === 'asc' ? '↑' : '↓'
                         )}
                       </TableHead>
@@ -1004,7 +879,6 @@ const ExpiredStockPage = () => {
         </CardContent>
       </Card>
 
-      <ProductionAnalysisReport />
       <Navigation />
     </div>
   );
