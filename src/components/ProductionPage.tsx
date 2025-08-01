@@ -151,10 +151,12 @@ const ProductionPage = () => {
       <ProductionAnalytics
         showComparison={showComparison}
         showStaffAnalytics={showStaffAnalytics}
+        showAIAnalytics={true}
         comparisonDays={comparisonDays}
         setComparisonDays={setComparisonDays}
         historicalProduction={historicalProduction}
         staffStats={staffStats}
+        productionBatches={productionBatches}
       />
 
       <ProductionForm
