@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, Brain } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
+import { AIProductionAnalytics } from '@/components/production/AIProductionAnalytics';
 import Navigation from '@/components/Navigation';
 
 // Types
@@ -477,6 +478,23 @@ const ExpiredStockPage = () => {
       <p className="text-gray-600">
         Record and manage expired products to minimize waste and keep inventory accurate.
       </p>
+
+      {/* AI Analytics Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5 text-purple-600" />
+            AI Production Analytics
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AIProductionAnalytics 
+            productionBatches={[]} 
+            dateRange={dateRange} 
+            timeRange={timeRange} 
+          />
+        </CardContent>
+      </Card>
 
       {/* Report Controls */}
       <div className="flex flex-wrap gap-2 items-center">
