@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Brain } from 'lucide-react';
+import { Loader2, Brain, FileText } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import { format } from 'date-fns';
 
 interface DailyProduction {
   date: string;
@@ -169,6 +170,138 @@ const AIProductionAnalytics = ({
     await analyzeWithAI(fullPrompt);
   };
 
+  const handlePrintPDF = () => {
+    if (!analysis.trim()) {
+      toast.error('Please generate an AI analysis first before printing.');
+      return;
+    }
+
+    const printContent = `
+      <html>
+        <head>
+          <title>AI Production Analytics Report</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 20px; 
+              line-height: 1.6;
+              color: #333;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              border-bottom: 2px solid #4f46e5;
+              padding-bottom: 20px;
+            }
+            .header h1 {
+              color: #4f46e5;
+              margin-bottom: 10px;
+            }
+            .header .subtitle {
+              color: #666;
+              font-size: 14px;
+            }
+            .analysis-content {
+              background: white;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              margin-bottom: 20px;
+            }
+            .analysis-content h1, .analysis-content h2, .analysis-content h3 {
+              color: #4f46e5;
+              margin-top: 20px;
+              margin-bottom: 10px;
+            }
+            .analysis-content h1 { font-size: 1.5rem; }
+            .analysis-content h2 { font-size: 1.25rem; }
+            .analysis-content h3 { font-size: 1.125rem; }
+            .analysis-content p {
+              margin-bottom: 10px;
+            }
+            .analysis-content ul, .analysis-content ol {
+              margin-left: 20px;
+              margin-bottom: 15px;
+            }
+            .analysis-content li {
+              margin-bottom: 5px;
+            }
+            .data-summary {
+              background: #f8f9fa;
+              padding: 15px;
+              border-radius: 5px;
+              margin: 20px 0;
+              border-left: 4px solid #4f46e5;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #ddd;
+              color: #666;
+              font-size: 12px;
+            }
+            .powered-by {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 5px;
+              margin-top: 10px;
+            }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>🤖 AI Production Analytics Report</h1>
+            <div class="subtitle">
+              Generated on ${format(new Date(), 'PPPp')}<br>
+              Analysis Period: ${comparisonDays} days
+            </div>
+          </div>
+          
+          <div class="data-summary">
+            <h3>📊 Data Summary</h3>
+            <p><strong>Total Production Items:</strong> ${historicalProduction.reduce((sum, day) => sum + day.total_production, 0)}</p>
+            <p><strong>Production Days Analyzed:</strong> ${historicalProduction.length}</p>
+            <p><strong>Staff Members:</strong> ${staffStats.length}</p>
+            <p><strong>Recent Batches:</strong> ${productionBatches.length}</p>
+          </div>
+          
+          <div class="analysis-content">
+            ${analysis.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
+          </div>
+          
+          <div class="footer">
+            <p>This report was generated using AI-powered analytics to provide insights into production data.</p>
+            <div class="powered-by">
+              <span>🧠 Powered by Claude-Sonnet-4 via Puter AI</span>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      
+      // Wait for content to load before printing
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+      
+      toast.success('PDF report opened for printing!');
+    } else {
+      toast.error('Unable to open print window. Please check popup blockers.');
+    }
+  };
+
   return (
     <Card className="mb-6">
       <CardHeader>
@@ -193,6 +326,17 @@ const AIProductionAnalytics = ({
               'Generate Complete Analysis'
             )}
           </Button>
+          
+          {analysis && (
+            <Button 
+              onClick={handlePrintPDF}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Export PDF
+            </Button>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -222,7 +366,18 @@ const AIProductionAnalytics = ({
 
         {analysis && (
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-3">AI Analysis Results:</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">AI Analysis Results:</h3>
+              <Button 
+                onClick={handlePrintPDF}
+                variant="ghost"
+                size="sm"
+                className="text-blue-600 hover:text-blue-800"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                PDF
+              </Button>
+            </div>
             <div className="bg-gray-50 p-4 rounded-lg border">
               <div className="whitespace-pre-wrap text-sm leading-relaxed">
                 {analysis}
