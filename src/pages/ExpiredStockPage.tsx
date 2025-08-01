@@ -491,19 +491,34 @@ const ExpiredStockPage = () => {
         </CardHeader>
         <CardContent>
           <AIProductionAnalytics 
-            historicalProduction={filteredItems.map(item => ({
-              date: item.removal_date,
-              total_production: parseFloat(item.quantity) || 0
-            }))}
-            staffStats={[]}
+            historicalProduction={filteredItems.reduce((acc, item) => {
+              const date = item.removal_date;
+              const existing = acc.find(h => h.date === date);
+              const quantity = parseFloat(item.quantity) || 0;
+              
+              if (existing) {
+                existing.total_production += quantity;
+              } else {
+                acc.push({
+                  date: date,
+                  total_production: quantity
+                });
+              }
+              return acc;
+            }, [] as Array<{date: string; total_production: number}>)}
+            staffStats={[{
+              staff_name: 'Kitchen Staff',
+              total_batches: filteredItems.length,
+              total_units: filteredItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
+            }]}
             productionBatches={filteredItems.map(item => ({
               id: item.id,
-              product_name: item.product_name,
+              product_name: item.product_name || 'Unknown Product',
               quantity_produced: parseFloat(item.quantity) || 0,
-              production_date: item.batch_date,
+              production_date: item.batch_date || new Date().toISOString().split('T')[0],
               staff_name: 'Kitchen Staff',
-              total_ingredient_cost: item.total_cost_loss,
-              cost_per_unit: item.selling_price
+              total_ingredient_cost: item.total_cost_loss || 0,
+              cost_per_unit: item.selling_price || 0
             }))}
             comparisonDays={comparisonDays}
           />
