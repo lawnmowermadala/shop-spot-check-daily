@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -5,7 +6,12 @@ import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { BarChart, User2, PackageCheck, TrendingUp } from 'lucide-react';
-import { StaffStats } from '@/types';
+
+interface StaffStats {
+  staff_name: string;
+  total_batches: number;
+  total_units: number;
+}
 
 interface ProductionAnalyticsProps {
   showComparison: boolean;

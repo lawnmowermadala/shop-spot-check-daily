@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangePicker } from '@/components/DateRangePicker';
-import { AIProductionAnalytics } from '@/components/production/AIProductionAnalytics';
+import AIProductionAnalytics from '@/components/production/AIProductionAnalytics';
 import Navigation from '@/components/Navigation';
 
 // Types
@@ -468,6 +468,8 @@ const ExpiredStockPage = () => {
     }, 500);
   };
 
+  const comparisonDays = 30;
+
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
       <div className="flex items-center gap-2">
@@ -489,9 +491,21 @@ const ExpiredStockPage = () => {
         </CardHeader>
         <CardContent>
           <AIProductionAnalytics 
-            productionBatches={[]} 
-            dateRange={dateRange} 
-            timeRange={timeRange} 
+            historicalProduction={filteredItems.map(item => ({
+              date: item.removal_date,
+              total_production: parseFloat(item.quantity) || 0
+            }))}
+            staffStats={[]}
+            productionBatches={filteredItems.map(item => ({
+              id: item.id,
+              product_name: item.product_name,
+              quantity_produced: parseFloat(item.quantity) || 0,
+              production_date: item.batch_date,
+              staff_name: 'Kitchen Staff',
+              total_ingredient_cost: item.total_cost_loss,
+              cost_per_unit: item.selling_price
+            }))}
+            comparisonDays={comparisonDays}
           />
         </CardContent>
       </Card>
