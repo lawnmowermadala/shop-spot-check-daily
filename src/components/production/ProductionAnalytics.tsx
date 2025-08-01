@@ -2,6 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import AIProductionAnalytics from './AIProductionAnalytics';
 
 interface DailyProduction {
   date: string;
@@ -14,22 +15,36 @@ interface StaffProductionStats {
   total_units: number;
 }
 
+interface ProductionBatch {
+  id: string;
+  product_name: string;
+  quantity_produced: number;
+  production_date: string;
+  staff_name: string;
+  total_ingredient_cost?: number;
+  cost_per_unit?: number;
+}
+
 interface ProductionAnalyticsProps {
   showComparison: boolean;
   showStaffAnalytics: boolean;
+  showAIAnalytics?: boolean;
   comparisonDays: number;
   setComparisonDays: (days: number) => void;
   historicalProduction: DailyProduction[];
   staffStats: StaffProductionStats[];
+  productionBatches?: ProductionBatch[];
 }
 
 const ProductionAnalytics = ({
   showComparison,
   showStaffAnalytics,
+  showAIAnalytics = true,
   comparisonDays,
   setComparisonDays,
   historicalProduction,
-  staffStats
+  staffStats,
+  productionBatches = []
 }: ProductionAnalyticsProps) => {
   const chartData = historicalProduction.map(item => ({
     date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -43,6 +58,16 @@ const ProductionAnalytics = ({
 
   return (
     <>
+      {/* AI Production Analytics */}
+      {showAIAnalytics && (
+        <AIProductionAnalytics
+          historicalProduction={historicalProduction}
+          staffStats={staffStats}
+          productionBatches={productionBatches}
+          comparisonDays={comparisonDays}
+        />
+      )}
+
       {/* Staff Analytics Chart */}
       {showStaffAnalytics && (
         <Card className="mb-6">
