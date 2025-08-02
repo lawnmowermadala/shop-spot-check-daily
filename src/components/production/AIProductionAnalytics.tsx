@@ -181,38 +181,50 @@ const AIProductionAnalytics = ({
       const productionData = prepareProductionDataForAI();
       
       const defaultPrompt = `
-        As a production analytics expert, analyze the following bakery/kitchen production data and provide:
+        As an expert production analytics consultant, analyze the following expired stock/production data and provide a comprehensive report with:
         
-        1. **Daily Production Analysis**: 
-           - Calculate daily averages, trends, and patterns
-           - Identify peak production days and low production days
-           - Daily efficiency metrics
+        1. **HIGH & LOW EXPIRY ANALYSIS**:
+           - Identify the TOP 5 products with HIGHEST expiry/waste rates (name each product specifically)
+           - Identify the TOP 5 products with LOWEST expiry/waste rates (name each product specifically)
+           - Calculate exact percentages and quantities for each product
+           - Analyze why these products have high/low expiry rates
         
-        2. **Weekly Production Proposal**:
-           - Day-by-day production recommendations for next week
-           - Consider historical patterns and staff capacity
-           - Include specific quantities per day
+        2. **SPECIFIC PRODUCT RECOMMENDATIONS**:
+           For HIGH expiry products:
+           - Reduce production quantities by specific amounts
+           - Suggest optimal production schedules
+           - Recommend shelf-life improvement strategies
+           
+           For LOW expiry products:
+           - Consider increasing production if demand allows
+           - Use as benchmark for other products
+           - Analyze what makes them successful
         
-        3. **Staff Performance Analysis**:
-           - Individual staff productivity metrics
-           - Recommendations for staff optimization
-           - Daily staff allocation suggestions
+        3. **DAILY PRODUCTION FORECAST**:
+           - Monday to Sunday production recommendations
+           - Specific quantities per product per day
+           - Seasonal adjustments based on expiry patterns
         
-        4. **Financial Analysis**:
-           - Calculate actual sale values (use selling price when available, otherwise apply 40% markup on cost)
-           - Daily revenue projections
-           - Cost vs revenue analysis per day
-           - Identify potential losses from expired stock
+        4. **WASTE REDUCTION STRATEGIES**:
+           - Immediate actions to reduce high-expiry products
+           - Long-term production optimization
+           - Staff training recommendations
+           - Inventory management improvements
         
-        5. **Executive Summary**:
-           - Key insights and recommendations
-           - Action items for management
-           - Daily operational improvements
+        5. **FINANCIAL IMPACT ANALYSIS**:
+           - Calculate total waste cost for high-expiry products
+           - Potential savings from implementing recommendations
+           - ROI projections for waste reduction initiatives
+        
+        6. **EXECUTIVE SUMMARY WITH ACTION ITEMS**:
+           - Top 3 critical actions to take immediately
+           - 30-day implementation plan
+           - Expected results and KPIs to track
         
         Production Data:
         ${productionData}
         
-        Please provide specific, actionable insights with daily breakdowns where requested.
+        Please provide specific product names, exact quantities, and actionable recommendations with measurable outcomes.
       `;
 
       const prompt = specificPrompt || defaultPrompt;
@@ -317,7 +329,7 @@ const AIProductionAnalytics = ({
     const printContent = `
       <html>
         <head>
-          <title>Elton Niati AI Production Analytics Report</title>
+          <title>Elton Niati Production Analytics & Expiry Analysis Report</title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
             * {
@@ -403,6 +415,24 @@ const AIProductionAnalytics = ({
               font-size: 13px;
             }
             
+            .highlight-section {
+              background: #fef3c7;
+              padding: 12px;
+              border-radius: 5px;
+              margin: 10px 0;
+              border-left: 4px solid #f59e0b;
+            }
+            
+            .high-expiry {
+              background: #fee2e2;
+              border-left-color: #dc2626;
+            }
+            
+            .low-expiry {
+              background: #dcfce7;
+              border-left-color: #16a34a;
+            }
+            
             .footer {
               text-align: center;
               margin-top: 20px;
@@ -441,7 +471,7 @@ const AIProductionAnalytics = ({
                 padding: 12px;
               }
               
-              .data-summary {
+              .data-summary, .highlight-section {
                 padding: 10px;
               }
             }
@@ -454,29 +484,16 @@ const AIProductionAnalytics = ({
                 font-size: 12px;
               }
               
-              .header {
-                break-inside: avoid;
-              }
-              
-              .analysis-content {
+              .header, .analysis-content, .data-summary, .highlight-section, .footer {
                 break-inside: avoid-page;
                 box-shadow: none;
                 border: 1px solid #ddd;
-              }
-              
-              .data-summary {
-                break-inside: avoid;
-              }
-              
-              .footer {
-                break-inside: avoid;
               }
               
               .no-print { 
                 display: none; 
               }
               
-              /* Ensure content doesn't get cut off */
               h1, h2, h3 {
                 break-after: avoid;
               }
@@ -504,7 +521,7 @@ const AIProductionAnalytics = ({
         </head>
         <body>
           <div class="header">
-            <h1>🤖 Production Analytics Report</h1>
+            <h1>🤖 Production Analytics & Expiry Analysis Report</h1>
             <div class="subtitle">
               Generated on ${format(new Date(), 'PPPp')}<br>
               Analysis Period: ${comparisonDays} days
@@ -512,22 +529,36 @@ const AIProductionAnalytics = ({
           </div>
           
           <div class="data-summary">
-            <h3>📊 Data Summary</h3>
+            <h3>📊 Production & Expiry Data Summary</h3>
             <p><strong>Total Production Items:</strong> ${historicalProduction.reduce((sum, day) => sum + day.total_production, 0)}</p>
             <p><strong>Production Days Analyzed:</strong> ${historicalProduction.length}</p>
             <p><strong>Staff Members:</strong> ${staffStats.length}</p>
-            <p><strong>Recent Batches:</strong> ${productionBatches.length}</p>
+            <p><strong>Expired/Waste Batches:</strong> ${productionBatches.length}</p>
+            <p><strong>Analysis Focus:</strong> High & Low Expiry Products with Future Production Recommendations</p>
+          </div>
+          
+          <div class="highlight-section">
+            <h3>🎯 Key Focus Areas</h3>
+            <p><strong>High Expiry Products:</strong> Products requiring immediate production reduction</p>
+            <p><strong>Low Expiry Products:</strong> Benchmark products for optimization strategies</p>
+            <p><strong>Action Items:</strong> Specific recommendations for waste reduction and production planning</p>
           </div>
           
           <div class="analysis-content">
-            ${analysis.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
+            ${analysis.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/(HIGH EXPIRY|HIGHEST|TOP.*HIGH)/gi, '<span style="color: #dc2626; font-weight: bold;">$1</span>')
+              .replace(/(LOW EXPIRY|LOWEST|TOP.*LOW)/gi, '<span style="color: #16a34a; font-weight: bold;">$1</span>')
+              .replace(/(RECOMMENDATION|ACTION|STRATEGY)/gi, '<span style="color: #f59e0b; font-weight: bold;">$1</span>')}
           </div>
           
           <div class="footer">
-            <p>This report was generated using AI-powered analytics to provide insights into production data.</p>
+            <p>This comprehensive expiry analysis report provides actionable insights to reduce waste and optimize production scheduling.</p>
             <div class="powered-by">
               <span class="ai-brand">🧠 Powered by Elton Niati AI Agent</span>
             </div>
+            <p style="margin-top: 8px; font-size: 10px;">
+              Report includes high/low expiry analysis, specific product recommendations, and future production planning
+            </p>
           </div>
         </body>
       </html>
@@ -544,7 +575,7 @@ const AIProductionAnalytics = ({
         printWindow.print();
       }, 500);
       
-      toast.success('PDF report opened for printing! Mobile-optimized for all devices.');
+      toast.success('Comprehensive expiry analysis report opened for printing! Optimized for all devices.');
     } else {
       toast.error('Unable to open print window. Please check popup blockers.');
     }
@@ -564,7 +595,7 @@ const AIProductionAnalytics = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Brain className="w-5 h-5 text-blue-500" />
-          Elton Niati AI Production Analytics
+          Elton Niati AI Production Analytics & Expiry Analysis
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -577,10 +608,10 @@ const AIProductionAnalytics = ({
             {isAnalyzing ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing Production Data...
+                Analyzing High & Low Expiry Products...
               </>
             ) : (
-              'Generate Complete Analysis'
+              'Generate Complete Expiry Analysis'
             )}
           </Button>
           
@@ -591,7 +622,7 @@ const AIProductionAnalytics = ({
               className="flex items-center gap-2"
             >
               <FileText className="w-4 h-4" />
-              Export PDF
+              Export Analysis PDF
             </Button>
           )}
         </div>
@@ -687,7 +718,7 @@ const AIProductionAnalytics = ({
         {analysis && (
           <div className="mt-6">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold">AI Analysis Results:</h3>
+              <h3 className="text-lg font-semibold">AI Expiry Analysis Results:</h3>
               <Button 
                 onClick={handlePrintPDF}
                 variant="ghost"
@@ -709,7 +740,8 @@ const AIProductionAnalytics = ({
         {!analysis && !isAnalyzing && (
           <div className="text-center py-8 text-gray-500">
             <Brain className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Select specific questions above or click "Generate Complete Analysis" to get AI insights</p>
+            <p>Generate AI analysis to get detailed insights on high & low expiry products</p>
+            <p className="text-xs mt-1">Includes specific product recommendations and future production planning</p>
             <p className="text-xs mt-1">Powered by Elton Niati AI Agent</p>
           </div>
         )}
