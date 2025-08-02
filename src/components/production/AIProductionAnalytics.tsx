@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Brain, FileText, HelpCircle } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { format } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
 
 interface DailyProduction {
   date: string;
@@ -173,6 +173,11 @@ const AIProductionAnalytics = ({
     setAnalysis('');
 
     try {
+      // Check if Puter is available
+      if (!window.puter || !window.puter.ai) {
+        throw new Error('Puter AI is not available. Please make sure you are running this in a Puter environment.');
+      }
+
       const productionData = prepareProductionDataForAI();
       
       const defaultPrompt = `
@@ -217,31 +222,34 @@ const AIProductionAnalytics = ({
            - Expected results and KPIs to track
         
         Please provide specific product names, exact quantities, and actionable recommendations with measurable outcomes.
+
+        Production Data: ${JSON.stringify(productionData, null, 2)}
       `;
 
       const prompt = specificPrompt || defaultPrompt;
 
-      const { data, error } = await supabase.functions.invoke('ai-production-analysis', {
-        body: {
-          prompt: prompt,
-          productionData: productionData
-        }
+      console.log('Sending analysis request to Puter AI...');
+      const response = await window.puter.ai.chat(prompt, {
+        model: 'gpt-4o-mini',
+        max_tokens: 4000,
+        temperature: 0.3
       });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to analyze production data');
+      console.log('Puter AI Response:', response);
+      
+      if (response && response.message) {
+        setAnalysis(response.message);
+        toast.success('AI analysis completed successfully!');
+      } else if (response && typeof response === 'string') {
+        setAnalysis(response);
+        toast.success('AI analysis completed successfully!');
+      } else {
+        throw new Error('No valid response from Puter AI');
       }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      setAnalysis(data.analysis || 'No analysis generated');
-      toast.success('AI analysis completed successfully!');
     } catch (error) {
       console.error('AI Analysis Error:', error);
       toast.error('Failed to analyze production data: ' + (error as Error).message);
-      setAnalysis('Failed to generate analysis. Please try again or check if OpenAI API key is configured.');
+      setAnalysis('Failed to generate analysis. Please ensure you are running this in a Puter environment with AI access.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -265,7 +273,7 @@ const AIProductionAnalytics = ({
       ${selectedQuestionTexts}
       
       Production Data:
-      ${productionData}
+      ${JSON.stringify(productionData, null, 2)}
       
       Please provide detailed, data-driven answers to each selected question with specific recommendations and insights.
     `;
@@ -284,7 +292,7 @@ const AIProductionAnalytics = ({
       ${customPrompt}
       
       Here is the production data to analyze:
-      ${productionData}
+      ${JSON.stringify(productionData, null, 2)}
     `;
 
     await analyzeWithAI(fullPrompt);
