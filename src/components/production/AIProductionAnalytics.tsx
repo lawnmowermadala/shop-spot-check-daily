@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Brain, FileText } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, Brain, FileText, HelpCircle } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { format } from 'date-fns';
 
@@ -53,6 +53,94 @@ declare global {
   }
 }
 
+const PREDEFINED_QUESTIONS = [
+  {
+    id: 'expiry_frequency',
+    category: 'Product Expiry Analysis',
+    question: 'Which products expire most frequently after a certain number of days?'
+  },
+  {
+    id: 'expiry_days',
+    category: 'Product Expiry Analysis',
+    question: 'On which days of the week do products tend to expire the most?'
+  },
+  {
+    id: 'average_expiry',
+    category: 'Product Expiry Analysis',
+    question: 'What is the average expiration period for different bakery and takeaway items?'
+  },
+  {
+    id: 'waste_expiry',
+    category: 'Product Expiry Analysis',
+    question: 'Which products have the highest waste due to expiration?'
+  },
+  {
+    id: 'overproduction',
+    category: 'Sales vs. Production Analysis',
+    question: 'Which products are produced in quantities exceeding actual sales?'
+  },
+  {
+    id: 'overproduction_days',
+    category: 'Sales vs. Production Analysis',
+    question: 'Are there specific days when overproduction occurs?'
+  },
+  {
+    id: 'production_vs_sales',
+    category: 'Sales vs. Production Analysis',
+    question: 'How does production volume compare to sales volume across different days?'
+  },
+  {
+    id: 'waste_products',
+    category: 'Waste and Expiry Patterns',
+    question: 'What products are most often wasted due to expiration?'
+  },
+  {
+    id: 'waste_patterns',
+    category: 'Waste and Expiry Patterns',
+    question: 'Is there a pattern in waste generation based on product type or day of the week?'
+  },
+  {
+    id: 'waste_volume',
+    category: 'Waste and Expiry Patterns',
+    question: 'How much waste is generated weekly/monthly from expired products?'
+  },
+  {
+    id: 'production_recommendations',
+    category: 'Optimization & Future Planning',
+    question: 'Based on past data, what should be the recommended production quantities for Monday, Tuesday, etc.?'
+  },
+  {
+    id: 'scaling_recommendations',
+    category: 'Optimization & Future Planning',
+    question: 'Which products should be scaled back or increased to minimize waste?'
+  },
+  {
+    id: 'waste_strategies',
+    category: 'Optimization & Future Planning',
+    question: 'What strategies can be implemented to reduce expired product waste?'
+  },
+  {
+    id: 'inventory_improvement',
+    category: 'Optimization & Future Planning',
+    question: 'How can inventory management be improved to prevent overproduction?'
+  },
+  {
+    id: 'discount_timing',
+    category: 'Operational Recommendations',
+    question: 'When is the optimal time to discount or sell near-expiry products?'
+  },
+  {
+    id: 'demand_forecasting',
+    category: 'Operational Recommendations',
+    question: 'How can demand forecasting improve to reduce waste?'
+  },
+  {
+    id: 'schedule_adjustments',
+    category: 'Operational Recommendations',
+    question: 'What adjustments can be made to production schedules to align better with sales trends?'
+  }
+];
+
 const AIProductionAnalytics = ({ 
   historicalProduction, 
   staffStats, 
@@ -62,6 +150,7 @@ const AIProductionAnalytics = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
 
   const prepareProductionDataForAI = () => {
     const dataContext = {
@@ -153,6 +242,32 @@ const AIProductionAnalytics = ({
     }
   };
 
+  const handleSelectedQuestionsAnalysis = async () => {
+    if (selectedQuestions.length === 0) {
+      toast.error('Please select at least one question to analyze.');
+      return;
+    }
+
+    const selectedQuestionTexts = PREDEFINED_QUESTIONS
+      .filter(q => selectedQuestions.includes(q.id))
+      .map(q => `${q.category}: ${q.question}`)
+      .join('\n');
+
+    const productionData = prepareProductionDataForAI();
+    const fullPrompt = `
+      Please analyze the following production data and answer these specific questions:
+      
+      ${selectedQuestionTexts}
+      
+      Production Data:
+      ${productionData}
+      
+      Please provide detailed, data-driven answers to each selected question with specific recommendations and insights.
+    `;
+
+    await analyzeWithAI(fullPrompt);
+  };
+
   const handleCustomAnalysis = async () => {
     if (!customPrompt.trim()) {
       toast.error('Please enter a custom prompt for analysis.');
@@ -168,6 +283,28 @@ const AIProductionAnalytics = ({
     `;
 
     await analyzeWithAI(fullPrompt);
+  };
+
+  const toggleQuestion = (questionId: string) => {
+    setSelectedQuestions(prev => 
+      prev.includes(questionId)
+        ? prev.filter(id => id !== questionId)
+        : [...prev, questionId]
+    );
+  };
+
+  const toggleAllInCategory = (category: string) => {
+    const categoryQuestions = PREDEFINED_QUESTIONS
+      .filter(q => q.category === category)
+      .map(q => q.id);
+    
+    const allSelected = categoryQuestions.every(id => selectedQuestions.includes(id));
+    
+    if (allSelected) {
+      setSelectedQuestions(prev => prev.filter(id => !categoryQuestions.includes(id)));
+    } else {
+      setSelectedQuestions(prev => [...new Set([...prev, ...categoryQuestions])]);
+    }
   };
 
   const handlePrintPDF = () => {
@@ -302,6 +439,15 @@ const AIProductionAnalytics = ({
     }
   };
 
+  // Group questions by category
+  const questionsByCategory = PREDEFINED_QUESTIONS.reduce((acc, question) => {
+    if (!acc[question.category]) {
+      acc[question.category] = [];
+    }
+    acc[question.category].push(question);
+    return acc;
+  }, {} as Record<string, typeof PREDEFINED_QUESTIONS>);
+
   return (
     <Card className="mb-6">
       <CardHeader>
@@ -310,7 +456,7 @@ const AIProductionAnalytics = ({
           AI Production Analytics (Claude-Sonnet-4)
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         <div className="flex flex-col sm:flex-row gap-4">
           <Button 
             onClick={() => analyzeWithAI()} 
@@ -339,6 +485,69 @@ const AIProductionAnalytics = ({
           )}
         </div>
 
+        {/* Predefined Questions Section */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <HelpCircle className="w-5 h-5 text-blue-500" />
+            <h3 className="text-lg font-semibold">Data Analysis & Waste Management Questions</h3>
+          </div>
+          
+          <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4">
+            {Object.entries(questionsByCategory).map(([category, questions]) => (
+              <div key={category} className="space-y-2">
+                <div className="flex items-center gap-2 border-b pb-2">
+                  <Checkbox
+                    id={`category-${category}`}
+                    checked={questions.every(q => selectedQuestions.includes(q.id))}
+                    onCheckedChange={() => toggleAllInCategory(category)}
+                  />
+                  <label 
+                    htmlFor={`category-${category}`}
+                    className="font-medium text-sm cursor-pointer"
+                  >
+                    {category} ({questions.filter(q => selectedQuestions.includes(q.id)).length}/{questions.length})
+                  </label>
+                </div>
+                
+                <div className="space-y-2 ml-6">
+                  {questions.map((question) => (
+                    <div key={question.id} className="flex items-start gap-2">
+                      <Checkbox
+                        id={question.id}
+                        checked={selectedQuestions.includes(question.id)}
+                        onCheckedChange={() => toggleQuestion(question.id)}
+                      />
+                      <label 
+                        htmlFor={question.id}
+                        className="text-sm cursor-pointer leading-tight"
+                      >
+                        {question.question}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Button 
+            onClick={handleSelectedQuestionsAnalysis}
+            disabled={isAnalyzing || selectedQuestions.length === 0}
+            className="w-full"
+            variant="outline"
+          >
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Processing Selected Questions...
+              </>
+            ) : (
+              `Analyze Selected Questions (${selectedQuestions.length})`
+            )}
+          </Button>
+        </div>
+
+        {/* Custom Analysis Section */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Custom Analysis Prompt:</label>
           <Textarea
@@ -389,7 +598,7 @@ const AIProductionAnalytics = ({
         {!analysis && !isAnalyzing && (
           <div className="text-center py-8 text-gray-500">
             <Brain className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Click "Generate Complete Analysis" to get AI insights on your production data</p>
+            <p>Select specific questions above or click "Generate Complete Analysis" to get AI insights</p>
             <p className="text-xs mt-1">Powered by Claude-Sonnet-4 via Puter AI</p>
           </div>
         )}
