@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Brain, FileText, HelpCircle } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DailyProduction {
   date: string;
@@ -165,15 +165,10 @@ const AIProductionAnalytics = ({
         : 0
     };
 
-    return JSON.stringify(dataContext, null, 2);
+    return dataContext;
   };
 
   const analyzeWithAI = async (specificPrompt?: string) => {
-    if (!window.puter) {
-      toast.error('Puter AI is not available. Please ensure you have the Puter script loaded.');
-      return;
-    }
-
     setIsAnalyzing(true);
     setAnalysis('');
 
@@ -181,7 +176,7 @@ const AIProductionAnalytics = ({
       const productionData = prepareProductionDataForAI();
       
       const defaultPrompt = `
-        As an expert production analytics consultant, analyze the following expired stock/production data and provide a comprehensive report with:
+        As Elton Niati AI Agent, an expert production analytics consultant, analyze the following expired stock/production data and provide a comprehensive report with:
         
         1. **HIGH & LOW EXPIRY ANALYSIS**:
            - Identify the TOP 5 products with HIGHEST expiry/waste rates (name each product specifically)
@@ -221,35 +216,32 @@ const AIProductionAnalytics = ({
            - 30-day implementation plan
            - Expected results and KPIs to track
         
-        Production Data:
-        ${productionData}
-        
         Please provide specific product names, exact quantities, and actionable recommendations with measurable outcomes.
       `;
 
       const prompt = specificPrompt || defaultPrompt;
 
-      const completion = await window.puter.ai.chat(prompt, {
-        model: 'claude-sonnet-4',
-        stream: true,
-        max_tokens: 4000,
-        temperature: 0.3
+      const { data, error } = await supabase.functions.invoke('ai-production-analysis', {
+        body: {
+          prompt: prompt,
+          productionData: productionData
+        }
       });
 
-      let fullResponse = '';
-      
-      for await (const part of completion) {
-        if (part?.text) {
-          fullResponse += part.text;
-          setAnalysis(fullResponse);
-        }
+      if (error) {
+        throw new Error(error.message || 'Failed to analyze production data');
       }
 
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      setAnalysis(data.analysis || 'No analysis generated');
       toast.success('AI analysis completed successfully!');
     } catch (error) {
       console.error('AI Analysis Error:', error);
       toast.error('Failed to analyze production data: ' + (error as Error).message);
-      setAnalysis('Failed to generate analysis. Please try again.');
+      setAnalysis('Failed to generate analysis. Please try again or check if OpenAI API key is configured.');
     } finally {
       setIsAnalyzing(false);
     }
