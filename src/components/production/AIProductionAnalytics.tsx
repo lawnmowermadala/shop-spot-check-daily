@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -316,84 +317,194 @@ const AIProductionAnalytics = ({
     const printContent = `
       <html>
         <head>
-          <title>AI Production Analytics Report</title>
+          <title>Elton Niati AI Production Analytics Report</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            
             body { 
-              font-family: Arial, sans-serif; 
-              padding: 20px; 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+              padding: 10px; 
               line-height: 1.6;
               color: #333;
-            }
-            .header { 
-              text-align: center; 
-              margin-bottom: 30px; 
-              border-bottom: 2px solid #4f46e5;
-              padding-bottom: 20px;
-            }
-            .header h1 {
-              color: #4f46e5;
-              margin-bottom: 10px;
-            }
-            .header .subtitle {
-              color: #666;
+              background: white;
               font-size: 14px;
             }
-            .analysis-content {
-              background: white;
-              padding: 20px;
-              border-radius: 8px;
-              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-              margin-bottom: 20px;
+            
+            .header { 
+              text-align: center; 
+              margin-bottom: 20px; 
+              border-bottom: 2px solid #4f46e5;
+              padding-bottom: 15px;
             }
-            .analysis-content h1, .analysis-content h2, .analysis-content h3 {
+            
+            .header h1 {
               color: #4f46e5;
-              margin-top: 20px;
-              margin-bottom: 10px;
+              margin-bottom: 8px;
+              font-size: 1.5rem;
             }
-            .analysis-content h1 { font-size: 1.5rem; }
-            .analysis-content h2 { font-size: 1.25rem; }
-            .analysis-content h3 { font-size: 1.125rem; }
-            .analysis-content p {
-              margin-bottom: 10px;
-            }
-            .analysis-content ul, .analysis-content ol {
-              margin-left: 20px;
-              margin-bottom: 15px;
-            }
-            .analysis-content li {
-              margin-bottom: 5px;
-            }
-            .data-summary {
-              background: #f8f9fa;
-              padding: 15px;
-              border-radius: 5px;
-              margin: 20px 0;
-              border-left: 4px solid #4f46e5;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #ddd;
+            
+            .header .subtitle {
               color: #666;
               font-size: 12px;
             }
+            
+            .analysis-content {
+              background: white;
+              padding: 15px;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              margin-bottom: 15px;
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+            }
+            
+            .analysis-content h1, .analysis-content h2, .analysis-content h3 {
+              color: #4f46e5;
+              margin-top: 15px;
+              margin-bottom: 8px;
+            }
+            
+            .analysis-content h1 { font-size: 1.3rem; }
+            .analysis-content h2 { font-size: 1.15rem; }
+            .analysis-content h3 { font-size: 1.05rem; }
+            
+            .analysis-content p {
+              margin-bottom: 8px;
+            }
+            
+            .analysis-content ul, .analysis-content ol {
+              margin-left: 15px;
+              margin-bottom: 10px;
+            }
+            
+            .analysis-content li {
+              margin-bottom: 4px;
+            }
+            
+            .data-summary {
+              background: #f8f9fa;
+              padding: 12px;
+              border-radius: 5px;
+              margin: 15px 0;
+              border-left: 4px solid #4f46e5;
+            }
+            
+            .data-summary h3 {
+              margin-bottom: 8px;
+            }
+            
+            .data-summary p {
+              margin-bottom: 5px;
+              font-size: 13px;
+            }
+            
+            .footer {
+              text-align: center;
+              margin-top: 20px;
+              padding-top: 15px;
+              border-top: 1px solid #ddd;
+              color: #666;
+              font-size: 11px;
+            }
+            
             .powered-by {
               display: flex;
               align-items: center;
               justify-content: center;
               gap: 5px;
-              margin-top: 10px;
+              margin-top: 8px;
+              flex-wrap: wrap;
             }
+            
+            .ai-brand {
+              color: #4f46e5;
+              font-weight: bold;
+            }
+            
+            /* Mobile-specific styles */
+            @media screen and (max-width: 768px) {
+              body {
+                padding: 8px;
+                font-size: 13px;
+              }
+              
+              .header h1 {
+                font-size: 1.3rem;
+              }
+              
+              .analysis-content {
+                padding: 12px;
+              }
+              
+              .data-summary {
+                padding: 10px;
+              }
+            }
+            
+            /* Print styles for all devices */
             @media print {
-              body { margin: 0; }
-              .no-print { display: none; }
+              body { 
+                margin: 0; 
+                padding: 10px;
+                font-size: 12px;
+              }
+              
+              .header {
+                break-inside: avoid;
+              }
+              
+              .analysis-content {
+                break-inside: avoid-page;
+                box-shadow: none;
+                border: 1px solid #ddd;
+              }
+              
+              .data-summary {
+                break-inside: avoid;
+              }
+              
+              .footer {
+                break-inside: avoid;
+              }
+              
+              .no-print { 
+                display: none; 
+              }
+              
+              /* Ensure content doesn't get cut off */
+              h1, h2, h3 {
+                break-after: avoid;
+              }
+              
+              p, li {
+                break-inside: avoid;
+              }
+            }
+            
+            /* Mobile print adjustments */
+            @media print and (max-width: 480px) {
+              body {
+                font-size: 11px;
+              }
+              
+              .header h1 {
+                font-size: 1.2rem;
+              }
+              
+              .analysis-content h1 { font-size: 1.1rem; }
+              .analysis-content h2 { font-size: 1.0rem; }
+              .analysis-content h3 { font-size: 0.95rem; }
             }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>🤖 AI Production Analytics Report</h1>
+            <h1>🤖 Production Analytics Report</h1>
             <div class="subtitle">
               Generated on ${format(new Date(), 'PPPp')}<br>
               Analysis Period: ${comparisonDays} days
@@ -415,7 +526,7 @@ const AIProductionAnalytics = ({
           <div class="footer">
             <p>This report was generated using AI-powered analytics to provide insights into production data.</p>
             <div class="powered-by">
-              <span>🧠 Powered by Claude-Sonnet-4 via Puter AI</span>
+              <span class="ai-brand">🧠 Powered by Elton Niati AI Agent</span>
             </div>
           </div>
         </body>
@@ -433,7 +544,7 @@ const AIProductionAnalytics = ({
         printWindow.print();
       }, 500);
       
-      toast.success('PDF report opened for printing!');
+      toast.success('PDF report opened for printing! Mobile-optimized for all devices.');
     } else {
       toast.error('Unable to open print window. Please check popup blockers.');
     }
@@ -453,7 +564,7 @@ const AIProductionAnalytics = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Brain className="w-5 h-5 text-blue-500" />
-          AI Production Analytics (Claude-Sonnet-4)
+          Elton Niati AI Production Analytics
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -599,7 +710,7 @@ const AIProductionAnalytics = ({
           <div className="text-center py-8 text-gray-500">
             <Brain className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>Select specific questions above or click "Generate Complete Analysis" to get AI insights</p>
-            <p className="text-xs mt-1">Powered by Claude-Sonnet-4 via Puter AI</p>
+            <p className="text-xs mt-1">Powered by Elton Niati AI Agent</p>
           </div>
         )}
       </CardContent>
