@@ -167,6 +167,45 @@ const AIProductionAnalytics = ({
     return dataContext;
   };
 
+  const extractAnalysisText = (response: any): string => {
+    console.log('Processing Puter AI response:', response);
+    
+    // Handle string responses directly
+    if (typeof response === 'string') {
+      return response.trim();
+    }
+    
+    // Handle object responses with different structures
+    if (response && typeof response === 'object') {
+      // Check for content property first (most common)
+      if (response.content && typeof response.content === 'string') {
+        return response.content.trim();
+      }
+      
+      // Check for message property
+      if (response.message && typeof response.message === 'string') {
+        return response.message.trim();
+      }
+      
+      // Check for OpenAI-style response structure
+      if (response.choices && Array.isArray(response.choices) && response.choices[0]) {
+        const choice = response.choices[0];
+        if (choice.message && choice.message.content) {
+          return choice.message.content.trim();
+        }
+      }
+      
+      // Handle direct object with role and content (specific error case)
+      if (response.role && response.content && typeof response.content === 'string') {
+        return response.content.trim();
+      }
+    }
+    
+    // If no valid text content found, throw error
+    console.error('Unable to extract text from Puter AI response:', response);
+    throw new Error('Unable to extract analysis text from Puter AI response');
+  };
+
   const analyzeWithAI = async (specificPrompt?: string) => {
     setIsAnalyzing(true);
     setAnalysis('');
@@ -234,32 +273,16 @@ const AIProductionAnalytics = ({
         temperature: 0.3
       });
 
-      console.log('Puter AI Response:', response);
+      console.log('Raw Puter AI Response:', response);
       
-      // Handle different response structures from Puter AI
-      let analysisText = '';
-      
-      if (response && typeof response === 'string') {
-        analysisText = response;
-      } else if (response && response.message && typeof response.message === 'string') {
-        analysisText = response.message;
-      } else if (response && response.content && typeof response.content === 'string') {
-        analysisText = response.content;
-      } else if (response && response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content) {
-        analysisText = response.choices[0].message.content;
-      } else if (response && typeof response === 'object' && response.role && response.content) {
-        // Handle the specific case mentioned in the error
-        analysisText = response.content;
-      } else {
-        console.error('Unexpected response structure:', response);
-        throw new Error('Unable to extract analysis from Puter AI response');
-      }
+      // Extract analysis text using improved function
+      const analysisText = extractAnalysisText(response);
 
-      if (analysisText && analysisText.trim()) {
-        setAnalysis(analysisText.trim());
+      if (analysisText && analysisText.length > 0) {
+        setAnalysis(analysisText);
         toast.success('AI analysis completed successfully!');
       } else {
-        throw new Error('Empty response from Puter AI');
+        throw new Error('Empty analysis text extracted from Puter AI response');
       }
     } catch (error) {
       console.error('AI Analysis Error:', error);
