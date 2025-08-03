@@ -141,6 +141,83 @@ export type Database = {
           },
         ]
       }
+      ingredient_transfers: {
+        Row: {
+          from_cost_per_unit: number
+          from_ingredient_id: string | null
+          from_stock_id: string | null
+          id: string
+          notes: string | null
+          price_difference: number | null
+          quantity_transferred: number
+          to_cost_per_unit: number
+          to_ingredient_id: string | null
+          to_stock_id: string | null
+          transfer_date: string
+          transfer_type: string
+          unit: string
+        }
+        Insert: {
+          from_cost_per_unit: number
+          from_ingredient_id?: string | null
+          from_stock_id?: string | null
+          id?: string
+          notes?: string | null
+          price_difference?: number | null
+          quantity_transferred: number
+          to_cost_per_unit: number
+          to_ingredient_id?: string | null
+          to_stock_id?: string | null
+          transfer_date?: string
+          transfer_type: string
+          unit: string
+        }
+        Update: {
+          from_cost_per_unit?: number
+          from_ingredient_id?: string | null
+          from_stock_id?: string | null
+          id?: string
+          notes?: string | null
+          price_difference?: number | null
+          quantity_transferred?: number
+          to_cost_per_unit?: number
+          to_ingredient_id?: string | null
+          to_stock_id?: string | null
+          transfer_date?: string
+          transfer_type?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingredient_transfers_from_ingredient_id_fkey"
+            columns: ["from_ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingredient_transfers_from_stock_id_fkey"
+            columns: ["from_stock_id"]
+            isOneToOne: false
+            referencedRelation: "kitchen_stock"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingredient_transfers_to_ingredient_id_fkey"
+            columns: ["to_ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingredient_transfers_to_stock_id_fkey"
+            columns: ["to_stock_id"]
+            isOneToOne: false
+            referencedRelation: "kitchen_stock"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingredients: {
         Row: {
           created_at: string | null
@@ -182,6 +259,53 @@ export type Database = {
           weight?: number
         }
         Relationships: []
+      }
+      kitchen_stock: {
+        Row: {
+          cost_per_unit: number
+          created_at: string
+          id: string
+          ingredient_id: string
+          ingredient_name: string
+          last_updated: string
+          pack_size: number
+          quantity_on_hand: number
+          total_value: number | null
+          unit: string
+        }
+        Insert: {
+          cost_per_unit?: number
+          created_at?: string
+          id?: string
+          ingredient_id: string
+          ingredient_name: string
+          last_updated?: string
+          pack_size: number
+          quantity_on_hand?: number
+          total_value?: number | null
+          unit?: string
+        }
+        Update: {
+          cost_per_unit?: number
+          created_at?: string
+          id?: string
+          ingredient_id?: string
+          ingredient_name?: string
+          last_updated?: string
+          pack_size?: number
+          quantity_on_hand?: number
+          total_value?: number | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kitchen_stock_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pos_users: {
         Row: {
@@ -464,6 +588,57 @@ export type Database = {
           staff_name?: string
         }
         Relationships: []
+      }
+      production_stock_usage: {
+        Row: {
+          batch_id: string
+          cost_per_unit: number
+          id: string
+          ingredient_name: string
+          kitchen_stock_id: string
+          quantity_used: number
+          total_cost: number | null
+          unit: string
+          usage_date: string
+        }
+        Insert: {
+          batch_id: string
+          cost_per_unit: number
+          id?: string
+          ingredient_name: string
+          kitchen_stock_id: string
+          quantity_used: number
+          total_cost?: number | null
+          unit: string
+          usage_date?: string
+        }
+        Update: {
+          batch_id?: string
+          cost_per_unit?: number
+          id?: string
+          ingredient_name?: string
+          kitchen_stock_id?: string
+          quantity_used?: number
+          total_cost?: number | null
+          unit?: string
+          usage_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_stock_usage_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "production_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_stock_usage_kitchen_stock_id_fkey"
+            columns: ["kitchen_stock_id"]
+            isOneToOne: false
+            referencedRelation: "kitchen_stock"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {

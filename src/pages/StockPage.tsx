@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, AlertTriangle } from 'lucide-react';
-import { format, addDays, isBefore } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowRightLeft, Plus, Package } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
@@ -15,346 +15,541 @@ import Navigation from '@/components/Navigation';
 import { Badge } from '@/components/ui/badge';
 
 // Types
-interface StockItem {
-  id: string;
-  product_id: string;
-  product_name: string;
-  quantity: number;
-  expiry_date: string;
-  batch_number?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface Product {
+interface Ingredient {
   id: string;
   name: string;
+  unit: string;
+  weight: number;
+  price_ex_vat: number;
+  total_price: number;
+}
+
+interface KitchenStock {
+  id: string;
+  ingredient_id: string;
+  ingredient_name: string;
+  pack_size: number;
+  unit: string;
+  quantity_on_hand: number;
+  cost_per_unit: number;
+  total_value: number;
+  last_updated: string;
+  created_at: string;
+}
+
+interface IngredientTransfer {
+  id: string;
+  from_ingredient_id?: string;
+  to_ingredient_id?: string;
+  from_stock_id?: string;
+  to_stock_id?: string;
+  quantity_transferred: number;
+  unit: string;
+  from_cost_per_unit: number;
+  to_cost_per_unit: number;
+  price_difference: number;
+  transfer_date: string;
+  notes?: string;
+  transfer_type: string;
 }
 
 const StockPage = () => {
   const queryClient = useQueryClient();
-  const today = new Date();
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [stockToStockDialogOpen, setStockToStockDialogOpen] = useState(false);
   
-  const [expiryDate, setExpiryDate] = useState<Date>(addDays(today, 14)); // Default 14 days from now
-  const [stockData, setStockData] = useState({
-    product_id: '',
-    quantity: 1,
-    batch_number: '',
+  // Transfer from ingredient to kitchen stock
+  const [ingredientTransfer, setIngredientTransfer] = useState({
+    ingredient_id: '',
+    quantity_transferred: 0,
+    notes: ''
   });
 
-  // 1. Fetch Products
-  const { data: products = [] } = useQuery({
-    queryKey: ['stock_products'],
+  // Transfer between kitchen stocks
+  const [stockTransfer, setStockTransfer] = useState({
+    from_stock_id: '',
+    to_ingredient_id: '',
+    quantity_transferred: 0,
+    notes: ''
+  });
+
+  // Fetch ingredients
+  const { data: ingredients = [] } = useQuery({
+    queryKey: ['ingredients'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('products')
-        .select('id, name')
+        .from('ingredients')
+        .select('*')
         .order('name');
       
       if (error) throw error;
-      return data as Product[];
+      return data as Ingredient[];
     }
   });
 
-  // 2. Fetch Stock Items
-  const { data: stockItems = [], isLoading: isLoadingStock } = useQuery({
-    queryKey: ['stock_items'],
+  // Fetch kitchen stock
+  const { data: kitchenStock = [], isLoading: isLoadingStock } = useQuery({
+    queryKey: ['kitchen_stock'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('stock')
-        .select(`
-          id, 
-          product_id,
-          product_name,
-          quantity,
-          expiry_date,
-          batch_number,
-          created_at,
-          updated_at
-        `)
-        .order('expiry_date', { ascending: true });
+        .from('kitchen_stock')
+        .select('*')
+        .order('ingredient_name');
       
       if (error) throw error;
-      return data as StockItem[];
+      return data as KitchenStock[];
     }
   });
 
-  // 3. Add Stock Item Mutation
-  const addStockItem = useMutation({
+  // Fetch transfer history
+  const { data: transfers = [] } = useQuery({
+    queryKey: ['ingredient_transfers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ingredient_transfers')
+        .select('*')
+        .order('transfer_date', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      return data as IngredientTransfer[];
+    }
+  });
+
+  // Transfer ingredient to kitchen stock mutation
+  const transferToKitchenMutation = useMutation({
     mutationFn: async () => {
-      if (!stockData.product_id || !stockData.quantity || !expiryDate) {
+      if (!ingredientTransfer.ingredient_id || !ingredientTransfer.quantity_transferred) {
+        throw new Error('Please select ingredient and quantity');
+      }
+
+      const selectedIngredient = ingredients.find(i => i.id === ingredientTransfer.ingredient_id);
+      if (!selectedIngredient) throw new Error('Ingredient not found');
+
+      // Calculate cost per unit from ingredient
+      const costPerUnit = selectedIngredient.total_price / selectedIngredient.weight;
+
+      // Check if kitchen stock already exists for this ingredient
+      const existingStock = kitchenStock.find(s => s.ingredient_id === ingredientTransfer.ingredient_id);
+
+      if (existingStock) {
+        // Update existing stock
+        const { error: updateError } = await supabase
+          .from('kitchen_stock')
+          .update({
+            quantity_on_hand: existingStock.quantity_on_hand + ingredientTransfer.quantity_transferred,
+            cost_per_unit: costPerUnit,
+            last_updated: new Date().toISOString()
+          })
+          .eq('id', existingStock.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Create new kitchen stock entry
+        const { error: insertError } = await supabase
+          .from('kitchen_stock')
+          .insert({
+            ingredient_id: ingredientTransfer.ingredient_id,
+            ingredient_name: selectedIngredient.name,
+            pack_size: selectedIngredient.weight,
+            unit: selectedIngredient.unit,
+            quantity_on_hand: ingredientTransfer.quantity_transferred,
+            cost_per_unit: costPerUnit
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      // Record the transfer
+      const { error: transferError } = await supabase
+        .from('ingredient_transfers')
+        .insert({
+          from_ingredient_id: ingredientTransfer.ingredient_id,
+          quantity_transferred: ingredientTransfer.quantity_transferred,
+          unit: selectedIngredient.unit,
+          from_cost_per_unit: costPerUnit,
+          to_cost_per_unit: costPerUnit,
+          transfer_type: 'ingredient_to_stock',
+          notes: ingredientTransfer.notes
+        });
+
+      if (transferError) throw transferError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen_stock'] });
+      queryClient.invalidateQueries({ queryKey: ['ingredient_transfers'] });
+      setIngredientTransfer({ ingredient_id: '', quantity_transferred: 0, notes: '' });
+      setTransferDialogOpen(false);
+      toast.success('Ingredient transferred to kitchen stock!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    }
+  });
+
+  // Transfer between kitchen stocks mutation
+  const transferBetweenStocksMutation = useMutation({
+    mutationFn: async () => {
+      if (!stockTransfer.from_stock_id || !stockTransfer.to_ingredient_id || !stockTransfer.quantity_transferred) {
         throw new Error('Please fill all required fields');
       }
 
-      const selectedProduct = products.find(p => p.id === stockData.product_id);
-      if (!selectedProduct) throw new Error('Product not found');
-
-      const { error } = await supabase
-        .from('stock')
-        .insert({
-          product_id: stockData.product_id,
-          product_name: selectedProduct.name,
-          quantity: stockData.quantity,
-          expiry_date: format(expiryDate, 'yyyy-MM-dd'),
-          batch_number: stockData.batch_number || null
-        });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock_items'] });
-      setStockData({
-        product_id: '',
-        quantity: 1,
-        batch_number: '',
-      });
-      toast("Stock item added successfully!");
-    },
-    onError: (error: Error) => {
-      toast(error.message);
-    }
-  });
-
-  // 4. Update Stock Quantity Mutation
-  const updateStockQuantity = useMutation({
-    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
-      if (quantity < 0) {
-        throw new Error('Quantity cannot be negative');
+      const fromStock = kitchenStock.find(s => s.id === stockTransfer.from_stock_id);
+      const toIngredient = ingredients.find(i => i.id === stockTransfer.to_ingredient_id);
+      
+      if (!fromStock || !toIngredient) throw new Error('Stock or ingredient not found');
+      
+      if (fromStock.quantity_on_hand < stockTransfer.quantity_transferred) {
+        throw new Error('Insufficient stock quantity');
       }
 
-      const { error } = await supabase
-        .from('stock')
-        .update({ 
-          quantity: quantity,
-          updated_at: new Date().toISOString()
+      // Calculate new cost per unit for target ingredient
+      const newCostPerUnit = toIngredient.total_price / toIngredient.weight;
+
+      // Update source stock (reduce quantity)
+      const { error: updateFromError } = await supabase
+        .from('kitchen_stock')
+        .update({
+          quantity_on_hand: fromStock.quantity_on_hand - stockTransfer.quantity_transferred,
+          last_updated: new Date().toISOString()
         })
-        .eq('id', id);
-      
-      if (error) throw error;
+        .eq('id', stockTransfer.from_stock_id);
+
+      if (updateFromError) throw updateFromError;
+
+      // Check if target ingredient already exists in kitchen stock
+      const existingTargetStock = kitchenStock.find(s => s.ingredient_id === stockTransfer.to_ingredient_id);
+
+      if (existingTargetStock) {
+        // Update existing target stock
+        const { error: updateToError } = await supabase
+          .from('kitchen_stock')
+          .update({
+            quantity_on_hand: existingTargetStock.quantity_on_hand + stockTransfer.quantity_transferred,
+            cost_per_unit: newCostPerUnit,
+            last_updated: new Date().toISOString()
+          })
+          .eq('id', existingTargetStock.id);
+
+        if (updateToError) throw updateToError;
+      } else {
+        // Create new kitchen stock entry for target
+        const { error: insertError } = await supabase
+          .from('kitchen_stock')
+          .insert({
+            ingredient_id: stockTransfer.to_ingredient_id,
+            ingredient_name: toIngredient.name,
+            pack_size: toIngredient.weight,
+            unit: toIngredient.unit,
+            quantity_on_hand: stockTransfer.quantity_transferred,
+            cost_per_unit: newCostPerUnit
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      // Record the transfer
+      const { error: transferError } = await supabase
+        .from('ingredient_transfers')
+        .insert({
+          from_stock_id: stockTransfer.from_stock_id,
+          to_ingredient_id: stockTransfer.to_ingredient_id,
+          quantity_transferred: stockTransfer.quantity_transferred,
+          unit: fromStock.unit,
+          from_cost_per_unit: fromStock.cost_per_unit,
+          to_cost_per_unit: newCostPerUnit,
+          transfer_type: 'stock_to_stock',
+          notes: stockTransfer.notes
+        });
+
+      if (transferError) throw transferError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock_items'] });
-      toast("Stock quantity updated!");
+      queryClient.invalidateQueries({ queryKey: ['kitchen_stock'] });
+      queryClient.invalidateQueries({ queryKey: ['ingredient_transfers'] });
+      setStockTransfer({ from_stock_id: '', to_ingredient_id: '', quantity_transferred: 0, notes: '' });
+      setStockToStockDialogOpen(false);
+      toast.success('Stock transferred successfully!');
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
-  const isNearExpiry = (expiryDate: string): boolean => {
-    const expiry = new Date(expiryDate);
-    const warningDate = addDays(today, 7); // 7 days warning
-    return isBefore(expiry, warningDate) && !isBefore(expiry, today);
-  };
-
-  const isExpired = (expiryDate: string): boolean => {
-    const expiry = new Date(expiryDate);
-    return isBefore(expiry, today);
-  };
-
-  const handleQuantityChange = (id: string, currentQuantity: number, change: number) => {
-    const newQuantity = currentQuantity + change;
-    if (newQuantity >= 0) {
-      updateStockQuantity.mutate({ id, quantity: newQuantity });
-    }
-  };
-
-  // Calculate stock statistics
-  const totalItems = stockItems.reduce((sum, item) => sum + item.quantity, 0);
-  const expiringItems = stockItems.filter(item => isNearExpiry(item.expiry_date))
-    .reduce((sum, item) => sum + item.quantity, 0);
-  const expiredItems = stockItems.filter(item => isExpired(item.expiry_date))
-    .reduce((sum, item) => sum + item.quantity, 0);
+  // Calculate total stock value
+  const totalStockValue = kitchenStock.reduce((sum, stock) => sum + stock.total_value, 0);
+  const lowStockItems = kitchenStock.filter(stock => stock.quantity_on_hand < 5).length;
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
-      <h1 className="text-2xl font-bold">Stock Management</h1>
+      <h1 className="text-2xl font-bold">Kitchen Stock Management</h1>
       
       {/* Stock Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Stock</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Stock Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{totalItems} items</p>
+            <p className="text-2xl font-bold">R{totalStockValue.toFixed(2)}</p>
           </CardContent>
         </Card>
-        <Card className="border-yellow-200">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-yellow-800">Expiring Soon</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Ingredients</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-yellow-700">{expiringItems} items</p>
+            <p className="text-2xl font-bold">{kitchenStock.length}</p>
           </CardContent>
         </Card>
-        <Card className="border-red-200">
+        <Card className={lowStockItems > 0 ? "border-yellow-200" : ""}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-800">Expired Items</CardTitle>
+            <CardTitle className="text-sm font-medium text-yellow-800">Low Stock Items</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-700">{expiredItems} items</p>
-            {expiredItems > 0 && (
-              <div className="flex items-center mt-2 text-sm text-red-600">
-                <AlertTriangle className="h-4 w-4 mr-1" />
-                <span>Needs attention</span>
-              </div>
-            )}
+            <p className="text-2xl font-bold text-yellow-700">{lowStockItems}</p>
           </CardContent>
         </Card>
       </div>
-      
-      {/* Add Stock Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Add New Stock</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Product Selection */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Product</label>
-              <select
-                className="w-full p-2 border rounded"
-                value={stockData.product_id}
-                onChange={(e) => setStockData({...stockData, product_id: e.target.value})}
-                required
+
+      {/* Action Buttons */}
+      <div className="flex gap-4">
+        <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Transfer Ingredient to Kitchen
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Transfer Ingredient to Kitchen Stock</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Select Ingredient</label>
+                <Select
+                  value={ingredientTransfer.ingredient_id}
+                  onValueChange={(value) => setIngredientTransfer({...ingredientTransfer, ingredient_id: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose ingredient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ingredients.map(ingredient => (
+                      <SelectItem key={ingredient.id} value={ingredient.id}>
+                        {ingredient.name} ({ingredient.weight}{ingredient.unit} - R{ingredient.total_price.toFixed(2)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Quantity to Transfer</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={ingredientTransfer.quantity_transferred}
+                  onChange={(e) => setIngredientTransfer({
+                    ...ingredientTransfer, 
+                    quantity_transferred: parseFloat(e.target.value) || 0
+                  })}
+                  placeholder="Enter quantity"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+                <Textarea
+                  value={ingredientTransfer.notes}
+                  onChange={(e) => setIngredientTransfer({...ingredientTransfer, notes: e.target.value})}
+                  placeholder="Add any notes about this transfer"
+                />
+              </div>
+              <Button 
+                onClick={() => transferToKitchenMutation.mutate()}
+                disabled={transferToKitchenMutation.isPending}
+                className="w-full"
               >
-                <option value="">Select Product</option>
-                {products.map(product => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
+                {transferToKitchenMutation.isPending ? "Transferring..." : "Transfer to Kitchen"}
+              </Button>
             </div>
+          </DialogContent>
+        </Dialog>
 
-            {/* Quantity Input */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Quantity</label>
-              <Input
-                type="number"
-                min="1"
-                value={stockData.quantity}
-                onChange={(e) => setStockData({
-                  ...stockData, 
-                  quantity: parseInt(e.target.value) || 1
-                })}
-                required
-              />
+        <Dialog open={stockToStockDialogOpen} onOpenChange={setStockToStockDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="flex items-center gap-2">
+              <ArrowRightLeft className="h-4 w-4" />
+              Transfer Between Stocks
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Transfer Between Kitchen Stocks</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">From Stock</label>
+                <Select
+                  value={stockTransfer.from_stock_id}
+                  onValueChange={(value) => setStockTransfer({...stockTransfer, from_stock_id: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose source stock" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kitchenStock.map(stock => (
+                      <SelectItem key={stock.id} value={stock.id}>
+                        {stock.ingredient_name} ({stock.quantity_on_hand.toFixed(1)}{stock.unit} available)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">To Ingredient</label>
+                <Select
+                  value={stockTransfer.to_ingredient_id}
+                  onValueChange={(value) => setStockTransfer({...stockTransfer, to_ingredient_id: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose target ingredient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ingredients.map(ingredient => (
+                      <SelectItem key={ingredient.id} value={ingredient.id}>
+                        {ingredient.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Quantity to Transfer</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={stockTransfer.quantity_transferred}
+                  onChange={(e) => setStockTransfer({
+                    ...stockTransfer, 
+                    quantity_transferred: parseFloat(e.target.value) || 0
+                  })}
+                  placeholder="Enter quantity"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+                <Textarea
+                  value={stockTransfer.notes}
+                  onChange={(e) => setStockTransfer({...stockTransfer, notes: e.target.value})}
+                  placeholder="Reason for transfer"
+                />
+              </div>
+              <Button 
+                onClick={() => transferBetweenStocksMutation.mutate()}
+                disabled={transferBetweenStocksMutation.isPending}
+                className="w-full"
+              >
+                {transferBetweenStocksMutation.isPending ? "Transferring..." : "Transfer Stock"}
+              </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+      </div>
 
-            {/* Expiry Date Picker */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Expiry Date</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {expiryDate ? format(expiryDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={expiryDate}
-                    onSelect={(date) => date && setExpiryDate(date)}
-                    initialFocus
-                    disabled={(date) => date < today}
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Batch Number */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Batch Number (optional)</label>
-              <Input
-                placeholder="Batch identifier"
-                value={stockData.batch_number}
-                onChange={(e) => setStockData({...stockData, batch_number: e.target.value})}
-              />
-            </div>
-          </div>
-
-          <Button 
-            onClick={() => addStockItem.mutate()}
-            disabled={addStockItem.isPending}
-          >
-            {addStockItem.isPending ? "Adding..." : "Add to Stock"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Stock Items List */}
+      {/* Kitchen Stock Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Current Stock</CardTitle>
+          <CardTitle>Current Kitchen Stock</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoadingStock ? (
-            <div className="text-center py-4">Loading stock...</div>
-          ) : stockItems.length > 0 ? (
+            <div className="text-center py-4">Loading kitchen stock...</div>
+          ) : kitchenStock.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Expiry Date</TableHead>
-                  <TableHead>Batch #</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Ingredient</TableHead>
+                  <TableHead>Pack Size</TableHead>
+                  <TableHead>Quantity on Hand</TableHead>
+                  <TableHead>Cost per Unit</TableHead>
+                  <TableHead>Total Value</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stockItems.map(item => (
-                  <TableRow key={item.id} className={
-                    isExpired(item.expiry_date) ? 
-                      'bg-red-50' : 
-                      isNearExpiry(item.expiry_date) ? 
-                        'bg-yellow-50' : ''
-                  }>
-                    <TableCell>{item.product_name}</TableCell>
-                    <TableCell>{item.quantity}</TableCell>
+                {kitchenStock.map(stock => (
+                  <TableRow key={stock.id}>
+                    <TableCell className="font-medium">{stock.ingredient_name}</TableCell>
+                    <TableCell>{stock.pack_size} {stock.unit}</TableCell>
+                    <TableCell>{stock.quantity_on_hand.toFixed(1)} {stock.unit}</TableCell>
+                    <TableCell>R{stock.cost_per_unit.toFixed(2)}</TableCell>
+                    <TableCell>R{stock.total_value.toFixed(2)}</TableCell>
                     <TableCell>
-                      {format(new Date(item.expiry_date), 'MMM d, yyyy')}
-                      {isExpired(item.expiry_date) ? (
-                        <Badge variant="outline" className="ml-2 bg-red-100 text-red-800 border-red-300">
-                          Expired
+                      {stock.quantity_on_hand < 5 ? (
+                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                          Low Stock
                         </Badge>
-                      ) : isNearExpiry(item.expiry_date) ? (
-                        <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300">
-                          Expiring Soon
+                      ) : (
+                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                          In Stock
                         </Badge>
-                      ) : null}
+                      )}
                     </TableCell>
-                    <TableCell>{item.batch_number || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleQuantityChange(item.id, item.quantity, -1)}
-                        >
-                          -
-                        </Button>
-                        <span className="w-8 text-center">{item.quantity}</span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleQuantityChange(item.id, item.quantity, 1)}
-                        >
-                          +
-                        </Button>
-                      </div>
-                    </TableCell>
+                    <TableCell>{new Date(stock.last_updated).toLocaleDateString()}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           ) : (
             <div className="text-center py-4 text-gray-500">
-              No stock items found. Add your first stock item above.
+              No kitchen stock found. Transfer ingredients to get started.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Transfer History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Transfers</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transfers.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Price Difference</TableHead>
+                  <TableHead>Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transfers.map(transfer => (
+                  <TableRow key={transfer.id}>
+                    <TableCell>{new Date(transfer.transfer_date).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {transfer.transfer_type.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{transfer.quantity_transferred.toFixed(1)} {transfer.unit}</TableCell>
+                    <TableCell className={transfer.price_difference > 0 ? 'text-red-600' : transfer.price_difference < 0 ? 'text-green-600' : ''}>
+                      {transfer.price_difference > 0 ? '+' : ''}R{transfer.price_difference.toFixed(2)}
+                    </TableCell>
+                    <TableCell>{transfer.notes || '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              No transfer history found.
             </div>
           )}
         </CardContent>
