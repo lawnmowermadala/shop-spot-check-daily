@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -162,7 +161,8 @@ const AIProductionAnalytics = ({
       total_production: historicalProduction.reduce((sum, day) => sum + day.total_production, 0),
       average_daily_production: historicalProduction.length > 0 
         ? (historicalProduction.reduce((sum, day) => sum + day.total_production, 0) / historicalProduction.length).toFixed(2)
-        : 0
+        : 0,
+      currency: 'ZAR (South African Rand)'
     };
 
     return JSON.stringify(dataContext, null, 2);
@@ -181,7 +181,7 @@ const AIProductionAnalytics = ({
       const productionData = prepareProductionDataForAI();
       
       const defaultPrompt = `
-        As an expert production analytics consultant, analyze the following expired stock/production data and provide a comprehensive report with:
+        As an expert production analytics consultant for a South African bakery business, analyze the following expired stock/production data and provide a comprehensive report with all costs in South African Rand (ZAR):
         
         1. **HIGH & LOW EXPIRY ANALYSIS**:
            - Identify the TOP 5 products with HIGHEST expiry/waste rates (name each product specifically)
@@ -211,7 +211,7 @@ const AIProductionAnalytics = ({
            - Staff training recommendations
            - Inventory management improvements
         
-        5. **FINANCIAL IMPACT ANALYSIS**:
+        5. **FINANCIAL IMPACT ANALYSIS** (All amounts in ZAR):
            - Calculate total waste cost for high-expiry products
            - Potential savings from implementing recommendations
            - ROI projections for waste reduction initiatives
@@ -224,7 +224,7 @@ const AIProductionAnalytics = ({
         Production Data:
         ${productionData}
         
-        Please provide specific product names, exact quantities, and actionable recommendations with measurable outcomes.
+        Please provide specific product names, exact quantities in ZAR, and actionable recommendations with measurable outcomes for this South African bakery business.
       `;
 
       const prompt = specificPrompt || defaultPrompt;
@@ -268,14 +268,14 @@ const AIProductionAnalytics = ({
 
     const productionData = prepareProductionDataForAI();
     const fullPrompt = `
-      Please analyze the following production data and answer these specific questions:
+      Please analyze the following South African bakery production data and answer these specific questions (all financial amounts should be in South African Rand - ZAR):
       
       ${selectedQuestionTexts}
       
       Production Data:
       ${productionData}
       
-      Please provide detailed, data-driven answers to each selected question with specific recommendations and insights.
+      Please provide detailed, data-driven answers to each selected question with specific recommendations and insights for this South African bakery business.
     `;
 
     await analyzeWithAI(fullPrompt);
@@ -291,7 +291,7 @@ const AIProductionAnalytics = ({
     const fullPrompt = `
       ${customPrompt}
       
-      Here is the production data to analyze:
+      Here is the South African bakery production data to analyze (all financial amounts should be in South African Rand - ZAR):
       ${productionData}
     `;
 
@@ -456,27 +456,15 @@ const AIProductionAnalytics = ({
               font-weight: bold;
             }
             
-            /* Mobile-specific styles */
-            @media screen and (max-width: 768px) {
-              body {
-                padding: 8px;
-                font-size: 13px;
-              }
-              
-              .header h1 {
-                font-size: 1.3rem;
-              }
-              
-              .analysis-content {
-                padding: 12px;
-              }
-              
-              .data-summary, .highlight-section {
-                padding: 10px;
-              }
+            .currency-note {
+              background: #e6f3ff;
+              padding: 10px;
+              border-radius: 5px;
+              margin: 10px 0;
+              border-left: 4px solid #0066cc;
+              font-size: 12px;
             }
             
-            /* Print styles for all devices */
             @media print {
               body { 
                 margin: 0; 
@@ -524,8 +512,12 @@ const AIProductionAnalytics = ({
             <h1>🤖 Production Analytics & Expiry Analysis Report</h1>
             <div class="subtitle">
               Generated on ${format(new Date(), 'PPPp')}<br>
-              Analysis Period: ${comparisonDays} days
+              Analysis Period: ${comparisonDays} days | Currency: South African Rand (ZAR)
             </div>
+          </div>
+          
+          <div class="currency-note">
+            <strong>💰 Currency Note:</strong> All financial amounts in this report are displayed in South African Rand (ZAR).
           </div>
           
           <div class="data-summary">
@@ -535,29 +527,23 @@ const AIProductionAnalytics = ({
             <p><strong>Staff Members:</strong> ${staffStats.length}</p>
             <p><strong>Expired/Waste Batches:</strong> ${productionBatches.length}</p>
             <p><strong>Analysis Focus:</strong> High & Low Expiry Products with Future Production Recommendations</p>
-          </div>
-          
-          <div class="highlight-section">
-            <h3>🎯 Key Focus Areas</h3>
-            <p><strong>High Expiry Products:</strong> Products requiring immediate production reduction</p>
-            <p><strong>Low Expiry Products:</strong> Benchmark products for optimization strategies</p>
-            <p><strong>Action Items:</strong> Specific recommendations for waste reduction and production planning</p>
+            <p><strong>Business Location:</strong> South Africa</p>
           </div>
           
           <div class="analysis-content">
             ${analysis.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/ZAR/gi, '<span style="color: #0066cc; font-weight: bold;">ZAR</span>')
               .replace(/(HIGH EXPIRY|HIGHEST|TOP.*HIGH)/gi, '<span style="color: #dc2626; font-weight: bold;">$1</span>')
-              .replace(/(LOW EXPIRY|LOWEST|TOP.*LOW)/gi, '<span style="color: #16a34a; font-weight: bold;">$1</span>')
-              .replace(/(RECOMMENDATION|ACTION|STRATEGY)/gi, '<span style="color: #f59e0b; font-weight: bold;">$1</span>')}
+              .replace(/(LOW EXPIRY|LOWEST|TOP.*LOW)/gi, '<span style="color: #16a34a; font-weight: bold;">$1</span>')}
           </div>
           
           <div class="footer">
-            <p>This comprehensive expiry analysis report provides actionable insights to reduce waste and optimize production scheduling.</p>
+            <p>This comprehensive expiry analysis report provides actionable insights to reduce waste and optimize production scheduling for South African bakery operations.</p>
             <div class="powered-by">
               <span class="ai-brand">🧠 Powered by Elton Niati AI Agent</span>
             </div>
             <p style="margin-top: 8px; font-size: 10px;">
-              Report includes high/low expiry analysis, specific product recommendations, and future production planning
+              Report includes high/low expiry analysis, specific product recommendations, and future production planning in ZAR
             </p>
           </div>
         </body>
