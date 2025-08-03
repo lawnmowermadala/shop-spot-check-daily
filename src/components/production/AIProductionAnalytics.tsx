@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -164,62 +165,23 @@ const AIProductionAnalytics = ({
         : 0
     };
 
-    return dataContext;
-  };
-
-  const extractAnalysisText = (response: any): string => {
-    console.log('Processing Puter AI response:', response);
-    
-    // Handle string responses directly
-    if (typeof response === 'string') {
-      return response.trim();
-    }
-    
-    // Handle object responses with different structures
-    if (response && typeof response === 'object') {
-      // Check for content property first (most common)
-      if (response.content && typeof response.content === 'string') {
-        return response.content.trim();
-      }
-      
-      // Check for message property
-      if (response.message && typeof response.message === 'string') {
-        return response.message.trim();
-      }
-      
-      // Check for OpenAI-style response structure
-      if (response.choices && Array.isArray(response.choices) && response.choices[0]) {
-        const choice = response.choices[0];
-        if (choice.message && choice.message.content) {
-          return choice.message.content.trim();
-        }
-      }
-      
-      // Handle direct object with role and content (specific error case)
-      if (response.role && response.content && typeof response.content === 'string') {
-        return response.content.trim();
-      }
-    }
-    
-    // If no valid text content found, throw error
-    console.error('Unable to extract text from Puter AI response:', response);
-    throw new Error('Unable to extract analysis text from Puter AI response');
+    return JSON.stringify(dataContext, null, 2);
   };
 
   const analyzeWithAI = async (specificPrompt?: string) => {
+    if (!window.puter) {
+      toast.error('Puter AI is not available. Please ensure you have the Puter script loaded.');
+      return;
+    }
+
     setIsAnalyzing(true);
     setAnalysis('');
 
     try {
-      // Check if Puter is available
-      if (!window.puter || !window.puter.ai) {
-        throw new Error('Puter AI is not available. Please make sure you are running this in a Puter environment.');
-      }
-
       const productionData = prepareProductionDataForAI();
       
       const defaultPrompt = `
-        As Elton Niati AI Agent, an expert production analytics consultant, analyze the following expired stock/production data and provide a comprehensive report with:
+        As an expert production analytics consultant, analyze the following expired stock/production data and provide a comprehensive report with:
         
         1. **HIGH & LOW EXPIRY ANALYSIS**:
            - Identify the TOP 5 products with HIGHEST expiry/waste rates (name each product specifically)
@@ -259,35 +221,35 @@ const AIProductionAnalytics = ({
            - 30-day implementation plan
            - Expected results and KPIs to track
         
+        Production Data:
+        ${productionData}
+        
         Please provide specific product names, exact quantities, and actionable recommendations with measurable outcomes.
-
-        Production Data: ${JSON.stringify(productionData, null, 2)}
       `;
 
       const prompt = specificPrompt || defaultPrompt;
 
-      console.log('Sending analysis request to Puter AI...');
-      const response = await window.puter.ai.chat(prompt, {
-        model: 'gpt-4o-mini',
+      const completion = await window.puter.ai.chat(prompt, {
+        model: 'claude-sonnet-4',
+        stream: true,
         max_tokens: 4000,
         temperature: 0.3
       });
 
-      console.log('Raw Puter AI Response:', response);
+      let fullResponse = '';
       
-      // Extract analysis text using improved function
-      const analysisText = extractAnalysisText(response);
-
-      if (analysisText && analysisText.length > 0) {
-        setAnalysis(analysisText);
-        toast.success('AI analysis completed successfully!');
-      } else {
-        throw new Error('Empty analysis text extracted from Puter AI response');
+      for await (const part of completion) {
+        if (part?.text) {
+          fullResponse += part.text;
+          setAnalysis(fullResponse);
+        }
       }
+
+      toast.success('AI analysis completed successfully!');
     } catch (error) {
       console.error('AI Analysis Error:', error);
       toast.error('Failed to analyze production data: ' + (error as Error).message);
-      setAnalysis('Failed to generate analysis. Please ensure you are running this in a Puter environment with AI access.');
+      setAnalysis('Failed to generate analysis. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -311,7 +273,7 @@ const AIProductionAnalytics = ({
       ${selectedQuestionTexts}
       
       Production Data:
-      ${JSON.stringify(productionData, null, 2)}
+      ${productionData}
       
       Please provide detailed, data-driven answers to each selected question with specific recommendations and insights.
     `;
@@ -330,7 +292,7 @@ const AIProductionAnalytics = ({
       ${customPrompt}
       
       Here is the production data to analyze:
-      ${JSON.stringify(productionData, null, 2)}
+      ${productionData}
     `;
 
     await analyzeWithAI(fullPrompt);
