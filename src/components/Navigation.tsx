@@ -1,41 +1,91 @@
-import React from 'react';
+
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Users, Package, ChefHat, BarChart3, Calendar, Utensils, Star, DollarSign, Archive, UserCheck, Search, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Home, Clipboard, Star, BarChart, Building, Users, BookOpen } from 'lucide-react';
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Navigation = () => {
   const location = useLocation();
-
-  const navItems = [
-    { to: "/", icon: Home, label: "Dashboard" },
-    { to: "/ingredients", icon: Utensils, label: "Ingredients" },
-    { to: "/products", icon: Package, label: "Products" },
-    { to: "/recipes", icon: ChefHat, label: "Recipes" },
-    { to: "/suppliers", icon: Users, label: "Suppliers" },
-    { to: "/customers", icon: UserCheck, label: "Customers" },
-    { to: "/sales", icon: DollarSign, label: "Sales" },
-    { to: "/expenses", icon: BarChart3, label: "Expenses" },
-    { to: "/inventory", icon: Archive, label: "Inventory" },
-    { to: "/reports", icon: Calendar, label: "Reports" },
-    { to: "/duplicate-review", icon: AlertTriangle, label: "Review Duplicates" },
-  ];
-
+  const isMobile = useIsMobile();
+  
+  const isActive = (path: string) => {
+    // For ratings pages, consider both /ratings and /rate-staff as active for the ratings tab
+    if (path === '/ratings' && (location.pathname === '/ratings' || location.pathname === '/rate-staff')) {
+      return true;
+    }
+    return location.pathname === path;
+  };
+  
   return (
-    <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-50">
-      <ul className="flex justify-around items-center p-2">
-        {navItems.map((item) => (
-          <li key={item.to}>
-            <Link
-              to={item.to}
-              className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 ${
-                location.pathname === item.to ? 'text-blue-600' : 'text-gray-600'
-              }`}
-            >
-              <item.icon className="h-5 w-5 mb-1" />
-              <span className="text-xs">{item.label}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t p-1 z-10">
+      <div className="flex justify-around items-center">
+        <Link to="/">
+          <Button 
+            variant={isActive('/') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center h-auto py-1 px-1"
+          >
+            <Home className="h-4 w-4" />
+            <span className="text-[10px]">{!isMobile && "Home"}</span>
+          </Button>
+        </Link>
+        <Link to="/assignments">
+          <Button 
+            variant={isActive('/assignments') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center h-auto py-1 px-1"
+          >
+            <Clipboard className="h-4 w-4" />
+            <span className="text-[10px]">{!isMobile ? "Assignments" : "Tasks"}</span>
+          </Button>
+        </Link>
+        <Link to="/ratings">
+          <Button 
+            variant={isActive('/ratings') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center h-auto py-1 px-1"
+          >
+            <Star className="h-4 w-4" />
+            <span className="text-[10px]">Ratings</span>
+          </Button>
+        </Link>
+        <Link to="/departments">
+          <Button 
+            variant={isActive('/departments') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center h-auto py-1 px-1"
+          >
+            <Building className="h-4 w-4" />
+            <span className="text-[10px]">Depts</span>
+          </Button>
+        </Link>
+        <Link to="/staff">
+          <Button 
+            variant={isActive('/staff') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center h-auto py-1 px-1"
+          >
+            <Users className="h-4 w-4" />
+            <span className="text-[10px]">Staff</span>
+          </Button>
+        </Link>
+        <Link to="/analytics">
+          <Button 
+            variant={isActive('/analytics') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center h-auto py-1 px-1"
+          >
+            <BarChart className="h-4 w-4" />
+            <span className="text-[10px]">Stats</span>
+          </Button>
+        </Link>
+        <Link to="/manual">
+          <Button 
+            variant={isActive('/manual') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center h-auto py-1 px-1"
+          >
+            <BookOpen className="h-4 w-4" />
+            <span className="text-[10px]">Help</span>
+          </Button>
+        </Link>
+      </div>
+      <div className="w-full text-center text-[9px] text-gray-500 py-1 border-t">
+        Conceived and developed by Elton Niati | eaglevision.dev30@gmail.com
+      </div>
     </nav>
   );
 };
