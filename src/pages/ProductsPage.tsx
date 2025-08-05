@@ -109,11 +109,12 @@ const ProductsPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isEditing && currentProduct.name) {
+    if (!isEditing && (currentProduct.name || currentProduct.code)) {
       // Check for similar products before creating new one
       const canProceed = checkSimilarity(
-        currentProduct.name,
-        products.map(prod => ({ id: prod.id, name: prod.name })),
+        currentProduct.name || '',
+        currentProduct.code,
+        products.map(prod => ({ id: prod.id, name: prod.name, code: prod.code })),
         () => upsertProduct.mutate(currentProduct)
       );
       
@@ -150,6 +151,7 @@ const ProductsPage = () => {
         <h1 className="text-2xl font-bold">Products Management</h1>
         <SimilarityWarning
           newName={currentProduct.name || ''}
+          newCode={currentProduct.code}
           similarItems={similarItems}
           itemType="product"
           onProceed={proceedWithAction}

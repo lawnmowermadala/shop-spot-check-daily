@@ -39,7 +39,7 @@ export const calculateSimilarity = (str1: string, str2: string): number => {
 
 export const findSimilarItems = (
   newName: string,
-  existingItems: { id: string; name: string }[],
+  existingItems: { id: string; name: string; code?: string }[],
   threshold: number = 0.7
 ) => {
   return existingItems
@@ -49,4 +49,13 @@ export const findSimilarItems = (
     }))
     .filter(item => item.similarity >= threshold)
     .sort((a, b) => b.similarity - a.similarity);
+};
+
+export const findSimilarByCode = (
+  newCode: string,
+  existingItems: { id: string; name: string; code: string }[]
+) => {
+  return existingItems.filter(item => 
+    item.code.toLowerCase().trim() === newCode.toLowerCase().trim()
+  );
 };

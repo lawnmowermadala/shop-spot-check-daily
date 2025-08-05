@@ -1,11 +1,13 @@
 
 import { useState } from 'react';
-import { findSimilarItems } from '@/utils/similarityCheck';
+import { findSimilarItems, findSimilarByCode } from '@/utils/similarityCheck';
 
 interface SimilarItem {
   id: string;
   name: string;
-  similarity: number;
+  similarity?: number;
+  code?: string;
+  exactMatch?: boolean;
 }
 
 export const useSimilarityCheck = () => {
@@ -15,14 +17,25 @@ export const useSimilarityCheck = () => {
 
   const checkSimilarity = (
     newName: string,
-    existingItems: { id: string; name: string }[],
+    newCode: string | undefined,
+    existingItems: { id: string; name: string; code?: string }[],
     onProceed: () => void,
     threshold: number = 0.7
   ) => {
-    const similar = findSimilarItems(newName, existingItems, threshold);
+    const similarByName = findSimilarItems(newName, existingItems, threshold);
+    let similarByCode: any[] = [];
     
-    if (similar.length > 0) {
-      setSimilarItems(similar);
+    if (newCode) {
+      similarByCode = findSimilarByCode(newCode, existingItems as { id: string; name: string; code: string }[])
+        .map(item => ({ ...item, exactMatch: true }));
+    }
+    
+    const allSimilar = [...similarByCode, ...similarByName.filter(
+      nameItem => !similarByCode.some(codeItem => codeItem.id === nameItem.id)
+    )];
+    
+    if (allSimilar.length > 0) {
+      setSimilarItems(allSimilar);
       setPendingAction(() => onProceed);
       setShowSimilarityWarning(true);
       return false; // Don't proceed yet

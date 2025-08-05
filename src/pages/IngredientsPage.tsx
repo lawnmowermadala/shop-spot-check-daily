@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -142,6 +141,7 @@ const IngredientsPage = () => {
       // Check for similar ingredients before creating new one
       const canProceed = checkSimilarity(
         currentIngredient.name,
+        undefined,
         ingredients.map(ing => ({ id: ing.id, name: ing.name })),
         () => upsertIngredient.mutate(currentIngredient)
       );

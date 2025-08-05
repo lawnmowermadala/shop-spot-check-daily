@@ -488,6 +488,7 @@ const RecipePage = () => {
       // Check for similar recipes before creating new one
       const canProceed = checkSimilarity(
         recipeData.name,
+        undefined,
         recipes.map(recipe => ({ id: recipe.id, name: recipe.name })),
         () => addRecipe.mutate()
       );
