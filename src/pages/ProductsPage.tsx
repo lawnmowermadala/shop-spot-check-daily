@@ -1,16 +1,13 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
-import SimilarityWarning from '@/components/SimilarityWarning';
-import { useSimilarityCheck } from '@/hooks/useSimilarityCheck';
 
 // Types
 interface Product {
@@ -27,14 +24,6 @@ const ProductsPage = () => {
     name: '',
     code: ''
   });
-
-  const {
-    showSimilarityWarning,
-    similarItems,
-    checkSimilarity,
-    proceedWithAction,
-    resetSimilarityCheck
-  } = useSimilarityCheck();
 
   // Fetch products
   const { data: products = [], isLoading } = useQuery({
@@ -80,10 +69,10 @@ const ProductsPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       resetForm();
-      toast.success(isEditing ? "Product updated successfully!" : "Product added successfully!");
+      toast(isEditing ? "Product updated successfully!" : "Product added successfully!");
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast(error.message);
     }
   });
 
@@ -99,31 +88,16 @@ const ProductsPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success("Product deleted successfully!");
+      toast("Product deleted successfully!");
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast(error.message);
     }
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isEditing && (currentProduct.name || currentProduct.code)) {
-      // Check for similar products before creating new one
-      const canProceed = checkSimilarity(
-        currentProduct.name || '',
-        currentProduct.code,
-        products.map(prod => ({ id: prod.id, name: prod.name, code: prod.code })),
-        () => upsertProduct.mutate(currentProduct)
-      );
-      
-      if (canProceed) {
-        upsertProduct.mutate(currentProduct);
-      }
-    } else {
-      upsertProduct.mutate(currentProduct);
-    }
+    upsertProduct.mutate(currentProduct);
   };
 
   const handleEdit = (product: Product) => {
@@ -144,24 +118,6 @@ const ProductsPage = () => {
       code: ''
     });
   };
-
-  if (showSimilarityWarning) {
-    return (
-      <div className="p-4 space-y-6 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold">Products Management</h1>
-        <SimilarityWarning
-          newName={currentProduct.name || ''}
-          newCode={currentProduct.code}
-          similarItems={similarItems}
-          itemType="product"
-          onProceed={proceedWithAction}
-          onCancel={resetSimilarityCheck}
-          isLoading={upsertProduct.isPending}
-        />
-        <Navigation />
-      </div>
-    );
-  }
 
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
@@ -190,7 +146,6 @@ const ProductsPage = () => {
             </div>
             <div className="flex gap-2">
               <Button type="submit" disabled={upsertProduct.isPending}>
-                <Plus className="h-4 w-4 mr-2" />
                 {isEditing ? 'Update Product' : 'Add Product'}
               </Button>
               {isEditing && (
@@ -210,7 +165,7 @@ const ProductsPage = () => {
       {/* Products List */}
       <Card>
         <CardHeader>
-          <CardTitle>Products List ({products.length} products)</CardTitle>
+          <CardTitle>Products List</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (

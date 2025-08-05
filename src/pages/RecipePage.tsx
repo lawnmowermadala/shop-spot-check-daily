@@ -8,8 +8,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
-import SimilarityWarning from '@/components/SimilarityWarning';
-import { useSimilarityCheck } from '@/hooks/useSimilarityCheck';
 
 // Types
 interface Recipe {
@@ -147,14 +145,6 @@ const RecipePage = () => {
     batch_size: '',
     unit: 'units'
   });
-
-  const {
-    showSimilarityWarning,
-    similarItems,
-    checkSimilarity,
-    proceedWithAction,
-    resetSimilarityCheck
-  } = useSimilarityCheck();
 
   // Ingredient form state
   const [ingredientData, setIngredientData] = useState({
@@ -326,10 +316,10 @@ const RecipePage = () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       setRecipeData({ name: '', description: '', batch_size: '', unit: 'units' });
       setSelectedRecipeId(data.id);
-      toast.success("Recipe added successfully!");
+      toast("Recipe added successfully!");
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast(error.message);
     }
   });
 
@@ -483,39 +473,6 @@ const RecipePage = () => {
     }))
   ];
 
-  const handleRecipeSubmit = () => {
-    if (recipeData.name) {
-      // Check for similar recipes before creating new one
-      const canProceed = checkSimilarity(
-        recipeData.name,
-        undefined,
-        recipes.map(recipe => ({ id: recipe.id, name: recipe.name })),
-        () => addRecipe.mutate()
-      );
-      
-      if (canProceed) {
-        addRecipe.mutate();
-      }
-    }
-  };
-
-  if (showSimilarityWarning) {
-    return (
-      <div className="p-4 space-y-6 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold">Recipe Management</h1>
-        <SimilarityWarning
-          newName={recipeData.name || ''}
-          similarItems={similarItems}
-          itemType="recipe"
-          onProceed={proceedWithAction}
-          onCancel={resetSimilarityCheck}
-          isLoading={addRecipe.isPending}
-        />
-        <Navigation />
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
       <div className="flex justify-between items-center">
@@ -643,7 +600,7 @@ const RecipePage = () => {
           </div>
           
           <Button 
-            onClick={handleRecipeSubmit}
+            onClick={() => addRecipe.mutate()}
             disabled={addRecipe.isPending}
             className="bg-green-600 hover:bg-green-700"
           >

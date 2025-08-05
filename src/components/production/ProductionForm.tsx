@@ -158,18 +158,8 @@ const ProductionForm = ({
       if (batchError) throw batchError;
 
       if (productionData.recipe_id && recipeIngredients.length > 0) {
-        const selectedRecipe = recipes.find(r => r.id === productionData.recipe_id);
-        const originalBatchSize = selectedRecipe?.batch_size || 1;
-        const newQuantityProduced = parseInt(productionData.quantity_produced);
-        
-        // Calculate the scaling factor for ingredients
-        const ingredientScaleFactor = newQuantityProduced / originalBatchSize;
-        
-        // Calculate original total cost (this stays the same)
-        const originalTotalCost = recipeIngredients.reduce(
-          (sum, ingredient) => sum + (ingredient.quantity * ingredient.cost_per_unit),
-          0
-        );
+        const scaleFactor = parseInt(productionData.quantity_produced) / 
+          (recipes.find(r => r.id === productionData.recipe_id)?.batch_size || 1);
 
         const ingredientPromises = recipeIngredients.map(ingredient => 
           supabase
@@ -177,9 +167,9 @@ const ProductionForm = ({
             .insert({
               batch_id: batchData.id,
               ingredient_name: ingredient.ingredient_name,
-              quantity_used: ingredient.quantity * ingredientScaleFactor, // Scale ingredient quantity
+              quantity_used: ingredient.quantity * scaleFactor,
               unit: ingredient.unit,
-              cost_per_unit: ingredient.cost_per_unit // Keep original cost per unit
+              cost_per_unit: ingredient.cost_per_unit
             })
         );
 
@@ -189,14 +179,18 @@ const ProductionForm = ({
           if (result.error) throw result.error;
         }
 
-        // Use the original total cost regardless of quantity produced
-        const costPerUnit = originalTotalCost / newQuantityProduced;
+        const totalIngredientCost = recipeIngredients.reduce(
+          (sum, ingredient) => sum + (ingredient.quantity * scaleFactor * ingredient.cost_per_unit),
+          0
+        );
+
+        const costPerUnit = totalIngredientCost / parseInt(productionData.quantity_produced);
 
         await supabase
           .from('production_batches')
           .update({
-            total_ingredient_cost: originalTotalCost, // Keep original total cost
-            cost_per_unit: costPerUnit // Adjust cost per unit based on new quantity
+            total_ingredient_cost: totalIngredientCost,
+            cost_per_unit: costPerUnit
           })
           .eq('id', batchData.id);
       }
@@ -319,24 +313,15 @@ const ProductionForm = ({
             <div className="bg-gray-50 p-4 rounded">
               <h4 className="font-medium mb-2">Recipe Ingredients Preview</h4>
               <p className="text-sm text-gray-600 mb-2">
-                Original recipe cost: R{calculateRecipeTotalCost().toFixed(2)} (cost stays the same)
+                Total recipe cost: R{calculateRecipeTotalCost().toFixed(2)}
               </p>
-              {productionData.quantity_produced && (
-                <p className="text-sm text-blue-600 mb-2">
-                  For {productionData.quantity_produced} units: Cost per unit = R{(calculateRecipeTotalCost() / parseInt(productionData.quantity_produced)).toFixed(2)}
-                </p>
-              )}
               <div className="space-y-1 text-sm">
-                {recipeIngredients.map(ingredient => {
-                  const scaleFactor = productionData.quantity_produced ? 
-                    parseInt(productionData.quantity_produced) / (recipes.find(r => r.id === productionData.recipe_id)?.batch_size || 1) : 1;
-                  return (
-                    <div key={ingredient.id} className="flex justify-between">
-                      <span>{ingredient.ingredient_name}</span>
-                      <span>{(ingredient.quantity * scaleFactor).toFixed(2)} {ingredient.unit}</span>
-                    </div>
-                  );
-                })}
+                {recipeIngredients.map(ingredient => (
+                  <div key={ingredient.id} className="flex justify-between">
+                    <span>{ingredient.ingredient_name}</span>
+                    <span>{ingredient.quantity} {ingredient.unit}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
