@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,7 @@ interface Ingredient {
   id: string;
   name: string;
   weight: number;
+  quantity: string;
   unit: string;
   price_ex_vat: number;
   vat_amount: number;
@@ -30,6 +32,7 @@ const IngredientsPage = () => {
   const [currentIngredient, setCurrentIngredient] = useState<Partial<Ingredient>>({
     name: '',
     weight: 0,
+    quantity: '',
     unit: 'kg',
     price_ex_vat: 0,
     vat_amount: 0,
@@ -69,8 +72,8 @@ const IngredientsPage = () => {
   // Add/update ingredient mutation
   const upsertIngredient = useMutation({
     mutationFn: async (ingredient: Partial<Ingredient>) => {
-      if (!ingredient.name || !ingredient.weight || !ingredient.price_ex_vat) {
-        throw new Error('Name, weight, and price are required');
+      if (!ingredient.name || !ingredient.weight || !ingredient.price_ex_vat || !ingredient.quantity) {
+        throw new Error('Name, weight, quantity, and price are required');
       }
       
       const { vat, total } = calculatePrices(ingredient.price_ex_vat);
@@ -81,6 +84,7 @@ const IngredientsPage = () => {
             .update({
               name: ingredient.name,
               weight: ingredient.weight,
+              quantity: ingredient.quantity,
               unit: ingredient.unit,
               price_ex_vat: ingredient.price_ex_vat,
               vat_amount: vat,
@@ -94,6 +98,7 @@ const IngredientsPage = () => {
             .insert([{
               name: ingredient.name,
               weight: ingredient.weight,
+              quantity: ingredient.quantity,
               unit: ingredient.unit,
               price_ex_vat: ingredient.price_ex_vat,
               vat_amount: vat,
@@ -170,6 +175,7 @@ const IngredientsPage = () => {
     setCurrentIngredient({
       name: '',
       weight: 0,
+      quantity: '',
       unit: 'kg',
       price_ex_vat: 0,
       vat_amount: 0,
@@ -229,6 +235,12 @@ const IngredientsPage = () => {
                 placeholder="Weight/Size"
                 value={currentIngredient.weight || ''}
                 onChange={(e) => setCurrentIngredient({...currentIngredient, weight: Number(e.target.value)})}
+                required
+              />
+              <Input
+                placeholder="Quantity (e.g., 1kg, 500g, 2 units)"
+                value={currentIngredient.quantity || ''}
+                onChange={(e) => setCurrentIngredient({...currentIngredient, quantity: e.target.value})}
                 required
               />
               <select
@@ -306,6 +318,7 @@ const IngredientsPage = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Weight/Size</TableHead>
+                    <TableHead>Quantity</TableHead>
                     <TableHead>Price Ex VAT</TableHead>
                     <TableHead>VAT</TableHead>
                     <TableHead>Total Price</TableHead>
@@ -318,6 +331,7 @@ const IngredientsPage = () => {
                     <TableRow key={ingredient.id}>
                       <TableCell className="font-medium">{ingredient.name}</TableCell>
                       <TableCell>{ingredient.weight} {ingredient.unit}</TableCell>
+                      <TableCell>{ingredient.quantity}</TableCell>
                       <TableCell>R{ingredient.price_ex_vat.toFixed(2)}</TableCell>
                       <TableCell>R{ingredient.vat_amount.toFixed(2)}</TableCell>
                       <TableCell className="font-bold">R{ingredient.total_price.toFixed(2)}</TableCell>
