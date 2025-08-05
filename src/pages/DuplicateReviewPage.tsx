@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -158,6 +159,7 @@ const DuplicateReviewPage = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Weight/Unit</TableHead>
                     <TableHead>Price</TableHead>
+                    <TableHead>Supplier</TableHead>
                     <TableHead>Similarity</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -168,6 +170,7 @@ const DuplicateReviewPage = () => {
                     <TableCell className="font-bold">{group.mainItem.name} (Main)</TableCell>
                     <TableCell>{group.mainItem.weight} {group.mainItem.unit}</TableCell>
                     <TableCell>R{group.mainItem.total_price.toFixed(2)}</TableCell>
+                    <TableCell>{group.mainItem.supplier || 'N/A'}</TableCell>
                     <TableCell>-</TableCell>
                     <TableCell>
                       <Button size="sm" variant="outline">Keep</Button>
@@ -181,6 +184,7 @@ const DuplicateReviewPage = () => {
                         <TableCell>{similar.name}</TableCell>
                         <TableCell>{fullItem?.weight} {fullItem?.unit}</TableCell>
                         <TableCell>R{fullItem?.total_price.toFixed(2)}</TableCell>
+                        <TableCell>{fullItem?.supplier || 'N/A'}</TableCell>
                         <TableCell>
                           <Badge className={getSimilarityColor(similar.similarity)}>
                             {Math.round(similar.similarity * 100)}% - {getSimilarityLabel(similar.similarity)}
