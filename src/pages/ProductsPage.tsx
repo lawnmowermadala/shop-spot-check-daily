@@ -36,14 +36,14 @@ const ProductsPage = () => {
     resetSimilarityCheck
   } = useSimilarityCheck();
 
-  // Fetch products
+  // Fetch products - sorted by name
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('name');
       
       if (error) throw error;
       return data as Product[];
@@ -109,13 +109,25 @@ const ProductsPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isEditing && (currentProduct.name || currentProduct.code)) {
-      // Check for similar products before creating new one
+    if (!currentProduct.name || !currentProduct.code) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    
+    if (!isEditing) {
+      // Check for similar products for new items with 30% threshold
+      const existingItems = products.map(prod => ({ 
+        id: prod.id, 
+        name: prod.name, 
+        code: prod.code 
+      }));
+      
       const canProceed = checkSimilarity(
-        currentProduct.name || '',
+        currentProduct.name,
         currentProduct.code,
-        products.map(prod => ({ id: prod.id, name: prod.name, code: prod.code })),
-        () => upsertProduct.mutate(currentProduct)
+        existingItems,
+        () => upsertProduct.mutate(currentProduct),
+        0.3 // Set threshold to 30%
       );
       
       if (canProceed) {

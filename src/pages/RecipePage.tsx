@@ -219,7 +219,7 @@ const RecipePage = () => {
     }
   });
 
-  // Fetch Recipes
+  // Fetch Recipes - sorted by name
   const { data: recipes = [], isLoading: recipesLoading } = useQuery({
     queryKey: ['recipes'],
     queryFn: async () => {
@@ -428,10 +428,10 @@ const RecipePage = () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       // Clear selected recipe if it was deleted
       setSelectedRecipeId('');
-      toast("Recipe deleted successfully!");
+      toast.success("Recipe deleted successfully!");
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -484,18 +484,27 @@ const RecipePage = () => {
   ];
 
   const handleRecipeSubmit = () => {
-    if (recipeData.name) {
-      // Check for similar recipes before creating new one
-      const canProceed = checkSimilarity(
-        recipeData.name,
-        undefined,
-        recipes.map(recipe => ({ id: recipe.id, name: recipe.name })),
-        () => addRecipe.mutate()
-      );
-      
-      if (canProceed) {
-        addRecipe.mutate();
-      }
+    if (!recipeData.name || !recipeData.batch_size) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+
+    // Check for similar recipes for new items with 30% threshold
+    const existingItems = recipes.map(recipe => ({ 
+      id: recipe.id, 
+      name: recipe.name 
+    }));
+    
+    const canProceed = checkSimilarity(
+      recipeData.name,
+      undefined,
+      existingItems,
+      () => addRecipe.mutate(),
+      0.3 // Set threshold to 30%
+    );
+    
+    if (canProceed) {
+      addRecipe.mutate();
     }
   };
 
