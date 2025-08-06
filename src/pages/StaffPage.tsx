@@ -38,7 +38,7 @@ export default function StaffPage() {
       const { data, error } = await supabase
         .from('departments')
         .select('*')
-        .order('name');
+        .order('name'); // Already sorted by name
 
       if (error) {
         console.error("Error fetching departments:", error);
@@ -66,7 +66,7 @@ export default function StaffPage() {
           *,
           departments:department_id (name)
         `)
-        .order('name');
+        .order('name'); // Sort by staff name
 
       if (error) {
         console.error("Error fetching staff:", error);

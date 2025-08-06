@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -50,7 +49,8 @@ const StaffRatings = () => {
       const { data, error } = await supabase
         .from('ratings')
         .select('*')
-        .order('rating_date', { ascending: false });
+        .order('staff_name') // Sort by staff name
+        .order('rating_date', { ascending: false }); // Then by date descending
       
       if (error) {
         console.error('Error fetching ratings:', error);
@@ -75,7 +75,7 @@ const StaffRatings = () => {
   // Get unique staff members from ratings
   const staffMembers = Array.from(
     new Set(ratings.map(rating => rating.staff_name))
-  );
+  ).sort(); // Sort staff names alphabetically
 
   const staffOptions = [
     { value: 'all', label: 'All Staff' },
