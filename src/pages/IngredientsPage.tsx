@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
+import { useSimilarityCheck } from '@/hooks/useSimilarityCheck';
+import SimilarityWarning from '@/components/SimilarityWarning';
 
 // Types - matching the actual database schema
 interface Ingredient {
@@ -117,6 +120,15 @@ const IngredientsPage = () => {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   
+  // Similarity check hook
+  const {
+    showSimilarityWarning,
+    similarItems,
+    checkSimilarity,
+    proceedWithAction,
+    resetSimilarityCheck
+  } = useSimilarityCheck();
+  
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -171,45 +183,48 @@ const IngredientsPage = () => {
     }
   };
 
-  // Add/Update Ingredient
+  // Function to actually save ingredient (called after similarity check)
+  const performSaveIngredient = async () => {
+    if (!formData.name || !formData.weight || !formData.price_ex_vat) {
+      throw new Error('Please fill all required fields');
+    }
+
+    const price = Number(formData.price_ex_vat);
+    const { price_ex_vat, vat_amount, total_price } = calculatePrices(
+      price,
+      formData.includes_vat
+    );
+
+    const ingredientData = {
+      name: formData.name,
+      weight: Number(formData.weight),
+      unit: formData.unit,
+      price_ex_vat,
+      vat_amount,
+      total_price,
+      supplier: formData.supplier || null,
+      quantity: `${formData.weight} ${formData.unit}`
+    };
+
+    if (editingId) {
+      const { error } = await supabase
+        .from('ingredients')
+        .update(ingredientData)
+        .eq('id', editingId);
+      
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('ingredients')
+        .insert(ingredientData);
+      
+      if (error) throw error;
+    }
+  };
+
+  // Add/Update Ingredient with similarity check
   const saveIngredient = useMutation({
-    mutationFn: async () => {
-      if (!formData.name || !formData.weight || !formData.price_ex_vat) {
-        throw new Error('Please fill all required fields');
-      }
-
-      const price = Number(formData.price_ex_vat);
-      const { price_ex_vat, vat_amount, total_price } = calculatePrices(
-        price,
-        formData.includes_vat
-      );
-
-      const ingredientData = {
-        name: formData.name,
-        weight: Number(formData.weight),
-        unit: formData.unit,
-        price_ex_vat,
-        vat_amount,
-        total_price,
-        supplier: formData.supplier || null,
-        quantity: `${formData.weight} ${formData.unit}`
-      };
-
-      if (editingId) {
-        const { error } = await supabase
-          .from('ingredients')
-          .update(ingredientData)
-          .eq('id', editingId);
-        
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('ingredients')
-          .insert(ingredientData);
-        
-        if (error) throw error;
-      }
-    },
+    mutationFn: performSaveIngredient,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
       setFormData({
@@ -227,6 +242,37 @@ const IngredientsPage = () => {
       toast(error.message);
     }
   });
+
+  // Handle save with similarity check
+  const handleSave = () => {
+    if (!formData.name || !formData.weight || !formData.price_ex_vat) {
+      toast("Please fill all required fields");
+      return;
+    }
+
+    // Skip similarity check for updates
+    if (editingId) {
+      saveIngredient.mutate();
+      return;
+    }
+
+    // Check for similar ingredients for new items
+    const existingItems = ingredients.map(ingredient => ({
+      id: ingredient.id,
+      name: ingredient.name
+    }));
+
+    const canProceed = checkSimilarity(
+      formData.name,
+      undefined, // No code field for ingredients
+      existingItems,
+      () => saveIngredient.mutate()
+    );
+
+    if (canProceed) {
+      saveIngredient.mutate();
+    }
+  };
 
   // Delete Ingredient
   const deleteIngredient = useMutation({
@@ -302,6 +348,18 @@ const IngredientsPage = () => {
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto pb-20">
       <h1 className="text-2xl font-bold">Ingredients Management</h1>
+      
+      {/* Similarity Warning */}
+      {showSimilarityWarning && (
+        <SimilarityWarning
+          newName={formData.name}
+          similarItems={similarItems}
+          itemType="ingredient"
+          onProceed={proceedWithAction}
+          onCancel={resetSimilarityCheck}
+          isLoading={saveIngredient.isPending}
+        />
+      )}
       
       {/* Add/Edit Ingredient Form */}
       <Card>
@@ -434,7 +492,7 @@ const IngredientsPage = () => {
           
           <div className="flex gap-2">
             <Button 
-              onClick={() => saveIngredient.mutate()}
+              onClick={handleSave}
               disabled={saveIngredient.isPending}
               className="bg-green-600 hover:bg-green-700"
             >
