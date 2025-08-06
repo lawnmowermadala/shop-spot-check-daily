@@ -87,9 +87,36 @@ const ProductsPage = () => {
     }
   });
 
-  // Delete product mutation
+  // Delete product mutation with foreign key constraint handling
   const deleteProduct = useMutation({
     mutationFn: async (productId: string) => {
+      // First check if product is referenced in production_batches
+      const { data: productionBatches, error: checkError } = await supabase
+        .from('production_batches')
+        .select('id')
+        .eq('product_id', productId)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (productionBatches && productionBatches.length > 0) {
+        throw new Error('Cannot delete product: It is being used in production batches. Please remove it from production records first.');
+      }
+
+      // Check if product is referenced in expired_items
+      const { data: expiredItems, error: expiredError } = await supabase
+        .from('expired_items')
+        .select('id')
+        .eq('product_id', productId)
+        .limit(1);
+
+      if (expiredError) throw expiredError;
+
+      if (expiredItems && expiredItems.length > 0) {
+        throw new Error('Cannot delete product: It is referenced in expired items records. Please remove those references first.');
+      }
+
+      // If no references found, proceed with deletion
       const { error } = await supabase
         .from('products')
         .delete()
@@ -144,7 +171,7 @@ const ProductsPage = () => {
   };
 
   const handleDelete = (productId: string) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
+    if (window.confirm('Are you sure you want to delete this product? This will also check for any related production records.')) {
       deleteProduct.mutate(productId);
     }
   };

@@ -405,10 +405,49 @@ const RecipePage = () => {
     }
   });
 
-  // Delete Recipe
+  // Delete Recipe with foreign key constraint handling
   const deleteRecipe = useMutation({
     mutationFn: async (recipeId: string) => {
-      // First delete all recipe ingredients
+      // First check if recipe is referenced in production_batches
+      const { data: productionBatches, error: checkError } = await supabase
+        .from('production_batches')
+        .select('id')
+        .eq('recipe_id', recipeId)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (productionBatches && productionBatches.length > 0) {
+        throw new Error('Cannot delete recipe: It is being used in production batches. Please remove it from production records first.');
+      }
+
+      // Check if recipe is referenced in production_cost_batches
+      const { data: costBatches, error: costError } = await supabase
+        .from('production_cost_batches')
+        .select('id')
+        .eq('recipe_id', recipeId)
+        .limit(1);
+
+      if (costError) throw costError;
+
+      if (costBatches && costBatches.length > 0) {
+        throw new Error('Cannot delete recipe: It is being used in production cost batches. Please remove it from production records first.');
+      }
+
+      // Check if recipe is referenced in product_recipes
+      const { data: productRecipes, error: productRecipeError } = await supabase
+        .from('product_recipes')
+        .select('id')
+        .eq('recipe_id', recipeId)
+        .limit(1);
+
+      if (productRecipeError) throw productRecipeError;
+
+      if (productRecipes && productRecipes.length > 0) {
+        throw new Error('Cannot delete recipe: It is linked to products. Please remove those product-recipe links first.');
+      }
+
+      // If no references found, first delete all recipe ingredients
       const { error: ingredientsError } = await supabase
         .from('recipe_ingredients')
         .delete()
@@ -902,7 +941,7 @@ const RecipePage = () => {
                         variant="destructive"
                         size="sm"
                         onClick={() => {
-                          if (confirm(`Are you sure you want to delete "${recipe.name}"? This action cannot be undone.`)) {
+                          if (confirm(`Are you sure you want to delete "${recipe.name}"? This will check for any related production records first.`)) {
                             deleteRecipe.mutate(recipe.id);
                           }
                         }}
