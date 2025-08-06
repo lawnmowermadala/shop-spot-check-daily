@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -237,14 +236,30 @@ const AIProductionAnalytics = ({
 
       console.log('Puter AI Response:', response);
       
-      if (response && response.message) {
-        setAnalysis(response.message);
-        toast.success('AI analysis completed successfully!');
-      } else if (response && typeof response === 'string') {
-        setAnalysis(response);
+      // Handle different response structures from Puter AI
+      let analysisText = '';
+      
+      if (response && typeof response === 'string') {
+        analysisText = response;
+      } else if (response && response.message && typeof response.message === 'string') {
+        analysisText = response.message;
+      } else if (response && response.content && typeof response.content === 'string') {
+        analysisText = response.content;
+      } else if (response && response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content) {
+        analysisText = response.choices[0].message.content;
+      } else if (response && typeof response === 'object' && response.role && response.content) {
+        // Handle the specific case mentioned in the error
+        analysisText = response.content;
+      } else {
+        console.error('Unexpected response structure:', response);
+        throw new Error('Unable to extract analysis from Puter AI response');
+      }
+
+      if (analysisText && analysisText.trim()) {
+        setAnalysis(analysisText.trim());
         toast.success('AI analysis completed successfully!');
       } else {
-        throw new Error('No valid response from Puter AI');
+        throw new Error('Empty response from Puter AI');
       }
     } catch (error) {
       console.error('AI Analysis Error:', error);
