@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -256,7 +255,7 @@ const IngredientsPage = () => {
       return;
     }
 
-    // Check for similar ingredients for new items
+    // Check for similar ingredients for new items with 30% threshold
     const existingItems = ingredients.map(ingredient => ({
       id: ingredient.id,
       name: ingredient.name
@@ -266,7 +265,8 @@ const IngredientsPage = () => {
       formData.name,
       undefined, // No code field for ingredients
       existingItems,
-      () => saveIngredient.mutate()
+      () => saveIngredient.mutate(),
+      0.3 // Set threshold to 30%
     );
 
     if (canProceed) {
