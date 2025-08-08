@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRightLeft, Plus, Package } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowRightLeft, Plus, Package, Settings, History } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
 import Navigation from '@/components/Navigation';
 import { Badge } from '@/components/ui/badge';
+import StockAdjustmentDialog from '@/components/StockAdjustmentDialog';
 
 // Types
 interface Ingredient {
@@ -57,6 +58,7 @@ const StockPage = () => {
   const queryClient = useQueryClient();
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [stockToStockDialogOpen, setStockToStockDialogOpen] = useState(false);
+  const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
   
   // Transfer from ingredient to kitchen stock
   const [ingredientTransfer, setIngredientTransfer] = useState({
@@ -113,6 +115,21 @@ const StockPage = () => {
       
       if (error) throw error;
       return data as IngredientTransfer[];
+    }
+  });
+
+  // Fetch stock adjustments history
+  const { data: adjustments = [] } = useQuery({
+    queryKey: ['stock_adjustments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('kitchen_stock_adjustments')
+        .select('*')
+        .order('adjustment_date', { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      return data;
     }
   });
 
@@ -277,7 +294,7 @@ const StockPage = () => {
   });
 
   // Calculate total stock value
-  const totalStockValue = kitchenStock.reduce((sum, stock) => sum + stock.total_value, 0);
+  const totalStockValue = kitchenStock.reduce((sum, stock) => sum + (stock.total_value || 0), 0);
   const lowStockItems = kitchenStock.filter(stock => stock.quantity_on_hand < 5).length;
 
   return (
@@ -313,7 +330,7 @@ const StockPage = () => {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
         <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2">
@@ -457,103 +474,189 @@ const StockPage = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2"
+          onClick={() => setAdjustmentDialogOpen(true)}
+        >
+          <Settings className="h-4 w-4" />
+          Adjust Stock
+        </Button>
       </div>
 
-      {/* Kitchen Stock Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Current Kitchen Stock</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoadingStock ? (
-            <div className="text-center py-4">Loading kitchen stock...</div>
-          ) : kitchenStock.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ingredient</TableHead>
-                  <TableHead>Pack Size</TableHead>
-                  <TableHead>Quantity on Hand</TableHead>
-                  <TableHead>Cost per Unit</TableHead>
-                  <TableHead>Total Value</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {kitchenStock.map(stock => (
-                  <TableRow key={stock.id}>
-                    <TableCell className="font-medium">{stock.ingredient_name}</TableCell>
-                    <TableCell>{stock.pack_size} {stock.unit}</TableCell>
-                    <TableCell>{stock.quantity_on_hand.toFixed(1)} {stock.unit}</TableCell>
-                    <TableCell>R{stock.cost_per_unit.toFixed(2)}</TableCell>
-                    <TableCell>R{stock.total_value.toFixed(2)}</TableCell>
-                    <TableCell>
-                      {stock.quantity_on_hand < 5 ? (
-                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
-                          Low Stock
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-                          In Stock
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>{new Date(stock.last_updated).toLocaleDateString()}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-4 text-gray-500">
-              No kitchen stock found. Transfer ingredients to get started.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Main Content with Tabs */}
+      <Tabs defaultValue="stock" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="stock">Current Stock</TabsTrigger>
+          <TabsTrigger value="transfers">Transfer History</TabsTrigger>
+          <TabsTrigger value="adjustments">Adjustments</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="stock">
+          <Card>
+            <CardHeader>
+              <CardTitle>Current Kitchen Stock</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingStock ? (
+                <div className="text-center py-4">Loading kitchen stock...</div>
+              ) : kitchenStock.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ingredient</TableHead>
+                      <TableHead>Pack Size</TableHead>
+                      <TableHead>Quantity on Hand</TableHead>
+                      <TableHead>Cost per Unit</TableHead>
+                      <TableHead>Total Value</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Updated</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {kitchenStock.map(stock => (
+                      <TableRow key={stock.id}>
+                        <TableCell className="font-medium">{stock.ingredient_name}</TableCell>
+                        <TableCell>{stock.pack_size} {stock.unit}</TableCell>
+                        <TableCell>{stock.quantity_on_hand.toFixed(1)} {stock.unit}</TableCell>
+                        <TableCell>R{stock.cost_per_unit.toFixed(2)}</TableCell>
+                        <TableCell>R{(stock.total_value || 0).toFixed(2)}</TableCell>
+                        <TableCell>
+                          {stock.quantity_on_hand < 5 ? (
+                            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                              Low Stock
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                              In Stock
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>{new Date(stock.last_updated).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  No kitchen stock found. Transfer ingredients to get started.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Transfer History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Transfers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {transfers.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Price Difference</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transfers.map(transfer => (
-                  <TableRow key={transfer.id}>
-                    <TableCell>{new Date(transfer.transfer_date).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {transfer.transfer_type.replace('_', ' ').toUpperCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{transfer.quantity_transferred.toFixed(1)} {transfer.unit}</TableCell>
-                    <TableCell className={transfer.price_difference > 0 ? 'text-red-600' : transfer.price_difference < 0 ? 'text-green-600' : ''}>
-                      {transfer.price_difference > 0 ? '+' : ''}R{transfer.price_difference.toFixed(2)}
-                    </TableCell>
-                    <TableCell>{transfer.notes || '-'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-4 text-gray-500">
-              No transfer history found.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="transfers">
+          <Card>
+            <CardHeader>
+              <CardTitle>Transfer History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {transfers.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Price Difference</TableHead>
+                      <TableHead>Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transfers.map(transfer => (
+                      <TableRow key={transfer.id}>
+                        <TableCell>{new Date(transfer.transfer_date).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {transfer.transfer_type.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{transfer.quantity_transferred.toFixed(1)} {transfer.unit}</TableCell>
+                        <TableCell className={transfer.price_difference > 0 ? 'text-red-600' : transfer.price_difference < 0 ? 'text-green-600' : ''}>
+                          {transfer.price_difference > 0 ? '+' : ''}R{transfer.price_difference.toFixed(2)}
+                        </TableCell>
+                        <TableCell>{transfer.notes || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  No transfer history found.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="adjustments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Adjustments History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {adjustments.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Ingredient</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Previous Qty</TableHead>
+                      <TableHead>Adjusted By</TableHead>
+                      <TableHead>New Qty</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Adjusted By</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {adjustments.map(adjustment => (
+                      <TableRow key={adjustment.id}>
+                        <TableCell>{new Date(adjustment.adjustment_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="font-medium">{adjustment.ingredient_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={
+                            adjustment.adjustment_type === 'increase' ? 'bg-green-100 text-green-800 border-green-300' :
+                            adjustment.adjustment_type === 'decrease' ? 'bg-red-100 text-red-800 border-red-300' :
+                            'bg-blue-100 text-blue-800 border-blue-300'
+                          }>
+                            {adjustment.adjustment_type.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{adjustment.previous_quantity.toFixed(1)}</TableCell>
+                        <TableCell className={
+                          adjustment.adjustment_type === 'increase' ? 'text-green-600' :
+                          adjustment.adjustment_type === 'decrease' ? 'text-red-600' : ''
+                        }>
+                          {adjustment.adjustment_type === 'increase' ? '+' : 
+                           adjustment.adjustment_type === 'decrease' ? '-' : ''}
+                          {adjustment.quantity_adjusted.toFixed(1)}
+                        </TableCell>
+                        <TableCell className="font-medium">{adjustment.new_quantity.toFixed(1)}</TableCell>
+                        <TableCell>{adjustment.reason || '-'}</TableCell>
+                        <TableCell>{adjustment.adjusted_by}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  No adjustments found.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Stock Adjustment Dialog */}
+      <StockAdjustmentDialog 
+        open={adjustmentDialogOpen}
+        onOpenChange={setAdjustmentDialogOpen}
+        kitchenStock={kitchenStock}
+      />
       
       <Navigation />
     </div>

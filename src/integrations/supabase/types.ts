@@ -307,6 +307,56 @@ export type Database = {
           },
         ]
       }
+      kitchen_stock_adjustments: {
+        Row: {
+          adjusted_by: string
+          adjustment_date: string
+          adjustment_type: string
+          created_at: string
+          id: string
+          ingredient_name: string
+          kitchen_stock_id: string
+          new_quantity: number
+          previous_quantity: number
+          quantity_adjusted: number
+          reason: string | null
+        }
+        Insert: {
+          adjusted_by: string
+          adjustment_date?: string
+          adjustment_type: string
+          created_at?: string
+          id?: string
+          ingredient_name: string
+          kitchen_stock_id: string
+          new_quantity: number
+          previous_quantity: number
+          quantity_adjusted: number
+          reason?: string | null
+        }
+        Update: {
+          adjusted_by?: string
+          adjustment_date?: string
+          adjustment_type?: string
+          created_at?: string
+          id?: string
+          ingredient_name?: string
+          kitchen_stock_id?: string
+          new_quantity?: number
+          previous_quantity?: number
+          quantity_adjusted?: number
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kitchen_stock_adjustments_kitchen_stock_id_fkey"
+            columns: ["kitchen_stock_id"]
+            isOneToOne: false
+            referencedRelation: "kitchen_stock"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_users: {
         Row: {
           active: boolean | null
