@@ -219,7 +219,6 @@ const ProductionForm = ({
     }
   };
 
-  // Prepare items for searchable selects with better search terms
   const productItems = products.map(product => ({
     id: product.id,
     value: product.id,
@@ -321,22 +320,55 @@ const ProductionForm = ({
           {productionData.recipe_id && recipeIngredients.length > 0 && (
             <div className="bg-gray-50 p-4 rounded">
               <h4 className="font-medium mb-2">Recipe Ingredients Preview</h4>
-              <p className="text-sm text-gray-600 mb-2">
-                Original cost per unit: R{calculateOriginalCostPerUnit().toFixed(2)} (cost per unit stays fixed)
-              </p>
-              {productionData.quantity_produced && (
-                <p className="text-sm text-blue-600 mb-2">
-                  For {productionData.quantity_produced} units: Total Cost = R{(calculateOriginalCostPerUnit() * parseInt(productionData.quantity_produced)).toFixed(2)}
+              <div className="mb-3">
+                <p className="text-sm text-gray-600">
+                  Recipe Batch Size: <span className="font-medium">{recipes.find(r => r.id === productionData.recipe_id)?.batch_size} {recipes.find(r => r.id === productionData.recipe_id)?.unit}</span>
                 </p>
-              )}
-              <div className="space-y-1 text-sm">
+                <p className="text-sm text-gray-600">
+                  Total Ingredient Cost: <span className="font-medium text-green-600">R{calculateOriginalRecipeTotalCost().toFixed(2)}</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Cost Per Unit: <span className="font-medium text-blue-600">R{calculateOriginalCostPerUnit().toFixed(2)} (cost per unit stays fixed)</span>
+                </p>
+                {productionData.quantity_produced && (
+                  <p className="text-sm text-blue-600 font-medium">
+                    For {productionData.quantity_produced} units: Total Cost = R{(calculateOriginalCostPerUnit() * parseInt(productionData.quantity_produced)).toFixed(2)}
+                  </p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <div className="grid grid-cols-5 gap-2 text-xs font-medium text-gray-600 border-b pb-1">
+                  <div>Ingredient</div>
+                  <div>Recipe Qty</div>
+                  <div>Scaled Qty</div>
+                  <div>Unit Cost</div>
+                  <div>Total Cost</div>
+                </div>
+                
                 {recipeIngredients.map(ingredient => {
                   const scaleFactor = productionData.quantity_produced ? 
                     parseInt(productionData.quantity_produced) / (recipes.find(r => r.id === productionData.recipe_id)?.batch_size || 1) : 1;
+                  const scaledQuantity = ingredient.quantity * scaleFactor;
+                  const totalCost = scaledQuantity * ingredient.cost_per_unit;
+                  
                   return (
-                    <div key={ingredient.id} className="flex justify-between">
-                      <span>{ingredient.ingredient_name}</span>
-                      <span>{(ingredient.quantity * scaleFactor).toFixed(2)} {ingredient.unit}</span>
+                    <div key={ingredient.id} className="grid grid-cols-5 gap-2 text-sm py-1">
+                      <div className="truncate" title={ingredient.ingredient_name}>
+                        {ingredient.ingredient_name}
+                      </div>
+                      <div>
+                        {ingredient.quantity} {ingredient.unit}
+                      </div>
+                      <div className="text-blue-600 font-medium">
+                        {scaledQuantity.toFixed(2)} {ingredient.unit}
+                      </div>
+                      <div>
+                        R{ingredient.cost_per_unit.toFixed(2)}
+                      </div>
+                      <div className="text-green-600 font-medium">
+                        R{totalCost.toFixed(2)}
+                      </div>
                     </div>
                   );
                 })}
