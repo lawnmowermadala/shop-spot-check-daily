@@ -124,7 +124,7 @@ const ProductionForm = ({
     setProductionData({...productionData, recipe_id: recipeId});
   };
 
-  const calculateRecipeTotalCost = () => {
+  const calculateOriginalRecipeTotalCost = () => {
     return recipeIngredients.reduce((total, ingredient) => {
       return total + (ingredient.quantity * ingredient.cost_per_unit);
     }, 0);
@@ -166,10 +166,7 @@ const ProductionForm = ({
         const ingredientScaleFactor = newQuantityProduced / originalBatchSize;
         
         // Calculate original total cost (this stays the same)
-        const originalTotalCost = recipeIngredients.reduce(
-          (sum, ingredient) => sum + (ingredient.quantity * ingredient.cost_per_unit),
-          0
-        );
+        const originalTotalCost = calculateOriginalRecipeTotalCost();
 
         const ingredientPromises = recipeIngredients.map(ingredient => 
           supabase
@@ -319,11 +316,11 @@ const ProductionForm = ({
             <div className="bg-gray-50 p-4 rounded">
               <h4 className="font-medium mb-2">Recipe Ingredients Preview</h4>
               <p className="text-sm text-gray-600 mb-2">
-                Original recipe cost: R{calculateRecipeTotalCost().toFixed(2)} (cost stays the same)
+                Original recipe cost: R{calculateOriginalRecipeTotalCost().toFixed(2)} (cost stays the same)
               </p>
               {productionData.quantity_produced && (
                 <p className="text-sm text-blue-600 mb-2">
-                  For {productionData.quantity_produced} units: Cost per unit = R{(calculateRecipeTotalCost() / parseInt(productionData.quantity_produced)).toFixed(2)}
+                  For {productionData.quantity_produced} units: Cost per unit = R{(calculateOriginalRecipeTotalCost() / parseInt(productionData.quantity_produced)).toFixed(2)}
                 </p>
               )}
               <div className="space-y-1 text-sm">
