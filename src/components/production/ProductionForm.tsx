@@ -130,6 +130,13 @@ const ProductionForm = ({
     }, 0);
   };
 
+  const calculateOriginalCostPerUnit = () => {
+    const selectedRecipe = recipes.find(r => r.id === productionData.recipe_id);
+    const originalBatchSize = selectedRecipe?.batch_size || 1;
+    const originalTotalCost = calculateOriginalRecipeTotalCost();
+    return originalTotalCost / originalBatchSize;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -165,8 +172,9 @@ const ProductionForm = ({
         // Calculate the scaling factor for ingredients
         const ingredientScaleFactor = newQuantityProduced / originalBatchSize;
         
-        // Calculate original total cost (this stays the same)
-        const originalTotalCost = calculateOriginalRecipeTotalCost();
+        // Keep the original cost per unit fixed
+        const originalCostPerUnit = calculateOriginalCostPerUnit();
+        const totalCostForNewQuantity = originalCostPerUnit * newQuantityProduced;
 
         const ingredientPromises = recipeIngredients.map(ingredient => 
           supabase
@@ -186,14 +194,12 @@ const ProductionForm = ({
           if (result.error) throw result.error;
         }
 
-        // Use the original total cost regardless of quantity produced
-        const costPerUnit = originalTotalCost / newQuantityProduced;
-
+        // Use the fixed cost per unit and calculate total cost based on quantity produced
         await supabase
           .from('production_batches')
           .update({
-            total_ingredient_cost: originalTotalCost, // Keep original total cost
-            cost_per_unit: costPerUnit // Adjust cost per unit based on new quantity
+            total_ingredient_cost: totalCostForNewQuantity,
+            cost_per_unit: originalCostPerUnit // Keep original cost per unit fixed
           })
           .eq('id', batchData.id);
       }
@@ -316,11 +322,11 @@ const ProductionForm = ({
             <div className="bg-gray-50 p-4 rounded">
               <h4 className="font-medium mb-2">Recipe Ingredients Preview</h4>
               <p className="text-sm text-gray-600 mb-2">
-                Original recipe cost: R{calculateOriginalRecipeTotalCost().toFixed(2)} (cost stays the same)
+                Original cost per unit: R{calculateOriginalCostPerUnit().toFixed(2)} (cost per unit stays fixed)
               </p>
               {productionData.quantity_produced && (
                 <p className="text-sm text-blue-600 mb-2">
-                  For {productionData.quantity_produced} units: Cost per unit = R{(calculateOriginalRecipeTotalCost() / parseInt(productionData.quantity_produced)).toFixed(2)}
+                  For {productionData.quantity_produced} units: Total Cost = R{(calculateOriginalCostPerUnit() * parseInt(productionData.quantity_produced)).toFixed(2)}
                 </p>
               )}
               <div className="space-y-1 text-sm">
