@@ -172,9 +172,8 @@ const ProductionForm = ({
         // Calculate the scaling factor for ingredients
         const ingredientScaleFactor = newQuantityProduced / originalBatchSize;
         
-        // Keep the original cost per unit fixed
+        // Keep the original cost per unit EXACTLY the same regardless of quantity
         const originalCostPerUnit = calculateOriginalCostPerUnit();
-        const totalCostForNewQuantity = originalCostPerUnit * newQuantityProduced;
 
         const ingredientPromises = recipeIngredients.map(ingredient => 
           supabase
@@ -194,12 +193,14 @@ const ProductionForm = ({
           if (result.error) throw result.error;
         }
 
-        // Use the fixed cost per unit and calculate total cost based on quantity produced
+        // Calculate total cost using the FIXED cost per unit multiplied by quantity produced
+        const totalCostForNewQuantity = originalCostPerUnit * newQuantityProduced;
+
         await supabase
           .from('production_batches')
           .update({
             total_ingredient_cost: totalCostForNewQuantity,
-            cost_per_unit: originalCostPerUnit // Keep original cost per unit fixed
+            cost_per_unit: originalCostPerUnit // FIXED cost per unit - never changes
           })
           .eq('id', batchData.id);
       }
@@ -328,7 +329,7 @@ const ProductionForm = ({
                   Total Ingredient Cost: <span className="font-medium text-green-600">R{calculateOriginalRecipeTotalCost().toFixed(2)}</span>
                 </p>
                 <p className="text-sm text-gray-600">
-                  Cost Per Unit: <span className="font-medium text-blue-600">R{calculateOriginalCostPerUnit().toFixed(2)} (cost per unit stays fixed)</span>
+                  Cost Per Unit: <span className="font-medium text-blue-600">R{calculateOriginalCostPerUnit().toFixed(2)} (FIXED - never changes)</span>
                 </p>
                 {productionData.quantity_produced && (
                   <p className="text-sm text-blue-600 font-medium">
