@@ -16,6 +16,21 @@ interface ExpiredItem {
   batch_date: string;
   removal_date: string;
   remaining_quantity: number;
+  dispatch_status: string;
+  cost_per_unit?: number;
+  selling_price?: number;
+  total_cost_loss?: number;
+  product_id?: string;
+  created_at?: string;
+}
+
+interface DispatchRecord {
+  expired_item_id: string;
+  dispatch_destination: string;
+  quantity_dispatched: number;
+  dispatched_by: string;
+  notes?: string;
+  dispatch_date: string;
 }
 
 const ExpiredStockDispatchForm = () => {
@@ -47,7 +62,15 @@ const ExpiredStockDispatchForm = () => {
         .gt('remaining_quantity', 0);
 
       if (error) throw error;
-      setExpiredItems(data || []);
+      
+      // Type assertion to match our interface
+      const typedData = (data || []).map(item => ({
+        ...item,
+        remaining_quantity: item.remaining_quantity || 0,
+        dispatch_status: item.dispatch_status || 'available'
+      })) as ExpiredItem[];
+      
+      setExpiredItems(typedData);
     } catch (error) {
       console.error('Error fetching expired items:', error);
       toast({
@@ -86,17 +109,19 @@ const ExpiredStockDispatchForm = () => {
     setIsSubmitting(true);
 
     try {
-      // Insert dispatch record
-      const { error: dispatchError } = await supabase
+      // Insert dispatch record using type assertion
+      const dispatchData: DispatchRecord = {
+        expired_item_id: selectedItemId,
+        dispatch_destination: destination,
+        quantity_dispatched: dispatchQuantity,
+        dispatched_by: dispatchedBy,
+        notes: notes || undefined,
+        dispatch_date: new Date().toISOString().split('T')[0]
+      };
+
+      const { error: dispatchError } = await (supabase as any)
         .from('expired_stock_dispatches')
-        .insert({
-          expired_item_id: selectedItemId,
-          dispatch_destination: destination,
-          quantity_dispatched: dispatchQuantity,
-          dispatched_by: dispatchedBy,
-          notes: notes || null,
-          dispatch_date: new Date().toISOString().split('T')[0]
-        });
+        .insert(dispatchData);
 
       if (dispatchError) throw dispatchError;
 
@@ -109,7 +134,7 @@ const ExpiredStockDispatchForm = () => {
         .update({ 
           remaining_quantity: newRemainingQuantity,
           dispatch_status: newDispatchStatus
-        })
+        } as any)
         .eq('id', selectedItemId);
 
       if (updateError) throw updateError;
