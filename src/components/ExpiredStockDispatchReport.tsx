@@ -17,7 +17,7 @@ interface DispatchRecord {
   notes: string | null;
   expired_items: {
     product_name: string;
-  };
+  } | null;
 }
 
 const ExpiredStockDispatchReport = () => {
@@ -137,7 +137,7 @@ const ExpiredStockDispatchReport = () => {
                     <TableCell>
                       {format(new Date(dispatch.dispatch_date), 'dd/MM/yyyy')}
                     </TableCell>
-                    <TableCell>{dispatch.expired_items?.product_name}</TableCell>
+                    <TableCell>{dispatch.expired_items?.product_name || 'Unknown Product'}</TableCell>
                     <TableCell>
                       <Badge 
                         variant="outline" 
