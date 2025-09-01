@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -43,19 +42,44 @@ const ExpiredStockDispatchReport = () => {
 
   const fetchDispatches = async () => {
     try {
-      const { data, error } = await supabase
+      // First get the dispatches
+      const { data: dispatchData, error: dispatchError } = await supabase
         .from('expired_stock_dispatches')
-        .select(`
-          *,
-          expired_items (
-            product_name
-          )
-        `)
+        .select('*')
         .order('dispatch_date', { ascending: false });
 
-      if (error) throw error;
+      if (dispatchError) {
+        console.error('Error fetching dispatches:', dispatchError);
+        throw dispatchError;
+      }
 
-      setDispatches(data || []);
+      // Then get expired items data separately
+      const expiredItemIds = dispatchData?.map(d => d.expired_item_id) || [];
+      
+      let expiredItemsData: any[] = [];
+      if (expiredItemIds.length > 0) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('expired_items')
+          .select('id, product_name')
+          .in('id', expiredItemIds);
+
+        if (itemsError) {
+          console.error('Error fetching expired items:', itemsError);
+        } else {
+          expiredItemsData = itemsData || [];
+        }
+      }
+
+      // Combine the data
+      const combinedData = dispatchData?.map(dispatch => {
+        const expiredItem = expiredItemsData.find(item => item.id === dispatch.expired_item_id);
+        return {
+          ...dispatch,
+          expired_items: expiredItem ? { product_name: expiredItem.product_name } : null
+        };
+      }) || [];
+
+      setDispatches(combinedData);
     } catch (error) {
       console.error('Error fetching dispatches:', error);
       toast({
