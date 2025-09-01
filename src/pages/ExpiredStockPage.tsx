@@ -56,7 +56,7 @@ const ExpiredStockPage = () => {
 
   const getStatusBadge = (status: string, remaining: number | null, original: string) => {
     const originalQty = parseFloat(original) || 0;
-    const remainingQty = remaining || originalQty;
+    const remainingQty = remaining ?? originalQty;
 
     if (status === 'fully_dispatched' || remainingQty === 0) {
       return <Badge variant="outline" className="bg-green-100 text-green-800">Fully Dispatched</Badge>;
@@ -99,7 +99,7 @@ const ExpiredStockPage = () => {
                 Expired Stock Items
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Total Loss</p>
-                  <p className="text-2xl font-bold text-red-600">£{calculateTotalLoss()}</p>
+                  <p className="text-2xl font-bold text-red-600">R{calculateTotalLoss()}</p>
                 </div>
               </CardTitle>
             </CardHeader>
@@ -133,9 +133,9 @@ const ExpiredStockPage = () => {
                           <TableCell className="font-medium">{availableQty}</TableCell>
                           <TableCell>{format(new Date(item.batch_date), 'dd/MM/yyyy')}</TableCell>
                           <TableCell>{format(new Date(item.removal_date), 'dd/MM/yyyy')}</TableCell>
-                          <TableCell>£{item.cost_per_unit?.toFixed(2) || '0.00'}</TableCell>
+                          <TableCell>R{item.cost_per_unit?.toFixed(2) || '0.00'}</TableCell>
                           <TableCell className="text-red-600 font-medium">
-                            £{item.total_cost_loss?.toFixed(2) || '0.00'}
+                            R{item.total_cost_loss?.toFixed(2) || '0.00'}
                           </TableCell>
                           <TableCell>
                             {getStatusBadge(item.dispatch_status, item.remaining_quantity, item.quantity)}
