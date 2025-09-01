@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, Brain, Truck } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, Brain } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateRangePicker } from '@/components/DateRangePicker';
 import AIProductionAnalytics from '@/components/production/AIProductionAnalytics';
 import Navigation from '@/components/Navigation';
-import { useRouter } from 'next/router';
 
 // Types
 interface ExpiredItem {
@@ -50,7 +49,6 @@ interface ProductSummary {
 
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const [date, setDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
@@ -574,14 +572,6 @@ const ExpiredStockPage = () => {
               <SelectItem value="detailed">Detailed</SelectItem>
             </SelectContent>
           </Select>
-          <Button 
-            variant="outline" 
-            onClick={() => router.push('/expired-stock-dispatch')}
-            className="flex items-center gap-2"
-          >
-            <Truck className="h-4 w-4" />
-            Dispatch Expired Stock
-          </Button>
           <Button 
             variant="outline" 
             onClick={handlePrint}
