@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
+  // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -99,12 +99,10 @@ export type Database = {
           batch_date: string
           cost_per_unit: number | null
           created_at: string | null
-          dispatch_status: string | null
           id: string
           product_id: string | null
           product_name: string
           quantity: string
-          remaining_quantity: number | null
           removal_date: string
           selling_price: number | null
           total_cost_loss: number | null
@@ -113,12 +111,10 @@ export type Database = {
           batch_date: string
           cost_per_unit?: number | null
           created_at?: string | null
-          dispatch_status?: string | null
           id?: string
           product_id?: string | null
           product_name: string
           quantity: string
-          remaining_quantity?: number | null
           removal_date: string
           selling_price?: number | null
           total_cost_loss?: number | null
@@ -127,12 +123,10 @@ export type Database = {
           batch_date?: string
           cost_per_unit?: number | null
           created_at?: string | null
-          dispatch_status?: string | null
           id?: string
           product_id?: string | null
           product_name?: string
           quantity?: string
-          remaining_quantity?: number | null
           removal_date?: string
           selling_price?: number | null
           total_cost_loss?: number | null
@@ -146,39 +140,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      expired_stock_dispatches: {
-        Row: {
-          created_at: string
-          dispatch_date: string
-          dispatch_destination: string
-          dispatched_by: string
-          expired_item_id: string
-          id: string
-          notes: string | null
-          quantity_dispatched: number
-        }
-        Insert: {
-          created_at?: string
-          dispatch_date?: string
-          dispatch_destination: string
-          dispatched_by: string
-          expired_item_id: string
-          id?: string
-          notes?: string | null
-          quantity_dispatched: number
-        }
-        Update: {
-          created_at?: string
-          dispatch_date?: string
-          dispatch_destination?: string
-          dispatched_by?: string
-          expired_item_id?: string
-          id?: string
-          notes?: string | null
-          quantity_dispatched?: number
-        }
-        Relationships: []
       }
       ingredient_transfers: {
         Row: {
