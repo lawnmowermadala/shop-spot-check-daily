@@ -1,13 +1,13 @@
 
 -- Add missing columns to expired_items table
 ALTER TABLE expired_items 
-ADD COLUMN IF NOT EXISTS remaining_quantity numeric,
+ADD COLUMN IF NOT EXISTS remaining_quantity numeric DEFAULT 0,
 ADD COLUMN IF NOT EXISTS dispatch_status text DEFAULT 'available';
 
 -- Update existing records to set remaining_quantity equal to quantity if it's null
 UPDATE expired_items 
 SET remaining_quantity = CAST(quantity as numeric)
-WHERE remaining_quantity IS NULL;
+WHERE remaining_quantity IS NULL OR remaining_quantity = 0;
 
 -- Create expired_stock_dispatches table
 CREATE TABLE IF NOT EXISTS expired_stock_dispatches (
