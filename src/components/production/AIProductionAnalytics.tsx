@@ -32,6 +32,7 @@ interface AIProductionAnalyticsProps {
   historicalProduction: DailyProduction[];
   staffStats: StaffProductionStats[];
   productionBatches: ProductionBatch[];
+  dispatchRecords?: any[];
   comparisonDays: number;
 }
 
@@ -145,6 +146,7 @@ const AIProductionAnalytics = ({
   historicalProduction, 
   staffStats, 
   productionBatches, 
+  dispatchRecords = [],
   comparisonDays 
 }: AIProductionAnalyticsProps) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -157,6 +159,15 @@ const AIProductionAnalytics = ({
       historical_production: historicalProduction,
       staff_statistics: staffStats,
       recent_batches: productionBatches.slice(0, 20),
+      dispatch_records: dispatchRecords.slice(0, 20),
+      dispatch_summary: {
+        total_dispatched: dispatchRecords.reduce((sum, dispatch) => sum + (dispatch.quantity_dispatched || 0), 0),
+        dispatch_destinations: dispatchRecords.reduce((acc, dispatch) => {
+          acc[dispatch.dispatch_destination] = (acc[dispatch.dispatch_destination] || 0) + dispatch.quantity_dispatched;
+          return acc;
+        }, {} as Record<string, number>),
+        recent_dispatches: dispatchRecords.slice(0, 10)
+      },
       analysis_period: `${comparisonDays} days`,
       total_production: historicalProduction.reduce((sum, day) => sum + day.total_production, 0),
       average_daily_production: historicalProduction.length > 0 
@@ -181,7 +192,7 @@ const AIProductionAnalytics = ({
       const productionData = prepareProductionDataForAI();
       
       const defaultPrompt = `
-        As an expert production analytics consultant for a South African bakery business, analyze the following expired stock/production data and provide a comprehensive report with all costs in South African Rand (ZAR):
+        As an expert production analytics consultant for a South African bakery business, analyze the following expired stock/production data and dispatch records, and provide a comprehensive report with all costs in South African Rand (ZAR):
         
         1. **HIGH & LOW EXPIRY ANALYSIS**:
            - Identify the TOP 5 products with HIGHEST expiry/waste rates (name each product specifically)
@@ -189,42 +200,53 @@ const AIProductionAnalytics = ({
            - Calculate exact percentages and quantities for each product
            - Analyze why these products have high/low expiry rates
         
-        2. **SPECIFIC PRODUCT RECOMMENDATIONS**:
+        2. **DISPATCH EFFECTIVENESS ANALYSIS**:
+           - Analyze dispatch destinations and their effectiveness
+           - Identify which destinations receive the most expired stock
+           - Calculate recovery rates from dispatched items
+           - Recommend optimal dispatch strategies and timing
+           - Suggest new dispatch channels to minimize waste
+        
+        3. **SPECIFIC PRODUCT RECOMMENDATIONS**:
            For HIGH expiry products:
            - Reduce production quantities by specific amounts
            - Suggest optimal production schedules
            - Recommend shelf-life improvement strategies
+           - Identify best dispatch destinations for these products
            
            For LOW expiry products:
            - Consider increasing production if demand allows
            - Use as benchmark for other products
            - Analyze what makes them successful
         
-        3. **DAILY PRODUCTION FORECAST**:
+        4. **DAILY PRODUCTION FORECAST WITH DISPATCH PLANNING**:
            - Monday to Sunday production recommendations
            - Specific quantities per product per day
-           - Seasonal adjustments based on expiry patterns
+           - Dispatch schedule recommendations
+           - Seasonal adjustments based on expiry and dispatch patterns
         
-        4. **WASTE REDUCTION STRATEGIES**:
+        5. **WASTE REDUCTION & DISPATCH OPTIMIZATION STRATEGIES**:
            - Immediate actions to reduce high-expiry products
            - Long-term production optimization
-           - Staff training recommendations
+           - Staff training recommendations for dispatch management
            - Inventory management improvements
+           - Dispatch timing optimization
         
-        5. **FINANCIAL IMPACT ANALYSIS** (All amounts in ZAR):
+        6. **FINANCIAL IMPACT ANALYSIS** (All amounts in ZAR):
            - Calculate total waste cost for high-expiry products
+           - Value recovery from dispatch operations
            - Potential savings from implementing recommendations
-           - ROI projections for waste reduction initiatives
+           - ROI projections for waste reduction and dispatch optimization initiatives
         
-        6. **EXECUTIVE SUMMARY WITH ACTION ITEMS**:
+        7. **EXECUTIVE SUMMARY WITH ACTION ITEMS**:
            - Top 3 critical actions to take immediately
-           - 30-day implementation plan
-           - Expected results and KPIs to track
+           - 30-day implementation plan for dispatch optimization
+           - Expected results and KPIs to track (including dispatch metrics)
         
-        Production Data:
+        Production Data & Dispatch Records:
         ${productionData}
         
-        Please provide specific product names, exact quantities in ZAR, and actionable recommendations with measurable outcomes for this South African bakery business.
+        Please provide specific product names, exact quantities in ZAR, dispatch destination analysis, and actionable recommendations with measurable outcomes for this South African bakery business.
       `;
 
       const prompt = specificPrompt || defaultPrompt;

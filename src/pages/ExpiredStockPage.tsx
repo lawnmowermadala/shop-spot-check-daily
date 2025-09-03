@@ -104,6 +104,20 @@ const ExpiredStockPage = () => {
     }
   });
 
+  // Fetch dispatch records
+  const { data: dispatchRecords = [] } = useQuery({
+    queryKey: ['expired-dispatches'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('expired_stock_dispatches')
+        .select('*')
+        .order('dispatch_date', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Sort items
   const sortedItems = [...expiredItems].sort((a, b) => {
     if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -328,6 +342,45 @@ const ExpiredStockPage = () => {
 
   // Print report function
   const handlePrint = () => {
+    const filteredDispatches = dispatchRecords.filter(dispatch => {
+      const dispatchDate = new Date(dispatch.dispatch_date);
+      const now = new Date();
+      let startDate, endDate;
+
+      switch (timeRange) {
+        case 'day':
+          startDate = startOfDay(now);
+          endDate = endOfDay(now);
+          break;
+        case 'week':
+          startDate = startOfWeek(now);
+          endDate = endOfWeek(now);
+          break;
+        case 'month':
+          startDate = startOfMonth(now);
+          endDate = endOfMonth(now);
+          break;
+        case 'custom':
+          if (dateRange?.from && dateRange?.to) {
+            startDate = startOfDay(dateRange.from);
+            endDate = endOfDay(dateRange.to);
+          } else {
+            return dispatchDate;
+          }
+          break;
+        default:
+          startDate = startOfDay(now);
+          endDate = endOfDay(now);
+      }
+      return dispatchDate >= startDate && dispatchDate <= endDate;
+    });
+
+    const totalDispatched = filteredDispatches.reduce((sum, dispatch) => sum + (dispatch.quantity_dispatched || 0), 0);
+    const dispatchDestinations = filteredDispatches.reduce((acc, dispatch) => {
+      acc[dispatch.dispatch_destination] = (acc[dispatch.dispatch_destination] || 0) + dispatch.quantity_dispatched;
+      return acc;
+    }, {} as Record<string, number>);
+
     const printContent = `
       <html>
         <head>
@@ -336,7 +389,7 @@ const ExpiredStockPage = () => {
             body { font-family: Arial, sans-serif; padding: 20px; }
             h1, h2, h3 { color: #333; }
             .header { text-align: center; margin-bottom: 20px; }
-            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+            .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
             .summary-item { border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
             .summary-value { font-size: 1.5rem; font-weight: bold; margin-top: 5px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -345,8 +398,10 @@ const ExpiredStockPage = () => {
             .product-group { margin-top: 30px; }
             .product-header { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
             .text-red { color: #dc3545; }
+            .text-green { color: #28a745; }
             .text-bold { font-weight: bold; }
             .page-break { page-break-after: always; }
+            .dispatch-section { margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 5px; }
           </style>
         </head>
         <body>
@@ -366,9 +421,33 @@ const ExpiredStockPage = () => {
               <div class="summary-value text-red">R${filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}</div>
             </div>
             <div class="summary-item">
+              <div>Total Dispatched</div>
+              <div class="summary-value text-green">${totalDispatched}</div>
+            </div>
+            <div class="summary-item">
               <div>Average Loss Per Item</div>
               <div class="summary-value">R${filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0) / filteredItems.length).toFixed(2) : '0.00'}</div>
             </div>
+          </div>
+
+          <div class="dispatch-section">
+            <h2>Dispatch Summary by Destination</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Destination</th>
+                  <th>Total Quantity Dispatched</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${Object.entries(dispatchDestinations).map(([destination, quantity]) => `
+                  <tr>
+                    <td>${destination}</td>
+                    <td class="text-green">${quantity}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
           </div>
           
           <h2>${reportView === 'summary' ? 'Product Summary' : 'Detailed Items'}</h2>
@@ -483,12 +562,21 @@ const ExpiredStockPage = () => {
         Record and manage expired products to minimize waste and keep inventory accurate.
       </p>
 
-      <Button 
-        onClick={() => navigate('/expired-dispatch')}
-        className="w-fit"
-      >
-        Dispatch Expired Stock
-      </Button>
+      <div className="flex gap-2">
+        <Button 
+          onClick={() => navigate('/expired-dispatch')}
+          className="w-fit"
+        >
+          Dispatch Expired Stock
+        </Button>
+        <Button 
+          onClick={() => navigate('/expired-dispatch-report')}
+          variant="outline"
+          className="w-fit"
+        >
+          Dispatch Report
+        </Button>
+      </div>
 
       {/* AI Analytics Section */}
       <Card>
@@ -529,6 +617,7 @@ const ExpiredStockPage = () => {
               total_ingredient_cost: item.total_cost_loss || 0,
               cost_per_unit: item.selling_price || 0
             }))}
+            dispatchRecords={dispatchRecords}
             comparisonDays={comparisonDays}
           />
         </CardContent>
@@ -593,7 +682,7 @@ const ExpiredStockPage = () => {
       {/* Loss Summary */}
       <Card className="bg-red-50 border-red-200">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
               <p className="text-sm text-gray-600">Total Items Lost ({timeRange})</p>
               <p className="text-2xl font-bold text-red-600">
@@ -604,6 +693,42 @@ const ExpiredStockPage = () => {
               <p className="text-sm text-gray-600">Total Financial Loss ({timeRange})</p>
               <p className="text-2xl font-bold text-red-600">
                 R{filteredItems.reduce((sum, item) => sum + (item.total_cost_loss || 0), 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Total Dispatched ({timeRange})</p>
+              <p className="text-2xl font-bold text-green-600">
+                {dispatchRecords.filter(dispatch => {
+                  const dispatchDate = new Date(dispatch.dispatch_date);
+                  const now = new Date();
+                  let startDate, endDate;
+                  switch (timeRange) {
+                    case 'day':
+                      startDate = startOfDay(now);
+                      endDate = endOfDay(now);
+                      break;
+                    case 'week':
+                      startDate = startOfWeek(now);
+                      endDate = endOfWeek(now);
+                      break;
+                    case 'month':
+                      startDate = startOfMonth(now);
+                      endDate = endOfMonth(now);
+                      break;
+                    case 'custom':
+                      if (dateRange?.from && dateRange?.to) {
+                        startDate = startOfDay(dateRange.from);
+                        endDate = endOfDay(dateRange.to);
+                      } else {
+                        return true;
+                      }
+                      break;
+                    default:
+                      startDate = startOfDay(now);
+                      endDate = endOfDay(now);
+                  }
+                  return dispatchDate >= startDate && dispatchDate <= endDate;
+                }).reduce((sum, dispatch) => sum + (dispatch.quantity_dispatched || 0), 0)}
               </p>
             </div>
             <div className="text-center">
