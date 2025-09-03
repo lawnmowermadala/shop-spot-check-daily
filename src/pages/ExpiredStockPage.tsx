@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { Calendar as CalendarIcon, AlertTriangle, Trash2, Search, ChevronDown, Edit, Brain } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
@@ -49,6 +50,7 @@ interface ProductSummary {
 
 const ExpiredStockPage = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [date, setDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
@@ -480,6 +482,13 @@ const ExpiredStockPage = () => {
       <p className="text-gray-600">
         Record and manage expired products to minimize waste and keep inventory accurate.
       </p>
+
+      <Button 
+        onClick={() => navigate('/expired-dispatch')}
+        className="w-fit"
+      >
+        Dispatch Expired Stock
+      </Button>
 
       {/* AI Analytics Section */}
       <Card>
