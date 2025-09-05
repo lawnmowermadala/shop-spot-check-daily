@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Brain, FileText, HelpCircle } from 'lucide-react';
+import { Loader2, Brain, FileText, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { format } from 'date-fns';
 
@@ -153,6 +153,7 @@ const AIProductionAnalytics = ({
   const [analysis, setAnalysis] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const prepareProductionDataForAI = () => {
     const dataContext = {
@@ -601,126 +602,161 @@ const AIProductionAnalytics = ({
   return (
     <Card className="mb-6">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Brain className="w-5 h-5 text-blue-500" />
-          Elton Niati AI Production Analytics & Expiry Analysis
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="w-5 h-5 text-blue-500" />
+            Elton Niati AI Production Analytics & Expiry Analysis
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-1 text-gray-600 hover:text-gray-900"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="w-4 h-4" />
+                Hide
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-4 h-4" />
+                Expand
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button 
-            onClick={() => analyzeWithAI()} 
-            disabled={isAnalyzing}
-            className="flex-1"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing High & Low Expiry Products...
-              </>
-            ) : (
-              'Generate Complete Expiry Analysis'
-            )}
-          </Button>
-          
-          {analysis && (
-            <Button 
-              onClick={handlePrintPDF}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              Export Analysis PDF
-            </Button>
-          )}
-        </div>
+        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
+          isExpanded ? 'opacity-100 max-h-screen animate-accordion-down' : 'opacity-0 max-h-0 animate-accordion-up'
+        }`}>
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button 
+                onClick={() => analyzeWithAI()} 
+                disabled={isAnalyzing}
+                className="flex-1"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Analyzing High & Low Expiry Products...
+                  </>
+                ) : (
+                  'Generate Complete Expiry Analysis'
+                )}
+              </Button>
+              
+              {analysis && (
+                <Button 
+                  onClick={handlePrintPDF}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export Analysis PDF
+                </Button>
+              )}
+            </div>
 
-        {/* Predefined Questions Section */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <HelpCircle className="w-5 h-5 text-blue-500" />
-            <h3 className="text-lg font-semibold">Data Analysis & Waste Management Questions</h3>
-          </div>
-          
-          <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4">
-            {Object.entries(questionsByCategory).map(([category, questions]) => (
-              <div key={category} className="space-y-2">
-                <div className="flex items-center gap-2 border-b pb-2">
-                  <Checkbox
-                    id={`category-${category}`}
-                    checked={questions.every(q => selectedQuestions.includes(q.id))}
-                    onCheckedChange={() => toggleAllInCategory(category)}
-                  />
-                  <label 
-                    htmlFor={`category-${category}`}
-                    className="font-medium text-sm cursor-pointer"
-                  >
-                    {category} ({questions.filter(q => selectedQuestions.includes(q.id)).length}/{questions.length})
-                  </label>
-                </div>
-                
-                <div className="space-y-2 ml-6">
-                  {questions.map((question) => (
-                    <div key={question.id} className="flex items-start gap-2">
+            {/* Predefined Questions Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-blue-500" />
+                <h3 className="text-lg font-semibold">Data Analysis & Waste Management Questions</h3>
+              </div>
+              
+              <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4">
+                {Object.entries(questionsByCategory).map(([category, questions]) => (
+                  <div key={category} className="space-y-2">
+                    <div className="flex items-center gap-2 border-b pb-2">
                       <Checkbox
-                        id={question.id}
-                        checked={selectedQuestions.includes(question.id)}
-                        onCheckedChange={() => toggleQuestion(question.id)}
+                        id={`category-${category}`}
+                        checked={questions.every(q => selectedQuestions.includes(q.id))}
+                        onCheckedChange={() => toggleAllInCategory(category)}
                       />
                       <label 
-                        htmlFor={question.id}
-                        className="text-sm cursor-pointer leading-tight"
+                        htmlFor={`category-${category}`}
+                        className="font-medium text-sm cursor-pointer"
                       >
-                        {question.question}
+                        {category} ({questions.filter(q => selectedQuestions.includes(q.id)).length}/{questions.length})
                       </label>
                     </div>
-                  ))}
-                </div>
+                    
+                    <div className="space-y-2 ml-6">
+                      {questions.map((question) => (
+                        <div key={question.id} className="flex items-start gap-2">
+                          <Checkbox
+                            id={question.id}
+                            checked={selectedQuestions.includes(question.id)}
+                            onCheckedChange={() => toggleQuestion(question.id)}
+                          />
+                          <label 
+                            htmlFor={question.id}
+                            className="text-sm cursor-pointer leading-tight"
+                          >
+                            {question.question}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+
+              <Button 
+                onClick={handleSelectedQuestionsAnalysis}
+                disabled={isAnalyzing || selectedQuestions.length === 0}
+                className="w-full"
+                variant="outline"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing Selected Questions...
+                  </>
+                ) : (
+                  `Analyze Selected Questions (${selectedQuestions.length})`
+                )}
+              </Button>
+            </div>
+
+            {/* Custom Analysis Section */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Custom Analysis Prompt:</label>
+              <Textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="Enter your specific questions about production data (e.g., 'Focus on staff efficiency and recommend daily production targets for next week')"
+                rows={3}
+              />
+              <Button 
+                onClick={handleCustomAnalysis}
+                disabled={isAnalyzing || !customPrompt.trim()}
+                variant="outline"
+                className="w-full"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing Custom Analysis...
+                  </>
+                ) : (
+                  'Run Custom Analysis'
+                )}
+              </Button>
+            </div>
+
+            {!analysis && !isAnalyzing && (
+              <div className="text-center py-8 text-gray-500">
+                <Brain className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Generate AI analysis to get detailed insights on high & low expiry products</p>
+                <p className="text-xs mt-1">Includes specific product recommendations and future production planning</p>
+                <p className="text-xs mt-1">Powered by Elton Niati AI Agent</p>
+              </div>
+            )}
           </div>
-
-          <Button 
-            onClick={handleSelectedQuestionsAnalysis}
-            disabled={isAnalyzing || selectedQuestions.length === 0}
-            className="w-full"
-            variant="outline"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing Selected Questions...
-              </>
-            ) : (
-              `Analyze Selected Questions (${selectedQuestions.length})`
-            )}
-          </Button>
-        </div>
-
-        {/* Custom Analysis Section */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Custom Analysis Prompt:</label>
-          <Textarea
-            value={customPrompt}
-            onChange={(e) => setCustomPrompt(e.target.value)}
-            placeholder="Enter your specific questions about production data (e.g., 'Focus on staff efficiency and recommend daily production targets for next week')"
-            rows={3}
-          />
-          <Button 
-            onClick={handleCustomAnalysis}
-            disabled={isAnalyzing || !customPrompt.trim()}
-            variant="outline"
-            className="w-full"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing Custom Analysis...
-              </>
-            ) : (
-              'Run Custom Analysis'
-            )}
-          </Button>
         </div>
 
         {analysis && (
@@ -742,15 +778,6 @@ const AIProductionAnalytics = ({
                 {analysis}
               </div>
             </div>
-          </div>
-        )}
-
-        {!analysis && !isAnalyzing && (
-          <div className="text-center py-8 text-gray-500">
-            <Brain className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Generate AI analysis to get detailed insights on high & low expiry products</p>
-            <p className="text-xs mt-1">Includes specific product recommendations and future production planning</p>
-            <p className="text-xs mt-1">Powered by Elton Niati AI Agent</p>
           </div>
         )}
       </CardContent>
