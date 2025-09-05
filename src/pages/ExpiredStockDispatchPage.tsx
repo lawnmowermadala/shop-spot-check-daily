@@ -6,9 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Printer } from "lucide-react";
+import { Printer, CalendarIcon, Filter } from "lucide-react";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface ExpiredItem {
   id: string;
@@ -32,12 +36,20 @@ interface DispatchRecord {
 const ExpiredStockDispatchPage = () => {
   const [expiredItems, setExpiredItems] = useState<ExpiredItem[]>([]);
   const [dispatchRecords, setDispatchRecords] = useState<DispatchRecord[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<DispatchRecord[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
   const [quantityToDispatch, setQuantityToDispatch] = useState<string>("");
   const [dispatchedBy, setDispatchedBy] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Filter states
+  const [filterPeriod, setFilterPeriod] = useState<string>("all");
+  const [fromDate, setFromDate] = useState<Date>();
+  const [toDate, setToDate] = useState<Date>();
+  const [showFilters, setShowFilters] = useState(false);
+  
   const { toast } = useToast();
 
   const destinations = [
@@ -50,6 +62,54 @@ const ExpiredStockDispatchPage = () => {
     fetchExpiredItems();
     fetchDispatchRecords();
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [dispatchRecords, filterPeriod, fromDate, toDate]);
+
+  const applyFilters = () => {
+    let filtered = [...dispatchRecords];
+    
+    if (filterPeriod !== "all") {
+      const now = new Date();
+      let startDate: Date;
+      let endDate: Date;
+      
+      switch (filterPeriod) {
+        case "today":
+          startDate = startOfDay(now);
+          endDate = endOfDay(now);
+          break;
+        case "week":
+          startDate = startOfWeek(now);
+          endDate = endOfWeek(now);
+          break;
+        case "month":
+          startDate = startOfMonth(now);
+          endDate = endOfMonth(now);
+          break;
+        case "custom":
+          if (fromDate && toDate) {
+            startDate = startOfDay(fromDate);
+            endDate = endOfDay(toDate);
+          } else {
+            setFilteredRecords(filtered);
+            return;
+          }
+          break;
+        default:
+          setFilteredRecords(filtered);
+          return;
+      }
+      
+      filtered = filtered.filter(record => {
+        const recordDate = new Date(record.dispatch_date);
+        return recordDate >= startDate && recordDate <= endDate;
+      });
+    }
+    
+    setFilteredRecords(filtered);
+  };
 
   const fetchExpiredItems = async () => {
     try {
@@ -166,6 +226,16 @@ const ExpiredStockDispatchPage = () => {
     window.print();
   };
 
+  const getPeriodLabel = () => {
+    switch (filterPeriod) {
+      case "today": return "Today's Dispatches";
+      case "week": return "This Week's Dispatches";
+      case "month": return "This Month's Dispatches";
+      case "custom": return `Dispatches (${fromDate ? format(fromDate, "MMM dd") : ""} - ${toDate ? format(toDate, "MMM dd, yyyy") : ""})`;
+      default: return "All Dispatches";
+    }
+  };
+
   const selectedItem = expiredItems.find(item => item.id === selectedItemId);
   const remainingQuantity = selectedItem ? calculateRemainingQuantity(selectedItemId, selectedItem.quantity) : 0;
 
@@ -183,6 +253,96 @@ const ExpiredStockDispatchPage = () => {
           Print Report
         </Button>
       </div>
+      
+      {/* Filter Controls */}
+      <Card className="print:hidden">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Filter Dispatch Records</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              {showFilters ? "Hide" : "Show"} Filters
+            </Button>
+          </div>
+        </CardHeader>
+        {showFilters && (
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Time Period</Label>
+                <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {filterPeriod === "custom" && (
+                <>
+                  <div>
+                    <Label>From Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn("w-full justify-start text-left font-normal", !fromDate && "text-muted-foreground")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {fromDate ? format(fromDate, "PPP") : "Pick start date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={fromDate}
+                          onSelect={setFromDate}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  <div>
+                    <Label>To Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {toDate ? format(toDate, "PPP") : "Pick end date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={toDate}
+                          onSelect={setToDate}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Dispatch Form */}
@@ -285,14 +445,17 @@ const ExpiredStockDispatchPage = () => {
         {/* Dispatch History */}
         <Card className="print:col-span-2">
           <CardHeader>
-            <CardTitle>Dispatch History</CardTitle>
+            <CardTitle>{getPeriodLabel()}</CardTitle>
+            <p className="text-sm text-gray-600">
+              Showing {filteredRecords.length} of {dispatchRecords.length} total dispatches
+            </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto print:max-h-none print:overflow-visible">
-              {dispatchRecords.length === 0 ? (
-                <p className="text-gray-500">No dispatches recorded yet</p>
+              {filteredRecords.length === 0 ? (
+                <p className="text-gray-500">No dispatches found for the selected period</p>
               ) : (
-                dispatchRecords.map((record) => {
+                filteredRecords.map((record) => {
                   const item = expiredItems.find(i => i.id === record.expired_item_id);
                   return (
                     <div key={record.id} className="p-3 border rounded-lg">
@@ -320,7 +483,7 @@ const ExpiredStockDispatchPage = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {destinations.map((dest) => {
-          const totalDispatched = dispatchRecords
+          const totalDispatched = filteredRecords
             .filter(record => record.dispatch_destination === dest)
             .reduce((sum, record) => sum + record.quantity_dispatched, 0);
           
