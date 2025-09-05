@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Printer } from "lucide-react";
 
 interface ExpiredItem {
   id: string;
@@ -161,16 +162,31 @@ const ExpiredStockDispatchPage = () => {
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   const selectedItem = expiredItems.find(item => item.id === selectedItemId);
   const remainingQuantity = selectedItem ? calculateRemainingQuantity(selectedItemId, selectedItem.quantity) : 0;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Expired Stock Dispatch</h1>
+      <div className="flex justify-between items-center print:justify-center">
+        <h1 className="text-3xl font-bold">Expired Stock Dispatch</h1>
+        <Button 
+          onClick={handlePrint}
+          variant="outline"
+          size="sm"
+          className="print:hidden"
+        >
+          <Printer className="h-4 w-4 mr-2" />
+          Print Report
+        </Button>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Dispatch Form */}
-        <Card>
+        <Card className="print:hidden">
           <CardHeader>
             <CardTitle>Dispatch Expired Stock</CardTitle>
           </CardHeader>
@@ -267,12 +283,12 @@ const ExpiredStockDispatchPage = () => {
         </Card>
 
         {/* Dispatch History */}
-        <Card>
+        <Card className="print:col-span-2">
           <CardHeader>
-            <CardTitle>Recent Dispatches</CardTitle>
+            <CardTitle>Dispatch History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-3 max-h-96 overflow-y-auto print:max-h-none print:overflow-visible">
               {dispatchRecords.length === 0 ? (
                 <p className="text-gray-500">No dispatches recorded yet</p>
               ) : (
