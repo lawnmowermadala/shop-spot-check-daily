@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Printer, CalendarIcon, Filter } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface ExpiredItem {
   id: string;
@@ -49,6 +50,10 @@ const ExpiredStockDispatchPage = () => {
   const [fromDate, setFromDate] = useState<Date>();
   const [toDate, setToDate] = useState<Date>();
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Edit states
+  const [editingRecord, setEditingRecord] = useState<DispatchRecord | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   
   const { toast } = useToast();
 
@@ -182,18 +187,31 @@ const ExpiredStockDispatchPage = () => {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
+      console.log('Submitting dispatch with data:', {
+        expired_item_id: selectedItemId,
+        dispatch_destination: destination,
+        quantity_dispatched: dispatchQuantity,
+        dispatched_by: dispatchedBy,
+        notes: notes || null
+      });
+
+      const { data, error } = await supabase
         .from('expired_stock_dispatches')
         .insert({
           expired_item_id: selectedItemId,
           dispatch_destination: destination,
           quantity_dispatched: dispatchQuantity,
           dispatched_by: dispatchedBy,
-          notes: notes || null,
-          dispatch_date: new Date().toISOString().split('T')[0]
-        });
+          notes: notes || null
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Dispatch successful:', data);
 
       toast({
         title: "Success",
@@ -214,11 +232,48 @@ const ExpiredStockDispatchPage = () => {
       console.error('Error dispatching stock:', error);
       toast({
         title: "Error",
-        description: "Failed to dispatch expired stock",
+        description: `Failed to dispatch expired stock: ${error.message}`,
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleEdit = (record: DispatchRecord) => {
+    setEditingRecord(record);
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateDispatch = async (updatedRecord: DispatchRecord) => {
+    try {
+      const { error } = await supabase
+        .from('expired_stock_dispatches')
+        .update({
+          dispatch_destination: updatedRecord.dispatch_destination,
+          quantity_dispatched: updatedRecord.quantity_dispatched,
+          dispatched_by: updatedRecord.dispatched_by,
+          notes: updatedRecord.notes
+        })
+        .eq('id', updatedRecord.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Dispatch record updated successfully",
+      });
+
+      setShowEditDialog(false);
+      setEditingRecord(null);
+      fetchDispatchRecords();
+    } catch (error) {
+      console.error('Error updating dispatch:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update dispatch record",
+        variant: "destructive",
+      });
     }
   };
 
@@ -460,13 +515,23 @@ const ExpiredStockDispatchPage = () => {
                   return (
                     <div key={record.id} className="p-3 border rounded-lg">
                       <div className="flex justify-between items-start">
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium">{item?.product_name || 'Unknown Item'}</p>
                           <p className="text-sm text-gray-600">To: {record.dispatch_destination}</p>
                           <p className="text-sm text-gray-600">Quantity: {record.quantity_dispatched}</p>
                           <p className="text-sm text-gray-600">By: {record.dispatched_by}</p>
                         </div>
-                        <span className="text-xs text-gray-500">{record.dispatch_date}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">{record.dispatch_date}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(record)}
+                            className="print:hidden"
+                          >
+                            Edit
+                          </Button>
+                        </div>
                       </div>
                       {record.notes && (
                         <p className="text-sm text-gray-600 mt-2">Notes: {record.notes}</p>
@@ -500,7 +565,111 @@ const ExpiredStockDispatchPage = () => {
           );
         })}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Dispatch Record</DialogTitle>
+          </DialogHeader>
+          {editingRecord && (
+            <EditDispatchForm 
+              record={editingRecord}
+              destinations={destinations}
+              onSave={handleUpdateDispatch}
+              onCancel={() => setShowEditDialog(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+};
+
+// Edit form component
+const EditDispatchForm = ({ 
+  record, 
+  destinations, 
+  onSave, 
+  onCancel 
+}: {
+  record: DispatchRecord;
+  destinations: string[];
+  onSave: (record: DispatchRecord) => void;
+  onCancel: () => void;
+}) => {
+  const [destination, setDestination] = useState(record.dispatch_destination);
+  const [quantity, setQuantity] = useState(record.quantity_dispatched.toString());
+  const [dispatchedBy, setDispatchedBy] = useState(record.dispatched_by);
+  const [notes, setNotes] = useState(record.notes || "");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      ...record,
+      dispatch_destination: destination,
+      quantity_dispatched: parseFloat(quantity),
+      dispatched_by: dispatchedBy,
+      notes: notes || undefined
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label>Destination</Label>
+        <Select value={destination} onValueChange={setDestination}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {destinations.map((dest) => (
+              <SelectItem key={dest} value={dest}>
+                {dest}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>Quantity</Label>
+        <Input
+          type="number"
+          step="0.01"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          required
+        />
+      </div>
+
+      <div>
+        <Label>Dispatched By</Label>
+        <Input
+          value={dispatchedBy}
+          onChange={(e) => setDispatchedBy(e.target.value)}
+          required
+        />
+      </div>
+
+      <div>
+        <Label>Notes</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+        />
+      </div>
+
+      <div className="flex gap-2 pt-4">
+        <Button type="submit" className="flex-1">
+          Save Changes
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 };
 
