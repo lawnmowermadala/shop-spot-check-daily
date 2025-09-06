@@ -58,9 +58,9 @@ const ExpiredStockDispatchPage = () => {
   const { toast } = useToast();
 
   const destinations = [
-    "Pig Food Production",
-    "Dog Food Production", 
-    "Ginger Biscuit Production"
+    { label: "Pig Feed", value: "pig_feed" },
+    { label: "Dog Food Production", value: "dog_feed" }, 
+    { label: "Ginger Biscuit Production", value: "ginger_biscuit" }
   ];
 
   useEffect(() => {
@@ -443,11 +443,11 @@ const ExpiredStockDispatchPage = () => {
                     <SelectValue placeholder="Select destination" />
                   </SelectTrigger>
                   <SelectContent>
-                    {destinations.map((dest) => (
-                      <SelectItem key={dest} value={dest}>
-                        {dest}
-                      </SelectItem>
-                    ))}
+                     {destinations.map((dest) => (
+                       <SelectItem key={dest.value} value={dest.value}>
+                         {dest.label}
+                       </SelectItem>
+                     ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -517,7 +517,7 @@ const ExpiredStockDispatchPage = () => {
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <p className="font-medium">{item?.product_name || 'Unknown Item'}</p>
-                          <p className="text-sm text-gray-600">To: {record.dispatch_destination}</p>
+                          <p className="text-sm text-gray-600">To: {destinations.find(d => d.value === record.dispatch_destination)?.label || record.dispatch_destination}</p>
                           <p className="text-sm text-gray-600">Quantity: {record.quantity_dispatched}</p>
                           <p className="text-sm text-gray-600">By: {record.dispatched_by}</p>
                         </div>
@@ -549,14 +549,14 @@ const ExpiredStockDispatchPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {destinations.map((dest) => {
           const totalDispatched = filteredRecords
-            .filter(record => record.dispatch_destination === dest)
+            .filter(record => record.dispatch_destination === dest.value)
             .reduce((sum, record) => sum + record.quantity_dispatched, 0);
           
           return (
-            <Card key={dest}>
+            <Card key={dest.value}>
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <h3 className="font-medium">{dest}</h3>
+                  <h3 className="font-medium">{dest.label}</h3>
                   <p className="text-2xl font-bold text-blue-600">{totalDispatched}</p>
                   <p className="text-sm text-gray-600">Total Dispatched</p>
                 </div>
@@ -594,7 +594,7 @@ const EditDispatchForm = ({
   onCancel 
 }: {
   record: DispatchRecord;
-  destinations: string[];
+  destinations: { label: string; value: string }[];
   onSave: (record: DispatchRecord) => void;
   onCancel: () => void;
 }) => {
@@ -624,8 +624,8 @@ const EditDispatchForm = ({
           </SelectTrigger>
           <SelectContent>
             {destinations.map((dest) => (
-              <SelectItem key={dest} value={dest}>
-                {dest}
+              <SelectItem key={dest.value} value={dest.value}>
+                {dest.label}
               </SelectItem>
             ))}
           </SelectContent>

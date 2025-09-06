@@ -44,9 +44,9 @@ const ExpiredStockDispatchForm = () => {
   const { toast } = useToast();
 
   const destinations = [
-    "Pig Food Production",
-    "Dog Food Production", 
-    "Ginger Biscuit Production"
+    { label: "Pig Feed", value: "pig_feed" },
+    { label: "Dog Food Production", value: "dog_feed" }, 
+    { label: "Ginger Biscuit Production", value: "ginger_biscuit" }
   ];
 
   useEffect(() => {
@@ -209,8 +209,8 @@ const ExpiredStockDispatchForm = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {destinations.map((dest) => (
-                    <SelectItem key={dest} value={dest}>
-                      {dest}
+                    <SelectItem key={dest.value} value={dest.value}>
+                      {dest.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
