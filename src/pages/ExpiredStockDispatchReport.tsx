@@ -266,9 +266,9 @@ const ExpiredStockDispatchReport = () => {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Product</th>
+                  <th>Product Dispatched</th>
                   <th>Quantity</th>
-                  <th>Destination</th>
+                  <th>Dispatched To</th>
                   <th>Dispatched By</th>
                   <th>Value (ZAR)</th>
                   <th>Notes</th>
