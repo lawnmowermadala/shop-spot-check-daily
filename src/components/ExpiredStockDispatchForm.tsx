@@ -46,7 +46,8 @@ const ExpiredStockDispatchForm = () => {
   const destinations = [
     { label: "Pig Feed", value: "pig_feed" },
     { label: "Dog Food Production", value: "dog_feed" }, 
-    { label: "Ginger Biscuit Production", value: "ginger_biscuit" }
+    { label: "Ginger Biscuit Production", value: "ginger_biscuit" },
+    { label: "Banana Bread", value: "banana_bread" }
   ];
 
   useEffect(() => {
