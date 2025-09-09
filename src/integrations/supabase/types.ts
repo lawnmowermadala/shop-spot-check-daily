@@ -396,6 +396,44 @@ export type Database = {
           },
         ]
       }
+      payment_transactions: {
+        Row: {
+          amount_paid: number
+          change_given: number | null
+          created_at: string
+          id: string
+          payment_method: string
+          reference_number: string | null
+          sales_transaction_id: string
+        }
+        Insert: {
+          amount_paid: number
+          change_given?: number | null
+          created_at?: string
+          id?: string
+          payment_method: string
+          reference_number?: string | null
+          sales_transaction_id: string
+        }
+        Update: {
+          amount_paid?: number
+          change_given?: number | null
+          created_at?: string
+          id?: string
+          payment_method?: string
+          reference_number?: string | null
+          sales_transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_sales_transaction"
+            columns: ["sales_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "sales_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_users: {
         Row: {
           active: boolean | null
@@ -881,6 +919,95 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_transaction_items: {
+        Row: {
+          created_at: string
+          id: string
+          line_total: number
+          product_id: string | null
+          product_name: string
+          quantity: number
+          transaction_id: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_total: number
+          product_id?: string | null
+          product_name: string
+          quantity: number
+          transaction_id: string
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_total?: number
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          transaction_id?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_transaction"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "sales_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_transactions: {
+        Row: {
+          cashier_id: string | null
+          created_at: string
+          customer_name: string | null
+          discount_amount: number
+          id: string
+          notes: string | null
+          payment_method: string
+          payment_status: string
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          transaction_date: string
+          transaction_number: string
+        }
+        Insert: {
+          cashier_id?: string | null
+          created_at?: string
+          customer_name?: string | null
+          discount_amount?: number
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          payment_status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          transaction_date?: string
+          transaction_number: string
+        }
+        Update: {
+          cashier_id?: string | null
+          created_at?: string
+          customer_name?: string | null
+          discount_amount?: number
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          payment_status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          transaction_date?: string
+          transaction_number?: string
+        }
+        Relationships: []
+      }
       staff: {
         Row: {
           created_at: string | null
@@ -945,7 +1072,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_transaction_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
