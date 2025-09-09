@@ -37,6 +37,17 @@ const ExpiredStockDispatchReport = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [reportView, setReportView] = useState<'summary' | 'detailed' | 'destination'>('summary');
 
+  const destinations = [
+    { label: "Pig Feed", value: "pig_feed" },
+    { label: "Dog Food Production", value: "dog_feed" }, 
+    { label: "Ginger Biscuit Production", value: "ginger_biscuit" },
+    { label: "Banana Bread", value: "banana_bread" }
+  ];
+
+  const getDestinationLabel = (value: string) => {
+    return destinations.find(d => d.value === value)?.label || value;
+  };
+
   // Fetch dispatch records with expired item details
   const { data: dispatchRecords = [], isLoading } = useQuery({
     queryKey: ['dispatch-records-report'],
@@ -214,7 +225,7 @@ const ExpiredStockDispatchReport = () => {
               <tbody>
                 ${Object.values(destinationSummary).map((dest: any) => `
                   <tr>
-                    <td>${dest.destination}</td>
+                    <td>${getDestinationLabel(dest.destination)}</td>
                     <td class="text-green">${dest.totalQuantity}</td>
                     <td class="text-green">R${dest.totalValue.toFixed(2)}</td>
                     <td>${dest.recordCount}</td>
@@ -269,7 +280,7 @@ const ExpiredStockDispatchReport = () => {
                     <td>${format(parseISO(record.dispatch_date), 'MMM d, yyyy')}</td>
                     <td>${record.expired_item?.product_name || 'Unknown'}</td>
                     <td>${record.quantity_dispatched}</td>
-                    <td>${record.dispatch_destination}</td>
+                    <td>${getDestinationLabel(record.dispatch_destination)}</td>
                     <td>${record.dispatched_by}</td>
                     <td class="text-green">R${(record.quantity_dispatched * (record.expired_item?.selling_price || 0)).toFixed(2)}</td>
                     <td>${record.notes || '-'}</td>
@@ -416,7 +427,7 @@ const ExpiredStockDispatchReport = () => {
                   <TableBody>
                     {Object.values(destinationSummary).map((dest: any) => (
                       <TableRow key={dest.destination}>
-                        <TableCell className="font-medium">{dest.destination}</TableCell>
+                        <TableCell className="font-medium">{getDestinationLabel(dest.destination)}</TableCell>
                         <TableCell className="text-green-600 font-semibold">{dest.totalQuantity}</TableCell>
                         <TableCell className="text-green-600 font-semibold">R{dest.totalValue.toFixed(2)}</TableCell>
                         <TableCell>{dest.recordCount}</TableCell>
@@ -446,7 +457,7 @@ const ExpiredStockDispatchReport = () => {
                         <TableCell>{format(parseISO(record.dispatch_date), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="font-medium">{record.expired_item?.product_name || 'Unknown'}</TableCell>
                         <TableCell>{record.quantity_dispatched}</TableCell>
-                        <TableCell>{record.dispatch_destination}</TableCell>
+                        <TableCell>{getDestinationLabel(record.dispatch_destination)}</TableCell>
                         <TableCell>{record.dispatched_by}</TableCell>
                         <TableCell className="text-green-600 font-semibold">
                           R{(record.quantity_dispatched * (record.expired_item?.selling_price || 0)).toFixed(2)}
@@ -463,7 +474,7 @@ const ExpiredStockDispatchReport = () => {
                   {Object.values(destinationSummary).map((dest: any) => (
                     <Card key={dest.destination} className="border-l-4 border-l-green-500">
                       <CardHeader>
-                        <CardTitle className="text-lg">{dest.destination}</CardTitle>
+                        <CardTitle className="text-lg">{getDestinationLabel(dest.destination)}</CardTitle>
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div>
                             <span className="text-gray-500">Total Quantity:</span>
@@ -486,6 +497,7 @@ const ExpiredStockDispatchReport = () => {
                               <TableHead>Date</TableHead>
                               <TableHead>Product</TableHead>
                               <TableHead>Quantity</TableHead>
+                              <TableHead>Value (ZAR)</TableHead>
                               <TableHead>Dispatched By</TableHead>
                               <TableHead>Notes</TableHead>
                             </TableRow>
@@ -496,6 +508,9 @@ const ExpiredStockDispatchReport = () => {
                                 <TableCell>{format(parseISO(record.dispatch_date), 'MMM d')}</TableCell>
                                 <TableCell>{record.expired_item?.product_name || 'Unknown'}</TableCell>
                                 <TableCell>{record.quantity_dispatched}</TableCell>
+                                <TableCell className="text-green-600 font-semibold">
+                                  R{(record.quantity_dispatched * (record.expired_item?.selling_price || 0)).toFixed(2)}
+                                </TableCell>
                                 <TableCell>{record.dispatched_by}</TableCell>
                                 <TableCell className="text-sm text-gray-600">{record.notes || '-'}</TableCell>
                               </TableRow>
