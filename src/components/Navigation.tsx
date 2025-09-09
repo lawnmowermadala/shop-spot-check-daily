@@ -1,7 +1,7 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Home, Clipboard, Star, BarChart, Building, Users, BookOpen } from 'lucide-react';
+import { Home, Clipboard, Star, BarChart, Building, Users, BookOpen, ShoppingCart, FileBarChart } from 'lucide-react';
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const Navigation = () => {
@@ -64,13 +64,22 @@ const Navigation = () => {
             <span className="text-[10px]">Staff</span>
           </Button>
         </Link>
-        <Link to="/analytics">
+        <Link to="/pos">
           <Button 
-            variant={isActive('/analytics') ? 'default' : 'ghost'} 
+            variant={isActive('/pos') ? 'default' : 'ghost'} 
             className="flex flex-col items-center h-auto py-1 px-1"
           >
-            <BarChart className="h-4 w-4" />
-            <span className="text-[10px]">Stats</span>
+            <ShoppingCart className="h-4 w-4" />
+            <span className="text-[10px]">POS</span>
+          </Button>
+        </Link>
+        <Link to="/sales-reports">
+          <Button 
+            variant={isActive('/sales-reports') ? 'default' : 'ghost'} 
+            className="flex flex-col items-center h-auto py-1 px-1"
+          >
+            <FileBarChart className="h-4 w-4" />
+            <span className="text-[10px]">Sales</span>
           </Button>
         </Link>
         <Link to="/manual">
