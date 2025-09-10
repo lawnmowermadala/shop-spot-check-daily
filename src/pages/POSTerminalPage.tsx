@@ -218,7 +218,7 @@ const POSTerminalPage = () => {
           <div className="flex-1">
             <Card>
               <CardHeader className="bg-blue-600 text-white">
-                <CardTitle className="text-center text-2xl">UNIPOS RETAIL SOLUTIONS</CardTitle>
+                <CardTitle className="text-center text-2xl">TEST RETAIL POS</CardTitle>
                 <div className="flex gap-2 mt-4">
                   <Input
                     placeholder="Search products..."
