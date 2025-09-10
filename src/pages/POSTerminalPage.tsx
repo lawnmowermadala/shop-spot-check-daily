@@ -9,9 +9,10 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, DollarSign, Receipt, Search, X, Scan } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, DollarSign, Receipt, Search, X, Scan, BarChart3 } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import Navigation from "@/components/Navigation";
+import { useNavigate } from 'react-router-dom';
 
 interface CartItem {
   id: string;
@@ -40,6 +41,7 @@ const POSTerminalPage = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('');
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Fetch products
   const { data: products = [] } = useQuery({
@@ -218,7 +220,17 @@ const POSTerminalPage = () => {
           <div className="flex-1">
             <Card>
               <CardHeader className="bg-blue-600 text-white">
-                <CardTitle className="text-center text-2xl">TEST RETAIL POS</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-center text-2xl">TEST RETAIL POS</CardTitle>
+                  <Button 
+                    variant="outline" 
+                    className="bg-white text-blue-600 hover:bg-gray-100"
+                    onClick={() => navigate('/stock-information')}
+                  >
+                    <BarChart3 className="h-4 w-4 mr-1" />
+                    Stock Info
+                  </Button>
+                </div>
                 <div className="flex gap-2 mt-4">
                   <Input
                     placeholder="Search products..."
