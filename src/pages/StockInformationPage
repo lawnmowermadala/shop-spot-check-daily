@@ -1,0 +1,314 @@
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+
+const StockInformationPage = () => {
+  const [activeTab, setActiveTab] = useState("general");
+
+  // Sample data
+  const supplierData = [
+    { suppNo: '001', supplierName: 'Supplier A', supplierCode: 'SUPP-A', invoiceNo: 'INV-001', qty: 10, cost: 25.99, crvNo: 'CRV-001', date: '2023-10-15' },
+    { suppNo: '002', supplierName: 'Supplier B', supplierCode: 'SUPP-B', invoiceNo: 'INV-002', qty: 5, cost: 19.99, crvNo: 'CRV-002', date: '2023-10-16' },
+  ];
+
+  const warehouseData = [
+    { name: 'Warehouse 1', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 2', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 3', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 4', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 5', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="container mx-auto">
+        <Card>
+          <CardHeader className="bg-blue-600 text-white py-3">
+            <CardTitle className="text-lg">Stock Information</CardTitle>
+            <div className="text-sm">Finsliste F12</div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <Separator className="my-4" />
+
+            {/* Stock Code */}
+            <div className="mb-6">
+              <Label htmlFor="stockCode" className="block mb-2 font-semibold">Stock Code</Label>
+              <Input id="stockCode" placeholder="Enter stock code" className="mb-4" />
+              
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid grid-cols-6 mb-4">
+                  <TabsTrigger value="general" className="text-xs py-1">General</TabsTrigger>
+                  <TabsTrigger value="pricing" className="text-xs py-1">Pricing</TabsTrigger>
+                  <TabsTrigger value="components" className="text-xs py-1">Components</TabsTrigger>
+                  <TabsTrigger value="alternative" className="text-xs py-1">Alternative Items</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-xs py-1">Settings</TabsTrigger>
+                  <TabsTrigger value="notes" className="text-xs py-1">Notes</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="general">
+                  {/* Extended Information Table */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Department</Label>
+                        <Badge variant="outline">Not Set</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Stock Type</Label>
+                        <Badge variant="outline">Normal</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Group</Label>
+                        <Badge variant="outline">Not Set</Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Barcode</Label>
+                        <Input placeholder="Barcode" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Min. Model Stock</Label>
+                        <Input type="number" defaultValue={0} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Extended Info 2</Label>
+                        <Input placeholder="Info" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Supplier Code</Label>
+                        <Input placeholder="Supplier code" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Weight</Label>
+                        <Input placeholder="Weight" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Months Warranty</Label>
+                        <Input type="number" defaultValue={0} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Days To Expire</Label>
+                        <Input type="number" defaultValue={0} />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">More Codes</Label>
+                        <Input placeholder="More codes" />
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="pricing">
+                  <div className="text-center py-8 text-gray-500">
+                    Pricing information will be displayed here
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="components">
+                  <div className="text-center py-8 text-gray-500">
+                    Components information will be displayed here
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="alternative">
+                  <div className="text-center py-8 text-gray-500">
+                    Alternative items will be displayed here
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="settings">
+                  <div className="text-center py-8 text-gray-500">
+                    Settings will be displayed here
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="notes">
+                  <div className="text-center py-8 text-gray-500">
+                    Notes will be displayed here
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            <Separator className="my-4" />
+
+            {/* Supplier Information */}
+            <div className="mb-6">
+              <h3 className="font-semibold mb-3">Supp Name and No.</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="p-2">Supp No.</TableHead>
+                    <TableHead className="p-2">Supplier Name</TableHead>
+                    <TableHead className="p-2">Supplier Code</TableHead>
+                    <TableHead className="p-2">Invoice No.</TableHead>
+                    <TableHead className="p-2">Qty</TableHead>
+                    <TableHead className="p-2">Cost</TableHead>
+                    <TableHead className="p-2">CRV No.</TableHead>
+                    <TableHead className="p-2">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplierData.map((supplier, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="p-2">{supplier.suppNo}</TableCell>
+                      <TableCell className="p-2">{supplier.supplierName}</TableCell>
+                      <TableCell className="p-2">{supplier.supplierCode}</TableCell>
+                      <TableCell className="p-2">{supplier.invoiceNo}</TableCell>
+                      <TableCell className="p-2">{supplier.qty}</TableCell>
+                      <TableCell className="p-2">R{supplier.cost.toFixed(2)}</TableCell>
+                      <TableCell className="p-2">{supplier.crvNo}</TableCell>
+                      <TableCell className="p-2">{supplier.date}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <Separator className="my-4" />
+
+            {/* Current Stock Information */}
+            <div>
+              <h3 className="font-semibold mb-3">Current</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="p-2"></TableHead>
+                      <TableHead className="p-2">Current</TableHead>
+                      <TableHead className="p-2">Period 1</TableHead>
+                      <TableHead className="p-2">Period 2</TableHead>
+                      <TableHead className="p-2">Period 3</TableHead>
+                      <TableHead className="p-2">Average</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="p-2 font-medium">Total Sales</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="p-2 font-medium">Specials</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="p-2 font-medium">Transfers</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Act SDH</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Sales Orders</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Online Orders</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Netto SDH</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Cost Price</Label>
+                        <Badge variant="outline">0.00</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Model Stock</Label>
+                        <Badge variant="outline">0.00</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Qty On Order</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Days/Stock</Label>
+                        <Badge variant="outline">-</Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="p-2">Warehouse</TableHead>
+                        <TableHead className="p-2">Stock</TableHead>
+                        <TableHead className="p-2">On Order</TableHead>
+                        <TableHead className="p-2">Price</TableHead>
+                        <TableHead className="p-2">Act Price</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {warehouseData.map((warehouse, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="p-2 font-medium">{warehouse.name}</TableCell>
+                          <TableCell className="p-2">{warehouse.stock}</TableCell>
+                          <TableCell className="p-2">{warehouse.onOrder}</TableCell>
+                          <TableCell className="p-2">R{warehouse.price.toFixed(2)}</TableCell>
+                          <TableCell className="p-2">R{warehouse.actPrice.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+
+            <Separator className="my-4" />
+
+            {/* Sales and Transfers Section */}
+            <div className="grid grid-cols-2 gap-4">
+              <Button variant="outline" className="text-xs py-1">
+                Sales
+              </Button>
+              <Button variant="outline" className="text-xs py-1">
+                Transfers
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default StockInformationPage;
