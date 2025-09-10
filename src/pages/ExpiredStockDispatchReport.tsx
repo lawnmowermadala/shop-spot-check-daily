@@ -261,29 +261,30 @@ const ExpiredStockDispatchReport = () => {
           </div>
 
           <div class="section">
-            <h2>Detailed Dispatch Records</h2>
+            <h2>📦 DETAILED DISPATCH RECORDS - WHAT, HOW MUCH & WHERE</h2>
+            <p style="margin-bottom: 15px; font-style: italic; color: #666;">Complete breakdown of all expired stock dispatches showing products, quantities, and destinations</p>
             <table>
               <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Product Dispatched</th>
-                  <th>Quantity</th>
-                  <th>Dispatched To</th>
-                  <th>Dispatched By</th>
-                  <th>Value (ZAR)</th>
-                  <th>Notes</th>
+                <tr style="background-color: #f8f9fa;">
+                  <th style="font-weight: bold;">📅 Dispatch Date</th>
+                  <th style="font-weight: bold; background-color: #e3f2fd;">🏷️ WHAT WAS DISPATCHED</th>
+                  <th style="font-weight: bold; background-color: #f3e5f5;">📊 HOW MUCH</th>
+                  <th style="font-weight: bold; background-color: #e8f5e8;">🏭 WHERE TO</th>
+                  <th style="font-weight: bold;">👤 Dispatched By</th>
+                  <th style="font-weight: bold;">💰 Value (ZAR)</th>
+                  <th style="font-weight: bold;">📝 Notes</th>
                 </tr>
               </thead>
               <tbody>
                 ${filteredRecords.map(record => `
-                  <tr>
+                  <tr style="border-bottom: 1px solid #ddd;">
                     <td>${format(parseISO(record.dispatch_date), 'MMM d, yyyy')}</td>
-                    <td>${record.expired_item?.product_name || 'Unknown'}</td>
-                    <td>${record.quantity_dispatched}</td>
-                    <td>${getDestinationLabel(record.dispatch_destination)}</td>
+                    <td style="font-weight: bold; background-color: #f0f8ff;">${record.expired_item?.product_name || 'Unknown Product'}</td>
+                    <td style="font-weight: bold; background-color: #fafafa; text-align: center;">${record.quantity_dispatched} units</td>
+                    <td style="font-weight: bold; background-color: #f0f8f0;">${getDestinationLabel(record.dispatch_destination)}</td>
                     <td>${record.dispatched_by}</td>
-                    <td class="text-green">R${(record.quantity_dispatched * (record.expired_item?.selling_price || 0)).toFixed(2)}</td>
-                    <td>${record.notes || '-'}</td>
+                    <td class="text-green" style="font-weight: bold;">R${(record.quantity_dispatched * (record.expired_item?.selling_price || 0)).toFixed(2)}</td>
+                    <td style="font-size: 11px;">${record.notes || 'No additional notes'}</td>
                   </tr>
                 `).join('')}
               </tbody>
