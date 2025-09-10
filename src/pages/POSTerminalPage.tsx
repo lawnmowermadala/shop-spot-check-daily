@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, DollarSign, Receipt, Search } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, DollarSign, Receipt, Search, X, Scan } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import Navigation from "@/components/Navigation";
 
@@ -26,6 +26,8 @@ interface Product {
   id: string;
   name: string;
   code: string;
+  price: number;
+  category: string;
 }
 
 const POSTerminalPage = () => {
@@ -36,6 +38,7 @@ const POSTerminalPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountPaid, setAmountPaid] = useState('');
   const [showScanner, setShowScanner] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string>('');
   const queryClient = useQueryClient();
 
   // Fetch products
@@ -51,10 +54,14 @@ const POSTerminalPage = () => {
     },
   });
 
-  // Filter products by search term
+  // Get unique categories
+  const categories = [...new Set(products.map(product => product.category))].filter(Boolean);
+
+  // Filter products by search term and category
   const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.code.toLowerCase().includes(searchTerm.toLowerCase())
+    (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.code.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (activeCategory === '' || product.category === activeCategory)
   );
 
   // Calculate totals
@@ -74,8 +81,8 @@ const POSTerminalPage = () => {
         product_id: product.id,
         product_name: product.name,
         quantity: 1,
-        unit_price: 10.00, // Default price - you might want to add price to products table
-        line_total: 10.00,
+        unit_price: product.price || 10.00,
+        line_total: product.price || 10.00,
       };
       setCart([...cart, newItem]);
     }
@@ -203,28 +210,28 @@ const POSTerminalPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-100 pb-20">
       <div className="container mx-auto p-4">
         <div className="flex flex-col lg:flex-row gap-6">
           
           {/* Product Selection */}
           <div className="flex-1">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Search className="h-5 w-5" />
-                  Product Selection
-                </CardTitle>
-                <div className="flex gap-2">
+              <CardHeader className="bg-blue-600 text-white">
+                <CardTitle className="text-center text-2xl">UNIPOS RETAIL SOLUTIONS</CardTitle>
+                <div className="flex gap-2 mt-4">
                   <Input
                     placeholder="Search products..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1"
+                    className="flex-1 bg-white"
                   />
                   <Dialog open={showScanner} onOpenChange={setShowScanner}>
                     <DialogTrigger asChild>
-                      <Button variant="outline">Scan Barcode</Button>
+                      <Button variant="outline" className="bg-white">
+                        <Scan className="h-4 w-4 mr-1" />
+                        Scan
+                      </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
@@ -235,14 +242,38 @@ const POSTerminalPage = () => {
                   </Dialog>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-2">
+                {/* Category Buttons */}
+                <div className="flex flex-wrap gap-1 mb-4">
+                  <Button 
+                    variant={activeCategory === '' ? "default" : "outline"} 
+                    size="sm"
+                    onClick={() => setActiveCategory('')}
+                    className="text-xs"
+                  >
+                    All
+                  </Button>
+                  {categories.map(category => (
+                    <Button 
+                      key={category} 
+                      variant={activeCategory === category ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setActiveCategory(category)}
+                      className="text-xs"
+                    >
+                      {category}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Products Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                   {filteredProducts.map((product) => (
                     <Card key={product.id} className="cursor-pointer hover:bg-gray-50" onClick={() => addToCart(product)}>
-                      <CardContent className="p-3 text-center">
-                        <h3 className="font-medium text-sm">{product.name}</h3>
-                        <p className="text-xs text-gray-500">{product.code}</p>
-                        <p className="text-sm font-bold text-green-600 mt-1">R10.00</p>
+                      <CardContent className="p-2 text-center">
+                        <h3 className="font-medium text-xs h-10 overflow-hidden">{product.name}</h3>
+                        <p className="text-[10px] text-gray-500">{product.code}</p>
+                        <p className="text-sm font-bold text-green-600 mt-1">R{product.price?.toFixed(2) || '10.00'}</p>
                       </CardContent>
                     </Card>
                   ))}
@@ -253,130 +284,178 @@ const POSTerminalPage = () => {
 
           {/* Shopping Cart */}
           <div className="lg:w-96">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" />
-                  Cart ({cart.length} items)
+            <Card className="h-full">
+              <CardHeader className="bg-gray-800 text-white py-2">
+                <CardTitle className="text-lg flex justify-between items-center">
+                  <span>Cart</span>
+                  <Badge variant="secondary">{cart.length} items</Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3">
+                {/* Transaction Details */}
+                <div className="bg-white p-3 rounded mb-3">
+                  <div className="text-center text-2xl font-bold mb-2">R{total.toFixed(2)}</div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-500">Change:</span>
+                    <span>R0.00</span>
+                  </div>
+                  <Separator className="my-2" />
+                  
+                  {/* Cart Items */}
+                  <div className="max-h-40 overflow-y-auto mb-2">
+                    {cart.length === 0 ? (
+                      <p className="text-center text-gray-500 text-sm py-4">No items in cart</p>
+                    ) : (
+                      cart.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center py-1 text-sm">
+                          <div className="flex-1">
+                            <p className="font-medium truncate">{item.product_name}</p>
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>Qty: {item.quantity}</span>
+                              <span>R{item.unit_price.toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold">R{item.line_total.toFixed(2)}</span>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-5 w-5 p-0" 
+                              onClick={() => removeFromCart(item.id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  
+                  <Separator className="my-2" />
+                  
+                  {/* Totals */}
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>R{subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>VAT (15%):</span>
+                      <span>R{taxAmount.toFixed(2)}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between font-bold">
+                      <span>Total:</span>
+                      <span>R{total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Section */}
+                <div className="bg-white p-3 rounded mb-3">
+                  <div className="text-sm font-medium mb-2">Amount Inserted: R{amountPaid || '0.00'}</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" onClick={clearCart}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={() => setShowPayment(true)} 
+                      disabled={cart.length === 0}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      Pay
+                    </Button>
+                  </div>
+                </div>
+
                 {/* Customer Name */}
                 <Input
                   placeholder="Customer name (optional)"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="mb-4"
+                  className="mb-3 bg-white"
                 />
 
-                {/* Cart Items */}
-                <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
-                  {cart.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.product_name}</p>
-                        <p className="text-xs text-gray-500">R{item.unit_price.toFixed(2)} each</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center text-sm">{item.quantity}</span>
-                        <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, item.quantity + 1)}>
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => removeFromCart(item.id)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
+                {/* Numeric Keypad */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, 'C'].map((key) => (
+                    <Button
+                      key={key}
+                      variant="outline"
+                      className="h-12 bg-white"
+                      onClick={() => {
+                        if (key === 'C') {
+                          setAmountPaid('');
+                        } else if (key === '.') {
+                          if (!amountPaid.includes('.')) {
+                            setAmountPaid(amountPaid + '.');
+                          }
+                        } else {
+                          setAmountPaid(amountPaid + key.toString());
+                        }
+                      }}
+                    >
+                      {key}
+                    </Button>
                   ))}
-                </div>
-
-                {/* Totals */}
-                <Separator className="my-3" />
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
-                    <span>R{subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>VAT (15%):</span>
-                    <span>R{taxAmount.toFixed(2)}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-bold">
-                    <span>Total:</span>
-                    <span>R{total.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 mt-4">
-                  <Button variant="outline" onClick={clearCart} className="flex-1">
-                    Clear
-                  </Button>
-                  <Dialog open={showPayment} onOpenChange={setShowPayment}>
-                    <DialogTrigger asChild>
-                      <Button className="flex-1" disabled={cart.length === 0}>
-                        <CreditCard className="h-4 w-4 mr-1" />
-                        Pay
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Process Payment</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium">Payment Method</label>
-                          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="cash">Cash</SelectItem>
-                              <SelectItem value="card">Card</SelectItem>
-                              <SelectItem value="eft">EFT</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">Amount Paid</label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={amountPaid}
-                            onChange={(e) => setAmountPaid(e.target.value)}
-                          />
-                        </div>
-                        <div className="flex justify-between font-bold text-lg">
-                          <span>Total Due:</span>
-                          <span>R{total.toFixed(2)}</span>
-                        </div>
-                        {paymentMethod === 'cash' && amountPaid && parseFloat(amountPaid) > total && (
-                          <div className="flex justify-between text-green-600">
-                            <span>Change:</span>
-                            <span>R{(parseFloat(amountPaid) - total).toFixed(2)}</span>
-                          </div>
-                        )}
-                        <Button 
-                          onClick={handleProcessSale} 
-                          className="w-full"
-                          disabled={processSaleMutation.isPending}
-                        >
-                          {processSaleMutation.isPending ? 'Processing...' : 'Complete Sale'}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
+
+      {/* Payment Dialog */}
+      <Dialog open={showPayment} onOpenChange={setShowPayment}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Process Payment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Payment Method</label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="eft">EFT</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Amount Paid</label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-between font-bold text-lg">
+              <span>Total Due:</span>
+              <span>R{total.toFixed(2)}</span>
+            </div>
+            {paymentMethod === 'cash' && amountPaid && parseFloat(amountPaid) > total && (
+              <div className="flex justify-between text-green-600">
+                <span>Change:</span>
+                <span>R{(parseFloat(amountPaid) - total).toFixed(2)}</span>
+              </div>
+            )}
+            <Button 
+              onClick={handleProcessSale} 
+              className="w-full"
+              disabled={processSaleMutation.isPending}
+            >
+              {processSaleMutation.isPending ? 'Processing...' : 'Complete Sale'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Navigation />
     </div>
   );
