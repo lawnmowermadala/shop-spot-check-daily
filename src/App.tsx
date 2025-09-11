@@ -4,7 +4,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Index from "./pages/Index";
 import Assignments from "./pages/Assignments";
 import StaffRatings from "./pages/StaffRatings";
@@ -29,7 +28,6 @@ import POSTerminalPage from "./pages/POSTerminalPage";
 import SalesReportsPage from "./pages/SalesReportsPage";
 import CashRegisterPage from "./pages/CashRegisterPage";
 import StockInformationPage from "./pages/StockInformationPage"; // ADD THIS IMPORT
-import StockInformationPage from './StockInformationPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,7 +47,6 @@ const App = () => {
           <Sonner />
           <SidebarMenu />
           <Routes>
-             <Route path="/stock" element={<StockInformationPage />} />
             <Route path="/" element={<Index />} />
             <Route path="/assignments" element={<Assignments />} />
             <Route path="/ratings" element={<StaffRatings />} />

@@ -1,141 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// UI Components (assuming you have these from shadcn/ui)
-const Card = ({ children, className }) => <div className={`border rounded-lg bg-white ${className}`}>{children}</div>;
-const CardHeader = ({ children, className }) => <div className={`p-6 ${className}`}>{children}</div>;
-const CardTitle = ({ children, className }) => <h3 className={`text-lg font-semibold ${className}`}>{children}</h3>;
-const CardContent = ({ children, className }) => <div className={`p-6 pt-0 ${className}`}>{children}</div>;
-const Button = ({ children, onClick, variant = 'default', className, size }) => {
-  const base = 'px-4 py-2 rounded-md font-medium transition-colors';
-  const variants = {
-    default: 'bg-blue-600 text-white hover:bg-blue-700',
-    outline: 'border border-gray-300 bg-white hover:bg-gray-50',
-    destructive: 'bg-red-600 text-white hover:bg-red-700'
-  };
-  const sizes = {
-    sm: 'text-sm py-1 px-2',
-    default: 'text-base'
-  };
-  return (
-    <button 
-      onClick={onClick} 
-      className={`${base} ${variants[variant]} ${sizes[size] || ''} ${className}`}
-    >
-      {children}
-    </button>
-  );
-};
-const Input = ({ value, onChange, placeholder, className, type = 'text', disabled }) => (
-  <input
-    type={type}
-    value={value}
-    onChange={onChange}
-    placeholder={placeholder}
-    disabled={disabled}
-    className={`border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
-  />
-);
-const Label = ({ children, htmlFor, className }) => (
-  <label htmlFor={htmlFor} className={`block text-sm font-medium mb-1 ${className}`}>{children}</label>
-);
-const Tabs = ({ value, onValueChange, children, className }) => (
-  <div className={className}>{children}</div>
-);
-const TabsList = ({ children, className }) => (
-  <div className={`flex border-b ${className}`}>{children}</div>
-);
-const TabsTrigger = ({ value, children, className, onClick }) => (
-  <button
-    onClick={() => onClick(value)}
-    className={`px-4 py-2 text-sm font-medium border-b-2 border-transparent hover:border-gray-300 ${className}`}
-  >
-    {children}
-  </button>
-);
-const TabsContent = ({ value, children, className }) => (
-  <div className={`mt-4 ${className}`}>{children}</div>
-);
-const Table = ({ children, className }) => (
-  <table className={`w-full border-collapse ${className}`}>{children}</table>
-);
-const TableHeader = ({ children, className }) => (
-  <thead className={className}>{children}</thead>
-);
-const TableBody = ({ children, className }) => (
-  <tbody className={className}>{children}</tbody>
-);
-const TableRow = ({ children, className }) => (
-  <tr className={`border-b ${className}`}>{children}</tr>
-);
-const TableHead = ({ children, className }) => (
-  <th className={`text-left py-2 px-3 font-medium bg-gray-50 ${className}`}>{children}</th>
-);
-const TableCell = ({ children, className }) => (
-  <td className={`py-2 px-3 ${className}`}>{children}</td>
-);
-const Badge = ({ children, variant = 'default', className }) => {
-  const variants = {
-    default: 'bg-gray-100 text-gray-800',
-    outline: 'border border-gray-300 bg-white',
-    destructive: 'bg-red-100 text-red-800'
-  };
-  return (
-    <span className={`px-2 py-1 text-xs rounded-full ${variants[variant]} ${className}`}>
-      {children}
-    </span>
-  );
-};
-const Separator = ({ className }) => (
-  <hr className={`my-4 border-gray-200 ${className}`}
-);
-
-// Icons (simple SVG replacements)
-const ArrowLeft = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-  </svg>
-);
-const Search = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
-const Plus = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-  </svg>
-);
-const Edit = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-  </svg>
-);
-const Save = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-  </svg>
-);
-const X = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft } from 'lucide-react';
 
 const StockInformationPage = () => {
   const [activeTab, setActiveTab] = useState("general");
-  const [stockCode, setStockCode] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
-  const [generalInfo, setGeneralInfo] = useState({
-    barcode: "",
-    minModelStock: 0,
-    extendedInfo: "",
-    supplierCode: "",
-    weight: "",
-    warranty: 0,
-    expireDays: 0,
-    moreCodes: ""
-  });
   const navigate = useNavigate();
 
   // Sample data
@@ -145,45 +21,22 @@ const StockInformationPage = () => {
   ];
 
   const warehouseData = [
-    { name: 'Warehouse 1', stock: 15, onOrder: 5, price: 29.99, actPrice: 25.99 },
-    { name: 'Warehouse 2', stock: 8, onOrder: 12, price: 29.99, actPrice: 25.99 },
-    { name: 'Warehouse 3', stock: 0, onOrder: 20, price: 29.99, actPrice: 25.99 },
-    { name: 'Warehouse 4', stock: 22, onOrder: 0, price: 29.99, actPrice: 25.99 },
-    { name: 'Warehouse 5', stock: 3, onOrder: 7, price: 29.99, actPrice: 25.99 },
+    { name: 'Warehouse 1', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 2', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 3', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 4', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 5', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
   ];
 
   const handleGoBack = () => {
-    navigate(-1);
-  };
-
-  const handleSearch = () => {
-    alert(`Searching for stock code: ${stockCode}`);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setGeneralInfo(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const toggleEdit = () => {
-    setIsEditing(!isEditing);
-  };
-
-  const handleSave = () => {
-    setIsEditing(false);
-    alert('Information saved successfully!');
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
+    // Navigate back to the previous page or a specific route
+    navigate(-1); // This goes back to the previous page in history
+    // Alternatively, you can use navigate('/specific-route') to go to a specific page
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="container mx-auto">
         {/* Back Button */}
         <div className="mb-4">
           <Button 
@@ -196,62 +49,32 @@ const StockInformationPage = () => {
           </Button>
         </div>
 
-        <Card className="overflow-hidden">
-          <CardHeader className="bg-blue-600 text-white">
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle className="text-xl">Stock Information</CardTitle>
-                <div className="text-sm">Finsliste F12</div>
-              </div>
-              <div className="flex items-center gap-2">
-                {isEditing ? (
-                  <>
-                    <Button size="sm" onClick={handleSave} className="bg-green-600 hover:bg-green-700 gap-1">
-                      <Save className="h-4 w-4" /> Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleCancel} className="gap-1">
-                      <X className="h-4 w-4" /> Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="sm" onClick={toggleEdit} className="gap-1">
-                    <Edit className="h-4 w-4" /> Edit
-                  </Button>
-                )}
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="bg-blue-600 text-white py-3">
+            <CardTitle className="text-lg">Stock Information</CardTitle>
+            <div className="text-sm">Finsliste F12</div>
           </CardHeader>
-          <CardContent className="p-5">
+          <CardContent className="p-4">
             <Separator className="my-4" />
 
-            {/* Stock Code Search */}
+            {/* Stock Code */}
             <div className="mb-6">
               <Label htmlFor="stockCode" className="block mb-2 font-semibold">Stock Code</Label>
-              <div className="flex gap-2">
-                <Input 
-                  id="stockCode" 
-                  placeholder="Enter stock code" 
-                  value={stockCode}
-                  onChange={(e) => setStockCode(e.target.value)}
-                  className="flex-1"
-                />
-                <Button onClick={handleSearch} className="gap-1">
-                  <Search className="h-4 w-4" /> Search
-                </Button>
-              </div>
+              <Input id="stockCode" placeholder="Enter stock code" className="mb-4" />
               
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-4">
-                <TabsList className="grid grid-cols-6 mb-4 gap-1">
-                  <TabsTrigger value="general" onClick={setActiveTab} className="text-xs py-2">General</TabsTrigger>
-                  <TabsTrigger value="pricing" onClick={setActiveTab} className="text-xs py-2">Pricing</TabsTrigger>
-                  <TabsTrigger value="components" onClick={setActiveTab} className="text-xs py-2">Components</TabsTrigger>
-                  <TabsTrigger value="alternative" onClick={setActiveTab} className="text-xs py-2">Alternative</TabsTrigger>
-                  <TabsTrigger value="settings" onClick={setActiveTab} className="text-xs py-2">Settings</TabsTrigger>
-                  <TabsTrigger value="notes" onClick={setActiveTab} className="text-xs py-2">Notes</TabsTrigger>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid grid-cols-6 mb-4">
+                  <TabsTrigger value="general" className="text-xs py-1">General</TabsTrigger>
+                  <TabsTrigger value="pricing" className="text-xs py-1">Pricing</TabsTrigger>
+                  <TabsTrigger value="components" className="text-xs py-1">Components</TabsTrigger>
+                  <TabsTrigger value="alternative" className="text-xs py-1">Alternative Items</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-xs py-1">Settings</TabsTrigger>
+                  <TabsTrigger value="notes" className="text-xs py-1">Notes</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="general">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  {/* Extended Information Table */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Department</Label>
@@ -270,222 +93,237 @@ const StockInformationPage = () => {
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Barcode</Label>
-                        <Input 
-                          name="barcode"
-                          value={generalInfo.barcode} 
-                          onChange={handleInputChange}
-                          placeholder="Barcode" 
-                          disabled={!isEditing}
-                        />
+                        <Input placeholder="Barcode" />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Min. Model Stock</Label>
-                        <Input 
-                          name="minModelStock"
-                          type="number" 
-                          value={generalInfo.minModelStock} 
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                        />
+                        <Input type="number" defaultValue={0} />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Extended Info 2</Label>
-                        <Input 
-                          name="extendedInfo"
-                          value={generalInfo.extendedInfo} 
-                          onChange={handleInputChange}
-                          placeholder="Info" 
-                          disabled={!isEditing}
-                        />
+                        <Input placeholder="Info" />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Supplier Code</Label>
-                        <Input 
-                          name="supplierCode"
-                          value={generalInfo.supplierCode} 
-                          onChange={handleInputChange}
-                          placeholder="Supplier code" 
-                          disabled={!isEditing}
-                        />
+                        <Input placeholder="Supplier code" />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Weight</Label>
-                        <Input 
-                          name="weight"
-                          value={generalInfo.weight} 
-                          onChange={handleInputChange}
-                          placeholder="Weight" 
-                          disabled={!isEditing}
-                        />
+                        <Input placeholder="Weight" />
                       </div>
                     </div>
                     
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Months Warranty</Label>
-                        <Input 
-                          name="warranty"
-                          type="number" 
-                          value={generalInfo.warranty} 
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                        />
+                        <Input type="number" defaultValue={0} />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Days To Expire</Label>
-                        <Input 
-                          name="expireDays"
-                          type="number" 
-                          value={generalInfo.expireDays} 
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                        />
+                        <Input type="number" defaultValue={0} />
                       </div>
                     </div>
                     
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">More Codes</Label>
-                        <Input 
-                          name="moreCodes"
-                          value={generalInfo.moreCodes} 
-                          onChange={handleInputChange}
-                          placeholder="More codes" 
-                          disabled={!isEditing}
-                        />
+                        <Input placeholder="More codes" />
                       </div>
                     </div>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="pricing">
-                  <div className="p-4 border rounded-lg">
-                    <h3 className="font-semibold mb-4">Pricing Information</h3>
-                    <div className="text-center py-8 text-gray-500">
-                      Pricing information will be displayed here
-                    </div>
+                  <div className="text-center py-8 text-gray-500">
+                    Pricing information will be displayed here
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="components">
-                  <div className="p-4 border rounded-lg">
-                    <h3 className="font-semibold mb-4">Components</h3>
-                    <div className="text-center py-8 text-gray-500">
-                      Components information will be displayed here
-                    </div>
+                  <div className="text-center py-8 text-gray-500">
+                    Components information will be displayed here
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="alternative">
-                  <div className="p-4 border rounded-lg">
-                    <h3 className="font-semibold mb-4">Alternative Items</h3>
-                    <div className="text-center py-8 text-gray-500">
-                      Alternative items will be displayed here
-                    </div>
+                  <div className="text-center py-8 text-gray-500">
+                    Alternative items will be displayed here
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="settings">
-                  <div className="p-4 border rounded-lg">
-                    <h3 className="font-semibold mb-4">Settings</h3>
-                    <div className="text-center py-8 text-gray-500">
-                      Settings will be displayed here
-                <TabsContent value="settings">
-                  <div className="p-4 border rounded-lg">
-                    <h3 className="font-semibold mb-4">Settings</h3>
-                    <div className="text-center py-8 text-gray-500">
-                      Settings will be displayed here
-                    </div>
+                  <div className="text-center py-8 text-gray-500">
+                    Settings will be displayed here
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="notes">
-                  <div className="p-4 border rounded-lg">
-                    <h3 className="font-semibold mb-4">Notes</h3>
-                    <div className="text-center py-8 text-gray-500">
-                      Notes will be displayed here
-                    </div>
+                  <div className="text-center py-8 text-gray-500">
+                    Notes will be displayed here
                   </div>
                 </TabsContent>
               </Tabs>
             </div>
 
-            {/* Supplier Information Table */}
-            <div className="mb-8">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Supplier Information</h3>
-                <Button size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" /> Add Supplier
-                </Button>
-              </div>
-              <div className="border rounded-lg overflow-hidden">
+            <Separator className="my-4" />
+
+            {/* Supplier Information */}
+            <div className="mb-6">
+              <h3 className="font-semibold mb-3">Supp Name and No.</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="p-2">Supp No.</TableHead>
+                    <TableHead className="p-2">Supplier Name</TableHead>
+                    <TableHead className="p-2">Supplier Code</TableHead>
+                    <TableHead className="p-2">Invoice No.</TableHead>
+                    <TableHead className="p-2">Qty</TableHead>
+                    <TableHead className="p-2">Cost</TableHead>
+                    <TableHead className="p-2">CRV No.</TableHead>
+                    <TableHead className="p-2">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplierData.map((supplier, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="p-2">{supplier.suppNo}</TableCell>
+                      <TableCell className="p-2">{supplier.supplierName}</TableCell>
+                      <TableCell className="p-2">{supplier.supplierCode}</TableCell>
+                      <TableCell className="p-2">{supplier.invoiceNo}</TableCell>
+                      <TableCell className="p-2">{supplier.qty}</TableCell>
+                      <TableCell className="p-2">R{supplier.cost.toFixed(2)}</TableCell>
+                      <TableCell className="p-2">{supplier.crvNo}</TableCell>
+                      <TableCell className="p-2">{supplier.date}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <Separator className="my-4" />
+
+            {/* Current Stock Information */}
+            <div>
+              <h3 className="font-semibold mb-3">Current</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Supp No</TableHead>
-                      <TableHead>Supplier Name</TableHead>
-                      <TableHead>Supplier Code</TableHead>
-                      <TableHead>Invoice No</TableHead>
-                      <TableHead>Qty</TableHead>
-                      <TableHead>Cost</TableHead>
-                      <TableHead>CRV No</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead className="p-2"></TableHead>
+                      <TableHead className="p-2">Current</TableHead>
+                      <TableHead className="p-2">Period 1</TableHead>
+                      <TableHead className="p-2">Period 2</TableHead>
+                      <TableHead className="p-2">Period 3</TableHead>
+                      <TableHead className="p-2">Average</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {supplierData.map((supplier, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{supplier.suppNo}</TableCell>
-                        <TableCell>{supplier.supplierName}</TableCell>
-                        <TableCell>{supplier.supplierCode}</TableCell>
-                        <TableCell>{supplier.invoiceNo}</TableCell>
-                        <TableCell>{supplier.qty}</TableCell>
-                        <TableCell>${supplier.cost.toFixed(2)}</TableCell>
-                        <TableCell>{supplier.crvNo}</TableCell>
-                        <TableCell>{supplier.date}</TableCell>
-                      </TableRow>
-                    ))}
+                    <TableRow>
+                      <TableCell className="p-2 font-medium">Total Sales</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="p-2 font-medium">Specials</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="p-2 font-medium">Transfers</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                      <TableCell className="p-2">0.000</TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Act SDH</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Sales Orders</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Online Orders</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Netto SDH</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Cost Price</Label>
+                        <Badge variant="outline">0.00</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Model Stock</Label>
+                        <Badge variant="outline">0.00</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Qty On Order</Label>
+                        <Badge variant="outline">0</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <Label className="font-medium">Days/Stock</Label>
+                        <Badge variant="outline">-</Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="p-2">Warehouse</TableHead>
+                        <TableHead className="p-2">Stock</TableHead>
+                        <TableHead className="p-2">On Order</TableHead>
+                        <TableHead className="p-2">Price</TableHead>
+                        <TableHead className="p-2">Act Price</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {warehouseData.map((warehouse, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="p-2 font-medium">{warehouse.name}</TableCell>
+                          <TableCell className="p-2">{warehouse.stock}</TableCell>
+                          <TableCell className="p-2">{warehouse.onOrder}</TableCell>
+                          <TableCell className="p-2">R{warehouse.price.toFixed(2)}</TableCell>
+                          <TableCell className="p-2">R{warehouse.actPrice.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </div>
 
-            {/* Warehouse Information Table */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Warehouse Information</h3>
-                <Button size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" /> Add Warehouse
-                </Button>
-              </div>
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Stock</TableHead>
-                      <TableHead>On Order</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Act. Price</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {warehouseData.map((warehouse, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{warehouse.name}</TableCell>
-                        <TableCell>
-                          <Badge variant={warehouse.stock === 0 ? "destructive" : "default"}>
-                            {warehouse.stock}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{warehouse.onOrder}</TableCell>
-                        <TableCell>${warehouse.price.toFixed(2)}</TableCell>
-                        <TableCell>${warehouse.actPrice.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            <Separator className="my-4" />
+
+            {/* Sales and Transfers Section */}
+            <div className="grid grid-cols-2 gap-4">
+              <Button variant="outline" className="text-xs py-1">
+                Sales
+              </Button>
+              <Button variant="outline" className="text-xs py-1">
+                Transfers
+              </Button>
             </div>
           </CardContent>
         </Card>
