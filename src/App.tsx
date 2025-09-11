@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -60,10 +59,12 @@ const App = () => {
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/production" element={<ProductionPage />} />
             <Route path="/stock" element={<StockPage />} />
+            {/* ADD THE MISSING ROUTE */}
+            <Route path="/stock-information" element={<StockPage />} />
             <Route path="/promotions" element={<PromotionsPage />} />
             <Route path="/expired" element={<ExpiredStockPage />} />
-          <Route path="/expired-dispatch" element={<ExpiredStockDispatchPage />} />
-          <Route path="/expired-dispatch-report" element={<ExpiredStockDispatchReport />} />
+            <Route path="/expired-dispatch" element={<ExpiredStockDispatchPage />} />
+            <Route path="/expired-dispatch-report" element={<ExpiredStockDispatchReport />} />
             <Route path="/user-management" element={<UserManagementPage />} />
             <Route path="/recipes" element={<RecipePage />} />
             <Route path="/ingredients" element={<IngredientsPage />} />
