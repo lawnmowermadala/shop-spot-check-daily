@@ -8,10 +8,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Edit, Save, X } from 'lucide-react';
 
 const StockInformationPage = () => {
   const [activeTab, setActiveTab] = useState("general");
+  const [stockCode, setStockCode] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [generalInfo, setGeneralInfo] = useState({
+    barcode: "",
+    minModelStock: 0,
+    extendedInfo: "",
+    supplierCode: "",
+    weight: "",
+    warranty: 0,
+    expireDays: 0,
+    moreCodes: ""
+  });
   const navigate = useNavigate();
 
   // Sample data
@@ -21,22 +33,48 @@ const StockInformationPage = () => {
   ];
 
   const warehouseData = [
-    { name: 'Warehouse 1', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
-    { name: 'Warehouse 2', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
-    { name: 'Warehouse 3', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
-    { name: 'Warehouse 4', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
-    { name: 'Warehouse 5', stock: 0, onOrder: 0.001, price: 0.00, actPrice: 0.00 },
+    { name: 'Warehouse 1', stock: 15, onOrder: 5, price: 29.99, actPrice: 25.99 },
+    { name: 'Warehouse 2', stock: 8, onOrder: 12, price: 29.99, actPrice: 25.99 },
+    { name: 'Warehouse 3', stock: 0, onOrder: 20, price: 29.99, actPrice: 25.99 },
+    { name: 'Warehouse 4', stock: 22, onOrder: 0, price: 29.99, actPrice: 25.99 },
+    { name: 'Warehouse 5', stock: 3, onOrder: 7, price: 29.99, actPrice: 25.99 },
   ];
 
   const handleGoBack = () => {
-    // Navigate back to the previous page or a specific route
-    navigate(-1); // This goes back to the previous page in history
-    // Alternatively, you can use navigate('/specific-route') to go to a specific page
+    navigate(-1);
+  };
+
+  const handleSearch = () => {
+    // In a real app, this would fetch data based on the stock code
+    alert(`Searching for stock code: ${stockCode}`);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setGeneralInfo(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const toggleEdit = () => {
+    setIsEditing(!isEditing);
+  };
+
+  const handleSave = () => {
+    // In a real app, this would save the data
+    setIsEditing(false);
+    alert('Information saved successfully!');
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    // Reset form data here if needed
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <div className="container mx-auto">
+      <div className="container mx-auto max-w-6xl">
         {/* Back Button */}
         <div className="mb-4">
           <Button 
@@ -49,32 +87,63 @@ const StockInformationPage = () => {
           </Button>
         </div>
 
-        <Card>
-          <CardHeader className="bg-blue-600 text-white py-3">
-            <CardTitle className="text-lg">Stock Information</CardTitle>
-            <div className="text-sm">Finsliste F12</div>
+        <Card className="overflow-hidden">
+          <CardHeader className="bg-blue-600 text-white py-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-xl">Stock Information</CardTitle>
+                <div className="text-sm">Finsliste F12</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {isEditing ? (
+                  <>
+                    <Button size="sm" onClick={handleSave} className="bg-green-600 hover:bg-green-700 gap-1">
+                      <Save className="h-4 w-4" /> Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleCancel} className="gap-1">
+                      <X className="h-4 w-4" /> Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" onClick={toggleEdit} className="gap-1">
+                    <Edit className="h-4 w-4" /> Edit
+                  </Button>
+                )}
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <Separator className="my-4" />
 
-            {/* Stock Code */}
+            {/* Stock Code Search */}
             <div className="mb-6">
               <Label htmlFor="stockCode" className="block mb-2 font-semibold">Stock Code</Label>
-              <Input id="stockCode" placeholder="Enter stock code" className="mb-4" />
+              <div className="flex gap-2">
+                <Input 
+                  id="stockCode" 
+                  placeholder="Enter stock code" 
+                  value={stockCode}
+                  onChange={(e) => setStockCode(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={handleSearch} className="gap-1">
+                  <Search className="h-4 w-4" /> Search
+                </Button>
+              </div>
               
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-4">
                 <TabsList className="grid grid-cols-6 mb-4">
-                  <TabsTrigger value="general" className="text-xs py-1">General</TabsTrigger>
-                  <TabsTrigger value="pricing" className="text-xs py-1">Pricing</TabsTrigger>
-                  <TabsTrigger value="components" className="text-xs py-1">Components</TabsTrigger>
-                  <TabsTrigger value="alternative" className="text-xs py-1">Alternative Items</TabsTrigger>
-                  <TabsTrigger value="settings" className="text-xs py-1">Settings</TabsTrigger>
-                  <TabsTrigger value="notes" className="text-xs py-1">Notes</TabsTrigger>
+                  <TabsTrigger value="general" className="text-xs py-2">General</TabsTrigger>
+                  <TabsTrigger value="pricing" className="text-xs py-2">Pricing</TabsTrigger>
+                  <TabsTrigger value="components" className="text-xs py-2">Components</TabsTrigger>
+                  <TabsTrigger value="alternative" className="text-xs py-2">Alternative Items</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-xs py-2">Settings</TabsTrigger>
+                  <TabsTrigger value="notes" className="text-xs py-2">Notes</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="general">
                   {/* Extended Information Table */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Department</Label>
@@ -93,73 +162,230 @@ const StockInformationPage = () => {
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Barcode</Label>
-                        <Input placeholder="Barcode" />
+                        <Input 
+                          name="barcode"
+                          value={generalInfo.barcode} 
+                          onChange={handleInputChange}
+                          placeholder="Barcode" 
+                          disabled={!isEditing}
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Min. Model Stock</Label>
-                        <Input type="number" defaultValue={0} />
+                        <Input 
+                          name="minModelStock"
+                          type="number" 
+                          value={generalInfo.minModelStock} 
+                          onChange={handleInputChange}
+                          disabled={!isEditing}
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Extended Info 2</Label>
-                        <Input placeholder="Info" />
+                        <Input 
+                          name="extendedInfo"
+                          value={generalInfo.extendedInfo} 
+                          onChange={handleInputChange}
+                          placeholder="Info" 
+                          disabled={!isEditing}
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Supplier Code</Label>
-                        <Input placeholder="Supplier code" />
+                        <Input 
+                          name="supplierCode"
+                          value={generalInfo.supplierCode} 
+                          onChange={handleInputChange}
+                          placeholder="Supplier code" 
+                          disabled={!isEditing}
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Weight</Label>
-                        <Input placeholder="Weight" />
+                        <Input 
+                          name="weight"
+                          value={generalInfo.weight} 
+                          onChange={handleInputChange}
+                          placeholder="Weight" 
+                          disabled={!isEditing}
+                        />
                       </div>
                     </div>
                     
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Months Warranty</Label>
-                        <Input type="number" defaultValue={0} />
+                        <Input 
+                          name="warranty"
+                          type="number" 
+                          value={generalInfo.warranty} 
+                          onChange={handleInputChange}
+                          disabled={!isEditing}
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Days To Expire</Label>
-                        <Input type="number" defaultValue={0} />
+                        <Input 
+                          name="expireDays"
+                          type="number" 
+                          value={generalInfo.expireDays} 
+                          onChange={handleInputChange}
+                          disabled={!isEditing}
+                        />
                       </div>
                     </div>
                     
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">More Codes</Label>
-                        <Input placeholder="More codes" />
+                        <Input 
+                          name="moreCodes"
+                          value={generalInfo.moreCodes} 
+                          onChange={handleInputChange}
+                          placeholder="More codes" 
+                          disabled={!isEditing}
+                        />
                       </div>
                     </div>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="pricing">
-                  <div className="text-center py-8 text-gray-500">
-                    Pricing information will be displayed here
+                  <div className="p-4 border rounded-lg">
+                    <h3 className="font-semibold mb-4">Pricing Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Cost Price</Label>
+                          <Input type="number" defaultValue={25.99} disabled={!isEditing} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Selling Price</Label>
+                          <Input type="number" defaultValue={39.99} disabled={!isEditing} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Discount %</Label>
+                          <Input type="number" defaultValue={0} disabled={!isEditing} />
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Special Price</Label>
+                          <Input type="number" defaultValue={0} disabled={!isEditing} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Price Group</Label>
+                          <Input defaultValue="Standard" disabled={!isEditing} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Tax Rate</Label>
+                          <Input defaultValue="15%" disabled={!isEditing} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="components">
-                  <div className="text-center py-8 text-gray-500">
-                    Components information will be displayed here
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-semibold">Component Items</h3>
+                      <Button size="sm" className="gap-1">
+                        <Plus className="h-4 w-4" /> Add Component
+                      </Button>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Component Code</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Cost</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                            No components added
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="alternative">
-                  <div className="text-center py-8 text-gray-500">
-                    Alternative items will be displayed here
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-semibold">Alternative Items</h3>
+                      <Button size="sm" className="gap-1">
+                        <Plus className="h-4 w-4" /> Add Alternative
+                      </Button>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item Code</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Supplier</TableHead>
+                          <TableHead>Price Difference</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                            No alternative items added
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="settings">
-                  <div className="text-center py-8 text-gray-500">
-                    Settings will be displayed here
+                  <div className="p-4 border rounded-lg">
+                    <h3 className="font-semibold mb-4">Stock Settings</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Reorder Level</Label>
+                          <Input type="number" defaultValue={5} disabled={!isEditing} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Reorder Quantity</Label>
+                          <Input type="number" defaultValue={20} disabled={!isEditing} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Max Stock Level</Label>
+                          <Input type="number" defaultValue={100} disabled={!isEditing} />
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Lead Time (days)</Label>
+                          <Input type="number" defaultValue={7} disabled={!isEditing} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Stock Take Frequency</Label>
+                          <Input defaultValue="Monthly" disabled={!isEditing} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                          <Label className="font-medium">Auto Reorder</Label>
+                          <Input type="checkbox" defaultChecked disabled={!isEditing} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="notes">
-                  <div className="text-center py-8 text-gray-500">
-                    Notes will be displayed here
+                  <div className="p-4 border rounded-lg">
+                    <h3 className="font-semibold mb-4">Notes</h3>
+                    <textarea 
+                      className="w-full h-40 p-3 border rounded-md" 
+                      placeholder="Add notes about this item..."
+                      disabled={!isEditing}
+                    ></textarea>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -169,160 +395,170 @@ const StockInformationPage = () => {
 
             {/* Supplier Information */}
             <div className="mb-6">
-              <h3 className="font-semibold mb-3">Supp Name and No.</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="p-2">Supp No.</TableHead>
-                    <TableHead className="p-2">Supplier Name</TableHead>
-                    <TableHead className="p-2">Supplier Code</TableHead>
-                    <TableHead className="p-2">Invoice No.</TableHead>
-                    <TableHead className="p-2">Qty</TableHead>
-                    <TableHead className="p-2">Cost</TableHead>
-                    <TableHead className="p-2">CRV No.</TableHead>
-                    <TableHead className="p-2">Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {supplierData.map((supplier, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="p-2">{supplier.suppNo}</TableCell>
-                      <TableCell className="p-2">{supplier.supplierName}</TableCell>
-                      <TableCell className="p-2">{supplier.supplierCode}</TableCell>
-                      <TableCell className="p-2">{supplier.invoiceNo}</TableCell>
-                      <TableCell className="p-2">{supplier.qty}</TableCell>
-                      <TableCell className="p-2">R{supplier.cost.toFixed(2)}</TableCell>
-                      <TableCell className="p-2">{supplier.crvNo}</TableCell>
-                      <TableCell className="p-2">{supplier.date}</TableCell>
+              <h3 className="font-semibold mb-3">Supplier Information</h3>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="p-2">Supp No.</TableHead>
+                      <TableHead className="p-2">Supplier Name</TableHead>
+                      <TableHead className="p-2">Supplier Code</TableHead>
+                      <TableHead className="p-2">Invoice No.</TableHead>
+                      <TableHead className="p-2">Qty</TableHead>
+                      <TableHead className="p-2">Cost</TableHead>
+                      <TableHead className="p-2">CRV No.</TableHead>
+                      <TableHead className="p-2">Date</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {supplierData.map((supplier, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="p-2">{supplier.suppNo}</TableCell>
+                        <TableCell className="p-2">{supplier.supplierName}</TableCell>
+                        <TableCell className="p-2">{supplier.supplierCode}</TableCell>
+                        <TableCell className="p-2">{supplier.invoiceNo}</TableCell>
+                        <TableCell className="p-2">{supplier.qty}</TableCell>
+                        <TableCell className="p-2">R{supplier.cost.toFixed(2)}</TableCell>
+                        <TableCell className="p-2">{supplier.crvNo}</TableCell>
+                        <TableCell className="p-2">{supplier.date}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
 
             <Separator className="my-4" />
 
             {/* Current Stock Information */}
             <div>
-              <h3 className="font-semibold mb-3">Current</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="p-2"></TableHead>
-                      <TableHead className="p-2">Current</TableHead>
-                      <TableHead className="p-2">Period 1</TableHead>
-                      <TableHead className="p-2">Period 2</TableHead>
-                      <TableHead className="p-2">Period 3</TableHead>
-                      <TableHead className="p-2">Average</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="p-2 font-medium">Total Sales</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="p-2 font-medium">Specials</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="p-2 font-medium">Transfers</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                      <TableCell className="p-2">0.000</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+              <h3 className="font-semibold mb-3">Current Stock Levels</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="border rounded-md p-4">
+                  <h4 className="font-medium mb-3 text-center">Sales History</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="p-2"></TableHead>
+                        <TableHead className="p-2">Current</TableHead>
+                        <TableHead className="p-2">Period 1</TableHead>
+                        <TableHead className="p-2">Period 2</TableHead>
+                        <TableHead className="p-2">Period 3</TableHead>
+                        <TableHead className="p-2">Average</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="p-2 font-medium">Total Sales</TableCell>
+                        <TableCell className="p-2">15.000</TableCell>
+                        <TableCell className="p-2">12.000</TableCell>
+                        <TableCell className="p-2">18.000</TableCell>
+                        <TableCell className="p-2">14.000</TableCell>
+                        <TableCell className="p-2">14.750</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="p-2 font-medium">Specials</TableCell>
+                        <TableCell className="p-2">2.000</TableCell>
+                        <TableCell className="p-2">3.000</TableCell>
+                        <TableCell className="p-2">1.000</TableCell>
+                        <TableCell className="p-2">2.000</TableCell>
+                        <TableCell className="p-2">2.000</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="p-2 font-medium">Transfers</TableCell>
+                        <TableCell className="p-2">5.000</TableCell>
+                        <TableCell className="p-2">3.000</TableCell>
+                        <TableCell className="p-2">4.000</TableCell>
+                        <TableCell className="p-2">6.000</TableCell>
+                        <TableCell className="p-2">4.500</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 p-3 border rounded-md">
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Act SDH</Label>
-                        <Badge variant="outline">0</Badge>
+                        <Badge variant="outline">15</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Sales Orders</Label>
-                        <Badge variant="outline">0</Badge>
+                        <Badge variant="outline">3</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Online Orders</Label>
-                        <Badge variant="outline">0</Badge>
+                        <Badge variant="outline">7</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Netto SDH</Label>
-                        <Badge variant="outline">0</Badge>
+                        <Badge variant="outline">12</Badge>
                       </div>
                     </div>
                     
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Cost Price</Label>
-                        <Badge variant="outline">0.00</Badge>
+                        <Badge variant="outline">25.99</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Model Stock</Label>
-                        <Badge variant="outline">0.00</Badge>
+                        <Badge variant="outline">50.00</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Qty On Order</Label>
-                        <Badge variant="outline">0</Badge>
+                        <Badge variant="outline">44</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 items-center">
                         <Label className="font-medium">Days/Stock</Label>
-                        <Badge variant="outline">-</Badge>
+                        <Badge variant="outline">12</Badge>
                       </div>
                     </div>
                   </div>
 
-                  <Separator />
-
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="p-2">Warehouse</TableHead>
-                        <TableHead className="p-2">Stock</TableHead>
-                        <TableHead className="p-2">On Order</TableHead>
-                        <TableHead className="p-2">Price</TableHead>
-                        <TableHead className="p-2">Act Price</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {warehouseData.map((warehouse, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="p-2 font-medium">{warehouse.name}</TableCell>
-                          <TableCell className="p-2">{warehouse.stock}</TableCell>
-                          <TableCell className="p-2">{warehouse.onOrder}</TableCell>
-                          <TableCell className="p-2">R{warehouse.price.toFixed(2)}</TableCell>
-                          <TableCell className="p-2">R{warehouse.actPrice.toFixed(2)}</TableCell>
+                  <div className="border rounded-md overflow-hidden">
+                    <h4 className="font-medium p-3 bg-gray-100">Warehouse Stock Levels</h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="p-2">Warehouse</TableHead>
+                          <TableHead className="p-2">Stock</TableHead>
+                          <TableHead className="p-2">On Order</TableHead>
+                          <TableHead className="p-2">Price</TableHead>
+                          <TableHead className="p-2">Act Price</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {warehouseData.map((warehouse, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="p-2 font-medium">{warehouse.name}</TableCell>
+                            <TableCell className="p-2">
+                              <Badge variant={warehouse.stock === 0 ? "destructive" : "outline"}>
+                                {warehouse.stock}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="p-2">{warehouse.onOrder}</TableCell>
+                            <TableCell className="p-2">R{warehouse.price.toFixed(2)}</TableCell>
+                            <TableCell className="p-2">R{warehouse.actPrice.toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </div>
             </div>
 
             <Separator className="my-4" />
 
-            {/* Sales and Transfers Section */}
+            {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="text-xs py-1">
-                Sales
+              <Button variant="outline" className="text-sm py-2">
+                View Sales History
               </Button>
-              <Button variant="outline" className="text-xs py-1">
-                Transfers
+              <Button variant="outline" className="text-sm py-2">
+                View Transfer History
               </Button>
             </div>
           </CardContent>
