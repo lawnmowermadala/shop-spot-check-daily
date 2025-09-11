@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -27,7 +28,6 @@ import IngredientsPage from "./pages/IngredientsPage";
 import POSTerminalPage from "./pages/POSTerminalPage";
 import SalesReportsPage from "./pages/SalesReportsPage";
 import CashRegisterPage from "./pages/CashRegisterPage";
-import StockInformationPage from "./pages/StockInformationPage"; // ADD THIS IMPORT
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,8 +62,8 @@ const App = () => {
             <Route path="/stock" element={<StockPage />} />
             <Route path="/promotions" element={<PromotionsPage />} />
             <Route path="/expired" element={<ExpiredStockPage />} />
-            <Route path="/expired-dispatch" element={<ExpiredStockDispatchPage />} />
-            <Route path="/expired-dispatch-report" element={<ExpiredStockDispatchReport />} />
+          <Route path="/expired-dispatch" element={<ExpiredStockDispatchPage />} />
+          <Route path="/expired-dispatch-report" element={<ExpiredStockDispatchReport />} />
             <Route path="/user-management" element={<UserManagementPage />} />
             <Route path="/recipes" element={<RecipePage />} />
             <Route path="/ingredients" element={<IngredientsPage />} />
@@ -72,9 +72,6 @@ const App = () => {
             <Route path="/pos" element={<POSTerminalPage />} />
             <Route path="/sales-reports" element={<SalesReportsPage />} />
             <Route path="/cash-register" element={<CashRegisterPage />} />
-            
-            {/* ADD THE STOCK INFORMATION ROUTE */}
-            <Route path="/stock-information" element={<StockInformationPage />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
