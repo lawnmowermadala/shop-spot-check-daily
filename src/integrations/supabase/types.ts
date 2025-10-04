@@ -769,22 +769,31 @@ export type Database = {
       }
       products: {
         Row: {
+          category: string | null
           code: string
           created_at: string | null
           id: string
           name: string
+          price: number | null
+          show_on_pos: boolean | null
         }
         Insert: {
+          category?: string | null
           code: string
           created_at?: string | null
           id?: string
           name: string
+          price?: number | null
+          show_on_pos?: boolean | null
         }
         Update: {
+          category?: string | null
           code?: string
           created_at?: string | null
           id?: string
           name?: string
+          price?: number | null
+          show_on_pos?: boolean | null
         }
         Relationships: []
       }

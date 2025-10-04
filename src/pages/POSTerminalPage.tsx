@@ -43,13 +43,14 @@ const POSTerminalPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Fetch products
+  // Fetch products that are enabled for POS
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('show_on_pos', true)
         .order('name');
       if (error) throw error;
       return data as Product[];
