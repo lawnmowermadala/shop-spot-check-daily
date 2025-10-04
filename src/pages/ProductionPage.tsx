@@ -631,7 +631,7 @@ const ProductionPage = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['batch_ingredients'] });
       setIngredientData({
         ingredient_name: '',
@@ -643,11 +643,86 @@ const ProductionPage = () => {
       
       // Update batch cost after adding ingredient
       if (activeBatchId) {
-        updateBatchMutation.mutate(activeBatchId);
+        await updateBatchCostMutation.mutateAsync(activeBatchId);
       }
     },
     onError: (error: Error) => {
       toast.error(error.message);
+    }
+  });
+
+  // Mutation to update batch costs (fixed cost per unit for recipes)
+  const updateBatchCostMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      // Get batch info including recipe_id
+      const { data: batch, error: batchError } = await supabase
+        .from('production_batches')
+        .select('quantity_produced, recipe_id')
+        .eq('id', batchId)
+        .single();
+      
+      if (batchError) throw batchError;
+
+      const { data: ingredients, error: ingredientsError } = await supabase
+        .from('production_ingredients')
+        .select('*')
+        .eq('batch_id', batchId);
+      
+      if (ingredientsError) throw ingredientsError;
+      
+      const totalIngredientCost = ingredients.reduce(
+        (sum, ingredient) => sum + (ingredient.quantity_used * ingredient.cost_per_unit),
+        0
+      );
+      
+      let costPerUnit = 0;
+
+      // If batch has a recipe, calculate fixed cost per unit from recipe
+      if (batch.recipe_id) {
+        const { data: recipe, error: recipeError } = await supabase
+          .from('recipes')
+          .select('batch_size')
+          .eq('id', batch.recipe_id)
+          .single();
+
+        if (recipeError) throw recipeError;
+
+        const { data: recipeIngredients, error: recipeIngrError } = await supabase
+          .from('recipe_ingredients')
+          .select('quantity, cost_per_unit')
+          .eq('recipe_id', batch.recipe_id);
+
+        if (recipeIngrError) throw recipeIngrError;
+
+        const originalRecipeTotalCost = recipeIngredients.reduce(
+          (sum, ing) => sum + (ing.quantity * ing.cost_per_unit),
+          0
+        );
+
+        // Fixed cost per unit based on recipe - NEVER changes with quantity
+        costPerUnit = recipe.batch_size > 0 ? originalRecipeTotalCost / recipe.batch_size : 0;
+      } else {
+        // No recipe: calculate dynamically (old behavior)
+        costPerUnit = batch.quantity_produced > 0 
+          ? totalIngredientCost / batch.quantity_produced 
+          : 0;
+      }
+      
+      const { error: updateError } = await supabase
+        .from('production_batches')
+        .update({
+          total_ingredient_cost: totalIngredientCost,
+          cost_per_unit: costPerUnit
+        })
+        .eq('id', batchId);
+      
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['production_batches'] });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update batch cost: ' + error.message);
     }
   });
 
@@ -661,13 +736,13 @@ const ProductionPage = () => {
 
       if (error) throw error;
     },
-    onSuccess: (_, ingredientId) => {
+    onSuccess: async (_, ingredientId) => {
       queryClient.invalidateQueries({ queryKey: ['batch_ingredients'] });
       toast.success('Ingredient removed successfully!');
       
       // Update batch cost after deleting ingredient
       if (activeBatchId) {
-        updateBatchMutation.mutate(activeBatchId);
+        await updateBatchCostMutation.mutateAsync(activeBatchId);
       }
     },
     onError: (error: Error) => {
@@ -698,7 +773,7 @@ const ProductionPage = () => {
         .eq('id', ingredientId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['batch_ingredients'] });
       setEditingIngredientId(null);
       setEditIngredientData({
@@ -708,9 +783,9 @@ const ProductionPage = () => {
         cost_per_unit: ''
       });
       toast.success('Ingredient updated successfully!');
-      // Optionally: update batch cost after editing ingredient
+      // Update batch cost after editing ingredient
       if (activeBatchId) {
-        updateBatchMutation.mutate(activeBatchId);
+        await updateBatchCostMutation.mutateAsync(activeBatchId);
       }
     },
     onError: (error: Error) => {
