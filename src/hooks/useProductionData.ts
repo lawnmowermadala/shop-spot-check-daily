@@ -263,6 +263,15 @@ export const useProductionData = (date: Date, comparisonDays: number, activeBatc
 
   const updateBatchCostMutation = useMutation({
     mutationFn: async (batchId: string) => {
+      // Get batch info including recipe_id
+      const { data: batch, error: batchError } = await supabase
+        .from('production_batches')
+        .select('quantity_produced, recipe_id')
+        .eq('id', batchId)
+        .single();
+      
+      if (batchError) throw batchError;
+
       const { data: ingredients, error: ingredientsError } = await supabase
         .from('production_ingredients')
         .select('*')
@@ -275,17 +284,38 @@ export const useProductionData = (date: Date, comparisonDays: number, activeBatc
         0
       );
       
-      const { data: batch, error: batchError } = await supabase
-        .from('production_batches')
-        .select('quantity_produced')
-        .eq('id', batchId)
-        .single();
-      
-      if (batchError) throw batchError;
-      
-      const costPerUnit = batch.quantity_produced > 0 
-        ? totalIngredientCost / batch.quantity_produced 
-        : 0;
+      let costPerUnit = 0;
+
+      // If batch has a recipe, calculate fixed cost per unit from recipe
+      if (batch.recipe_id) {
+        const { data: recipe, error: recipeError } = await supabase
+          .from('recipes')
+          .select('batch_size')
+          .eq('id', batch.recipe_id)
+          .single();
+
+        if (recipeError) throw recipeError;
+
+        const { data: recipeIngredients, error: recipeIngrError } = await supabase
+          .from('recipe_ingredients')
+          .select('quantity, cost_per_unit')
+          .eq('recipe_id', batch.recipe_id);
+
+        if (recipeIngrError) throw recipeIngrError;
+
+        const originalRecipeTotalCost = recipeIngredients.reduce(
+          (sum, ing) => sum + (ing.quantity * ing.cost_per_unit),
+          0
+        );
+
+        // Fixed cost per unit based on recipe - NEVER changes with quantity
+        costPerUnit = recipe.batch_size > 0 ? originalRecipeTotalCost / recipe.batch_size : 0;
+      } else {
+        // No recipe: calculate dynamically (old behavior)
+        costPerUnit = batch.quantity_produced > 0 
+          ? totalIngredientCost / batch.quantity_produced 
+          : 0;
+      }
       
       const { error: updateError } = await supabase
         .from('production_batches')
