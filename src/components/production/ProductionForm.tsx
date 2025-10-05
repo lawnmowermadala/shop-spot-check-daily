@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle } from 'lucide-react';
 
 interface Recipe {
   id: string;
@@ -56,6 +56,7 @@ const ProductionForm = ({
   onRecipeSelected
 }: ProductionFormProps) => {
   const [fetchingDefaultRecipe, setFetchingDefaultRecipe] = useState(false);
+  const [autoSelectedRecipe, setAutoSelectedRecipe] = useState(false);
   const [productionData, setProductionData] = useState({
     product_id: '',
     recipe_id: '',
@@ -70,7 +71,9 @@ const ProductionForm = ({
   }, [productionData.recipe_id, onRecipeSelected]);
 
   const handleProductChange = async (productId: string) => {
+    // Reset recipe selection and auto-selected flag when product changes
     setProductionData({...productionData, product_id: productId, recipe_id: ''});
+    setAutoSelectedRecipe(false);
     
     if (!productId) return;
     
@@ -89,7 +92,8 @@ const ProductionForm = ({
       if (defaultRecipe && defaultRecipe.recipe_id) {
         console.log('Found default recipe:', defaultRecipe.recipe_id);
         setProductionData(prev => ({...prev, recipe_id: defaultRecipe.recipe_id}));
-        toast.success('Default recipe auto-selected');
+        setAutoSelectedRecipe(true);
+        toast.success('Default recipe auto-selected (you can change it if needed)');
         setFetchingDefaultRecipe(false);
         return;
       }
@@ -125,7 +129,8 @@ const ProductionForm = ({
         console.log('Most used recipe ID:', mostUsedRecipeId);
         
         setProductionData(prev => ({...prev, recipe_id: mostUsedRecipeId}));
-        toast.success('Recipe selected based on production history');
+        setAutoSelectedRecipe(true);
+        toast.success('Recipe auto-selected based on history (you can change it)');
       } else {
         console.log('No previous batches found for this product');
       }
@@ -139,6 +144,7 @@ const ProductionForm = ({
 
   const handleRecipeChange = (recipeId: string) => {
     setProductionData({...productionData, recipe_id: recipeId});
+    setAutoSelectedRecipe(false); // User manually changed the recipe
   };
 
   const calculateOriginalRecipeTotalCost = () => {
@@ -198,9 +204,9 @@ const ProductionForm = ({
             .insert({
               batch_id: batchData.id,
               ingredient_name: ingredient.ingredient_name,
-              quantity_used: ingredient.quantity * ingredientScaleFactor, // Scale ingredient quantity
+              quantity_used: ingredient.quantity * ingredientScaleFactor,
               unit: ingredient.unit,
-              cost_per_unit: ingredient.cost_per_unit // Keep original cost per unit
+              cost_per_unit: ingredient.cost_per_unit
             })
         );
 
@@ -217,7 +223,7 @@ const ProductionForm = ({
           .from('production_batches')
           .update({
             total_ingredient_cost: totalCostForNewQuantity,
-            cost_per_unit: originalCostPerUnit // FIXED cost per unit - never changes
+            cost_per_unit: originalCostPerUnit
           })
           .eq('id', batchData.id);
       }
@@ -230,6 +236,7 @@ const ProductionForm = ({
         staff_id: '',
         notes: ''
       });
+      setAutoSelectedRecipe(false);
       onBatchCreated();
     } catch (error: any) {
       console.error('Error creating production batch:', error);
@@ -279,7 +286,6 @@ const ProductionForm = ({
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Product Dropdown Select with enhanced search */}
           <div>
             <Label htmlFor="product">Product *</Label>
             <Select value={productionData.product_id} onValueChange={handleProductChange}>
@@ -291,16 +297,31 @@ const ProductionForm = ({
           </div>
 
           <div>
-            <Label htmlFor="recipe">
+            <Label htmlFor="recipe" className="flex items-center gap-2">
               Recipe (Optional)
-              {fetchingDefaultRecipe && <Loader2 className="inline ml-2 h-4 w-4 animate-spin" />}
+              {fetchingDefaultRecipe && <Loader2 className="h-4 w-4 animate-spin" />}
+              {autoSelectedRecipe && !fetchingDefaultRecipe && (
+                <span className="flex items-center text-xs text-green-600">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Auto-selected
+                </span>
+              )}
             </Label>
-            <Select value={productionData.recipe_id} onValueChange={handleRecipeChange} disabled={fetchingDefaultRecipe}>
-              <SelectTrigger>
+            <Select 
+              value={productionData.recipe_id} 
+              onValueChange={handleRecipeChange} 
+              disabled={fetchingDefaultRecipe}
+            >
+              <SelectTrigger className={autoSelectedRecipe ? "border-green-500" : ""}>
                 <SelectValue placeholder="Select a recipe..." />
               </SelectTrigger>
               <SelectContent items={recipeItems} searchable={true} />
             </Select>
+            {autoSelectedRecipe && (
+              <p className="text-xs text-gray-500 mt-1">
+                Recipe was automatically selected. You can change it if needed.
+              </p>
+            )}
           </div>
 
           <div>
@@ -404,3 +425,4 @@ const ProductionForm = ({
 };
 
 export default ProductionForm;
+/////////////////////////////////////////////////////////////////////////////////////////
