@@ -408,11 +408,12 @@ const ProductionPage = () => {
     }, 0);
   };
 
-  // Calculate cost per unit for production batch
+  // Calculate cost per unit for production batch (FIXED - based on recipe batch size, not production quantity)
   const calculateProductionCostPerUnit = () => {
     const totalRecipeCost = calculateRecipeTotalCost();
-    const quantity = Number(productionData.quantity_produced) || 0;
-    return quantity > 0 ? totalRecipeCost / quantity : 0;
+    const selectedRecipe = recipes.find(r => r.id === productionData.recipe_id);
+    const recipeBatchSize = selectedRecipe?.batch_size || 1;
+    return recipeBatchSize > 0 ? totalRecipeCost / recipeBatchSize : 0;
   };
 
   // Calculate scaled ingredient costs for production quantity
