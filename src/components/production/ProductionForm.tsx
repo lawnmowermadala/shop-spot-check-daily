@@ -57,7 +57,8 @@ const ProductionForm = ({
 }: ProductionFormProps) => {
   const [fetchingDefaultRecipe, setFetchingDefaultRecipe] = useState(false);
   const [autoSelectedRecipe, setAutoSelectedRecipe] = useState(false);
-  const [productRecipeIds, setProductRecipeIds] = useState<string[]>([]);
+  const [productRecipes, setProductRecipes] = useState<{product_id: string, recipe_id: string}[]>([]);
+  const [fetchingProductRecipes, setFetchingProductRecipes] = useState(false);
   const [productionData, setProductionData] = useState({
     product_id: '',
     recipe_id: '',
@@ -66,6 +67,30 @@ const ProductionForm = ({
     notes: ''
   });
 
+  // Fetch product-recipes relationships
+  useEffect(() => {
+    const fetchProductRecipes = async () => {
+      setFetchingProductRecipes(true);
+      try {
+        const { data, error } = await supabase
+          .from('product_recipes')
+          .select('product_id, recipe_id');
+        
+        if (error) {
+          console.error('Error fetching product recipes:', error);
+        } else {
+          setProductRecipes(data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching product recipes:', error);
+      } finally {
+        setFetchingProductRecipes(false);
+      }
+    };
+
+    fetchProductRecipes();
+  }, []);
+
   // Update parent component when recipe changes
   useEffect(() => {
     onRecipeSelected(productionData.recipe_id || null);
@@ -73,9 +98,8 @@ const ProductionForm = ({
 
   const handleProductChange = async (productId: string) => {
     // Reset recipe selection and auto-selected flag when product changes
-    setProductionData(prev => ({...prev, product_id: productId, recipe_id: ''}));
+    setProductionData({...productionData, product_id: productId, recipe_id: ''});
     setAutoSelectedRecipe(false);
-    setProductRecipeIds([]);
     
     if (!productId) return;
     
@@ -83,27 +107,21 @@ const ProductionForm = ({
     console.log('Fetching default recipe for product:', productId);
     
     try {
-      // Fetch all recipes associated with this product
-      const { data: productRecipes, error: productRecipesError } = await supabase
+      // First, check if there's a default recipe for this product in product_recipes table
+      const { data: defaultRecipe, error: defaultRecipeError } = await supabase
         .from('product_recipes')
-        .select('recipe_id, is_default, recipes(name)')
-        .eq('product_id', productId);
+        .select('recipe_id, recipes(name)')
+        .eq('product_id', productId)
+        .eq('is_default', true)
+        .single();
 
-      if (productRecipes && productRecipes.length > 0) {
-        const recipeIds = productRecipes.map(pr => pr.recipe_id);
-        setProductRecipeIds(recipeIds);
-
-        // Check if there's a default recipe
-        const defaultRecipe = productRecipes.find(pr => pr.is_default);
-        
-        if (defaultRecipe && defaultRecipe.recipe_id) {
-          console.log('Found default recipe:', defaultRecipe.recipe_id);
-          setProductionData(prev => ({...prev, recipe_id: defaultRecipe.recipe_id}));
-          setAutoSelectedRecipe(true);
-          toast.success('Default recipe auto-selected (you can change it if needed)');
-          setFetchingDefaultRecipe(false);
-          return;
-        }
+      if (defaultRecipe && defaultRecipe.recipe_id) {
+        console.log('Found default recipe:', defaultRecipe.recipe_id);
+        setProductionData(prev => ({...prev, recipe_id: defaultRecipe.recipe_id}));
+        setAutoSelectedRecipe(true);
+        toast.success('Default recipe auto-selected (you can change it if needed)');
+        setFetchingDefaultRecipe(false);
+        return;
       }
 
       // If no default recipe, fall back to most frequently used recipe
@@ -151,8 +169,58 @@ const ProductionForm = ({
   };
 
   const handleRecipeChange = (recipeId: string) => {
-    setProductionData(prev => ({...prev, recipe_id: recipeId}));
+    setProductionData({...productionData, recipe_id: recipeId});
     setAutoSelectedRecipe(false); // User manually changed the recipe
+  };
+
+  // Get recipes associated with the selected product
+  const getAvailableRecipes = () => {
+    if (!productionData.product_id) {
+      // If no product selected, show all recipes plus "No Recipe" option
+      return [
+        { 
+          id: 'no-recipe', 
+          value: '', 
+          label: 'No Recipe', 
+          name: 'No Recipe',
+          searchTerms: 'no recipe'
+        },
+        ...recipes.map(recipe => ({
+          id: recipe.id,
+          value: recipe.id,
+          label: `${recipe.name} (${recipe.batch_size} ${recipe.unit})`,
+          name: recipe.name,
+          searchTerms: `${recipe.name} ${recipe.batch_size} ${recipe.unit}`.toLowerCase()
+        }))
+      ];
+    }
+
+    // Get recipe IDs associated with the selected product
+    const associatedRecipeIds = productRecipes
+      .filter(pr => pr.product_id === productionData.product_id)
+      .map(pr => pr.recipe_id);
+
+    // Filter recipes to only show those associated with the selected product
+    const availableRecipes = recipes.filter(recipe => 
+      associatedRecipeIds.includes(recipe.id)
+    );
+
+    return [
+      { 
+        id: 'no-recipe', 
+        value: '', 
+        label: 'No Recipe', 
+        name: 'No Recipe',
+        searchTerms: 'no recipe'
+      },
+      ...availableRecipes.map(recipe => ({
+        id: recipe.id,
+        value: recipe.id,
+        label: `${recipe.name} (${recipe.batch_size} ${recipe.unit})`,
+        name: recipe.name,
+        searchTerms: `${recipe.name} ${recipe.batch_size} ${recipe.unit}`.toLowerCase()
+      }))
+    ];
   };
 
   const calculateOriginalRecipeTotalCost = () => {
@@ -261,27 +329,7 @@ const ProductionForm = ({
     searchTerms: `${product.code} ${product.name}`.toLowerCase()
   }));
 
-  // Filter recipes based on selected product
-  const filteredRecipes = productionData.product_id && productRecipeIds.length > 0
-    ? recipes.filter(recipe => productRecipeIds.includes(recipe.id))
-    : recipes;
-
-  const recipeItems = [
-    { 
-      id: 'no-recipe', 
-      value: '', 
-      label: 'No Recipe', 
-      name: 'No Recipe',
-      searchTerms: 'no recipe'
-    },
-    ...filteredRecipes.map(recipe => ({
-      id: recipe.id,
-      value: recipe.id,
-      label: `${recipe.name} (${recipe.batch_size} ${recipe.unit})`,
-      name: recipe.name,
-      searchTerms: `${recipe.name} ${recipe.batch_size} ${recipe.unit}`.toLowerCase()
-    }))
-  ];
+  const recipeItems = getAvailableRecipes();
 
   const staffItems = staffMembers.map(staff => ({
     id: staff.id.toString(),
@@ -323,16 +371,23 @@ const ProductionForm = ({
             <Select 
               value={productionData.recipe_id} 
               onValueChange={handleRecipeChange} 
-              disabled={fetchingDefaultRecipe}
+              disabled={fetchingDefaultRecipe || fetchingProductRecipes}
             >
               <SelectTrigger className={autoSelectedRecipe ? "border-green-500" : ""}>
-                <SelectValue placeholder="Select a recipe..." />
+                <SelectValue placeholder={
+                  fetchingProductRecipes ? "Loading recipes..." : "Select a recipe..."
+                } />
               </SelectTrigger>
               <SelectContent items={recipeItems} searchable={true} />
             </Select>
             {autoSelectedRecipe && (
               <p className="text-xs text-gray-500 mt-1">
                 Recipe was automatically selected. You can change it if needed.
+              </p>
+            )}
+            {productionData.product_id && !autoSelectedRecipe && (
+              <p className="text-xs text-gray-500 mt-1">
+                Showing only recipes associated with this product
               </p>
             )}
           </div>
