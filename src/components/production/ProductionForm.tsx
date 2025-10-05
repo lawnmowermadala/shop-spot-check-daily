@@ -78,6 +78,23 @@ const ProductionForm = ({
     console.log('Fetching default recipe for product:', productId);
     
     try {
+      // First, check if there's a default recipe for this product in product_recipes table
+      const { data: defaultRecipe, error: defaultRecipeError } = await supabase
+        .from('product_recipes')
+        .select('recipe_id, recipes(name)')
+        .eq('product_id', productId)
+        .eq('is_default', true)
+        .single();
+
+      if (defaultRecipe && defaultRecipe.recipe_id) {
+        console.log('Found default recipe:', defaultRecipe.recipe_id);
+        setProductionData(prev => ({...prev, recipe_id: defaultRecipe.recipe_id}));
+        toast.success('Default recipe auto-selected');
+        setFetchingDefaultRecipe(false);
+        return;
+      }
+
+      // If no default recipe, fall back to most frequently used recipe
       const { data: batches, error } = await supabase
         .from('production_batches')
         .select('recipe_id, recipes(name)')
@@ -108,7 +125,7 @@ const ProductionForm = ({
         console.log('Most used recipe ID:', mostUsedRecipeId);
         
         setProductionData(prev => ({...prev, recipe_id: mostUsedRecipeId}));
-        toast.success('Default recipe selected based on production history');
+        toast.success('Recipe selected based on production history');
       } else {
         console.log('No previous batches found for this product');
       }
