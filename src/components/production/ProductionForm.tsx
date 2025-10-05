@@ -73,7 +73,7 @@ const ProductionForm = ({
 
   const handleProductChange = async (productId: string) => {
     // Reset recipe selection and auto-selected flag when product changes
-    setProductionData({...productionData, product_id: productId, recipe_id: ''});
+    setProductionData(prev => ({...prev, product_id: productId, recipe_id: ''}));
     setAutoSelectedRecipe(false);
     setProductRecipeIds([]);
     
@@ -151,7 +151,7 @@ const ProductionForm = ({
   };
 
   const handleRecipeChange = (recipeId: string) => {
-    setProductionData({...productionData, recipe_id: recipeId});
+    setProductionData(prev => ({...prev, recipe_id: recipeId}));
     setAutoSelectedRecipe(false); // User manually changed the recipe
   };
 
