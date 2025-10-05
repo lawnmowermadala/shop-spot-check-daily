@@ -57,6 +57,7 @@ const ProductionForm = ({
 }: ProductionFormProps) => {
   const [fetchingDefaultRecipe, setFetchingDefaultRecipe] = useState(false);
   const [autoSelectedRecipe, setAutoSelectedRecipe] = useState(false);
+  const [productRecipeIds, setProductRecipeIds] = useState<string[]>([]);
   const [productionData, setProductionData] = useState({
     product_id: '',
     recipe_id: '',
@@ -74,6 +75,7 @@ const ProductionForm = ({
     // Reset recipe selection and auto-selected flag when product changes
     setProductionData({...productionData, product_id: productId, recipe_id: ''});
     setAutoSelectedRecipe(false);
+    setProductRecipeIds([]);
     
     if (!productId) return;
     
@@ -81,21 +83,27 @@ const ProductionForm = ({
     console.log('Fetching default recipe for product:', productId);
     
     try {
-      // First, check if there's a default recipe for this product in product_recipes table
-      const { data: defaultRecipe, error: defaultRecipeError } = await supabase
+      // Fetch all recipes associated with this product
+      const { data: productRecipes, error: productRecipesError } = await supabase
         .from('product_recipes')
-        .select('recipe_id, recipes(name)')
-        .eq('product_id', productId)
-        .eq('is_default', true)
-        .single();
+        .select('recipe_id, is_default, recipes(name)')
+        .eq('product_id', productId);
 
-      if (defaultRecipe && defaultRecipe.recipe_id) {
-        console.log('Found default recipe:', defaultRecipe.recipe_id);
-        setProductionData(prev => ({...prev, recipe_id: defaultRecipe.recipe_id}));
-        setAutoSelectedRecipe(true);
-        toast.success('Default recipe auto-selected (you can change it if needed)');
-        setFetchingDefaultRecipe(false);
-        return;
+      if (productRecipes && productRecipes.length > 0) {
+        const recipeIds = productRecipes.map(pr => pr.recipe_id);
+        setProductRecipeIds(recipeIds);
+
+        // Check if there's a default recipe
+        const defaultRecipe = productRecipes.find(pr => pr.is_default);
+        
+        if (defaultRecipe && defaultRecipe.recipe_id) {
+          console.log('Found default recipe:', defaultRecipe.recipe_id);
+          setProductionData(prev => ({...prev, recipe_id: defaultRecipe.recipe_id}));
+          setAutoSelectedRecipe(true);
+          toast.success('Default recipe auto-selected (you can change it if needed)');
+          setFetchingDefaultRecipe(false);
+          return;
+        }
       }
 
       // If no default recipe, fall back to most frequently used recipe
@@ -253,6 +261,11 @@ const ProductionForm = ({
     searchTerms: `${product.code} ${product.name}`.toLowerCase()
   }));
 
+  // Filter recipes based on selected product
+  const filteredRecipes = productionData.product_id && productRecipeIds.length > 0
+    ? recipes.filter(recipe => productRecipeIds.includes(recipe.id))
+    : recipes;
+
   const recipeItems = [
     { 
       id: 'no-recipe', 
@@ -261,7 +274,7 @@ const ProductionForm = ({
       name: 'No Recipe',
       searchTerms: 'no recipe'
     },
-    ...recipes.map(recipe => ({
+    ...filteredRecipes.map(recipe => ({
       id: recipe.id,
       value: recipe.id,
       label: `${recipe.name} (${recipe.batch_size} ${recipe.unit})`,
