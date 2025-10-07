@@ -97,7 +97,8 @@ const ProductionForm = ({
   }, [productionData.recipe_id, onRecipeSelected]);
 
   const handleProductChange = async (productId: string) => {
-    console.log('🔵 Product changed to:', productId);
+    console.log('PRODUCT CHANGED TO:', productId);
+    console.log('handleProductChange called with:', productId);
     
     // Reset recipe selection and auto-selected flag when product changes
     setProductionData(prev => {
