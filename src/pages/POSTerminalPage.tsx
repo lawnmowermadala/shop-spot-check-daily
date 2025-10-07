@@ -234,9 +234,29 @@ const POSTerminalPage = () => {
                 </div>
                 <div className="flex gap-2 mt-4">
                   <Input
-                    placeholder="Search products..."
+                    placeholder="Search products or enter product code..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && searchTerm.trim()) {
+                        // Try to find exact match by code first
+                        const exactMatch = products.find(p => 
+                          p.code.toLowerCase() === searchTerm.toLowerCase().trim()
+                        );
+                        if (exactMatch) {
+                          addToCart(exactMatch);
+                          setSearchTerm('');
+                        } else {
+                          // If no exact match, try first filtered result
+                          if (filteredProducts.length > 0) {
+                            addToCart(filteredProducts[0]);
+                            setSearchTerm('');
+                          } else {
+                            toast.error('Product not found');
+                          }
+                        }
+                      }
+                    }}
                     className="flex-1 bg-white"
                   />
                   <Dialog open={showScanner} onOpenChange={setShowScanner}>
