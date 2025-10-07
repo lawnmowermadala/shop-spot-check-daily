@@ -17,6 +17,7 @@ interface Product {
   id: string;
   name: string;
   code: string;
+  show_on_pos?: boolean;
   created_at?: string;
 }
 
@@ -81,6 +82,25 @@ const ProductsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       resetForm();
       toast.success(isEditing ? "Product updated successfully!" : "Product added successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    }
+  });
+
+  // Enable all products for POS
+  const enableAllForPOS = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('products')
+        .update({ show_on_pos: true })
+        .eq('show_on_pos', false);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success("All products enabled for POS!");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -249,7 +269,16 @@ const ProductsPage = () => {
       {/* Products List */}
       <Card>
         <CardHeader>
-          <CardTitle>Products List ({products.length} products)</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Products List ({products.length} products)</CardTitle>
+            <Button 
+              onClick={() => enableAllForPOS.mutate()}
+              disabled={enableAllForPOS.isPending}
+              variant="outline"
+            >
+              Enable All for POS
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
