@@ -97,14 +97,22 @@ const ProductionForm = ({
   }, [productionData.recipe_id, onRecipeSelected]);
 
   const handleProductChange = async (productId: string) => {
+    console.log('🔵 Product changed to:', productId);
+    
     // Reset recipe selection and auto-selected flag when product changes
-    setProductionData(prev => ({...prev, product_id: productId, recipe_id: ''}));
+    setProductionData(prev => {
+      console.log('🔵 Resetting recipe_id, prev state:', prev);
+      return {...prev, product_id: productId, recipe_id: ''};
+    });
     setAutoSelectedRecipe(false);
     
-    if (!productId) return;
+    if (!productId) {
+      console.log('🔵 No product selected, returning');
+      return;
+    }
     
     setFetchingDefaultRecipe(true);
-    console.log('Fetching default recipe for product:', productId);
+    console.log('🔵 Fetching default recipe for product:', productId);
     
     try {
       // First, check if there's a default recipe for this product in product_recipes table
@@ -113,33 +121,39 @@ const ProductionForm = ({
         .select('recipe_id, recipes(name)')
         .eq('product_id', productId)
         .eq('is_default', true)
-        .single();
+        .maybeSingle();
+
+      console.log('🔵 Default recipe query result:', { defaultRecipe, defaultRecipeError });
 
       if (defaultRecipe && defaultRecipe.recipe_id) {
-        console.log('Found default recipe:', defaultRecipe.recipe_id);
-        setProductionData(prev => ({...prev, recipe_id: defaultRecipe.recipe_id}));
+        console.log('🟢 Found default recipe:', defaultRecipe.recipe_id);
+        setProductionData(prev => {
+          console.log('🟢 Setting default recipe, prev:', prev);
+          return {...prev, recipe_id: defaultRecipe.recipe_id};
+        });
         setAutoSelectedRecipe(true);
-        toast.success('Default recipe auto-selected (you can change it if needed)');
+        toast.success('Default recipe auto-selected');
         setFetchingDefaultRecipe(false);
         return;
       }
 
       // If no default recipe, fall back to most frequently used recipe
+      console.log('🔵 No default recipe, checking production batches...');
       const { data: batches, error } = await supabase
         .from('production_batches')
         .select('recipe_id, recipes(name)')
         .eq('product_id', productId)
         .not('recipe_id', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(50);
 
       if (error) {
-        console.error('Error fetching production batches:', error);
+        console.error('🔴 Error fetching production batches:', error);
         setFetchingDefaultRecipe(false);
         return;
       }
 
-      console.log('Found batches:', batches);
+      console.log('🔵 Found batches:', batches?.length, batches);
 
       if (batches && batches.length > 0) {
         const recipeCounts = batches.reduce((acc: Record<string, number>, batch) => {
@@ -149,21 +163,26 @@ const ProductionForm = ({
           return acc;
         }, {});
 
+        console.log('🔵 Recipe counts:', recipeCounts);
+
         const mostUsedRecipeId = Object.entries(recipeCounts)
           .sort(([,a], [,b]) => b - a)[0][0];
 
-        console.log('Most used recipe ID:', mostUsedRecipeId);
+        console.log('🟢 Most used recipe ID:', mostUsedRecipeId);
         
-        setProductionData(prev => ({...prev, recipe_id: mostUsedRecipeId}));
+        setProductionData(prev => {
+          console.log('🟢 Setting most-used recipe, prev:', prev);
+          return {...prev, recipe_id: mostUsedRecipeId};
+        });
         setAutoSelectedRecipe(true);
-        toast.success('Recipe auto-selected based on history (you can change it)');
+        toast.success('Recipe auto-selected based on history');
       } else {
-        console.log('No previous batches found for this product');
+        console.log('🟡 No previous batches found for this product');
       }
       
       setFetchingDefaultRecipe(false);
     } catch (error) {
-      console.error('Error fetching default recipe:', error);
+      console.error('🔴 Error in handleProductChange:', error);
       setFetchingDefaultRecipe(false);
     }
   };
