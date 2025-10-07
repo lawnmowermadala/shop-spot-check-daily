@@ -98,7 +98,7 @@ const ProductionForm = ({
 
   const handleProductChange = async (productId: string) => {
     // Reset recipe selection and auto-selected flag when product changes
-    setProductionData({...productionData, product_id: productId, recipe_id: ''});
+    setProductionData(prev => ({...prev, product_id: productId, recipe_id: ''}));
     setAutoSelectedRecipe(false);
     
     if (!productId) return;
