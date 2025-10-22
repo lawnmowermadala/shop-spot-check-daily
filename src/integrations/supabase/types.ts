@@ -1019,6 +1019,7 @@ export type Database = {
       }
       staff: {
         Row: {
+          active: boolean
           created_at: string | null
           department_id: number | null
           email: string | null
@@ -1027,6 +1028,7 @@ export type Database = {
           new_id: string | null
         }
         Insert: {
+          active?: boolean
           created_at?: string | null
           department_id?: number | null
           email?: string | null
@@ -1035,6 +1037,7 @@ export type Database = {
           new_id?: string | null
         }
         Update: {
+          active?: boolean
           created_at?: string | null
           department_id?: number | null
           email?: string | null
@@ -1081,10 +1084,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_transaction_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_transaction_number: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never

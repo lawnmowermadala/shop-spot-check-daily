@@ -3,8 +3,10 @@ import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
+import { Pencil, Trash2, Eye, EyeOff } from "lucide-react";
 
 interface Department {
   id: number;
@@ -16,6 +18,7 @@ interface Staff {
   name: string;
   department_id: number;
   department_name?: string;
+  active?: boolean;
 }
 
 export default function StaffPage() {
@@ -25,6 +28,10 @@ export default function StaffPage() {
   const [departmentId, setDepartmentId] = useState('');
   const [loadingDepts, setLoadingDepts] = useState(true);
   const [loadingStaff, setLoadingStaff] = useState(true);
+  const [showInactive, setShowInactive] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDepartmentId, setEditDepartmentId] = useState('');
 
   useEffect(() => {
     fetchDepartments();
@@ -60,13 +67,19 @@ export default function StaffPage() {
       setLoadingStaff(true);
       console.log("Fetching staff members...");
       // Join staff with departments to get department names
-      const { data, error } = await supabase
+      let query = supabase
         .from('staff')
         .select(`
           *,
           departments:department_id (name)
-        `)
-        .order('name'); // Sort by staff name
+        `);
+      
+      // Filter by active status if showInactive is false
+      if (!showInactive) {
+        query = query.eq('active', true);
+      }
+      
+      const { data, error } = await query.order('name');
 
       if (error) {
         console.error("Error fetching staff:", error);
@@ -79,7 +92,8 @@ export default function StaffPage() {
         id: item.id,
         name: item.name,
         department_id: item.department_id,
-        department_name: item.departments?.name || 'No Department'
+        department_name: item.departments?.name || 'No Department',
+        active: item.active
       })) || [];
 
       setStaff(staffWithDeptNames);
@@ -130,6 +144,66 @@ export default function StaffPage() {
     }
   }
 
+  async function handleEdit(person: Staff) {
+    setEditingStaff(person);
+    setEditName(person.name);
+    setEditDepartmentId(person.department_id.toString());
+  }
+
+  async function handleUpdate() {
+    if (!editingStaff) return;
+    
+    if (!editName.trim()) {
+      toast.error("Please enter a staff name");
+      return;
+    }
+
+    if (!editDepartmentId) {
+      toast.error("Please select a department");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('staff')
+        .update({ 
+          name: editName.trim(), 
+          department_id: parseInt(editDepartmentId) 
+        })
+        .eq('id', editingStaff.id);
+
+      if (error) throw error;
+
+      toast.success("Staff member updated successfully");
+      setEditingStaff(null);
+      fetchStaff();
+    } catch (error) {
+      toast.error("Error updating staff member");
+      console.error("Error updating staff:", error);
+    }
+  }
+
+  async function handleToggleActive(person: Staff) {
+    try {
+      const { error } = await supabase
+        .from('staff')
+        .update({ active: !person.active })
+        .eq('id', person.id);
+
+      if (error) throw error;
+
+      toast.success(person.active ? "Staff member deactivated" : "Staff member activated");
+      fetchStaff();
+    } catch (error) {
+      toast.error("Error updating staff status");
+      console.error("Error updating staff status:", error);
+    }
+  }
+
+  useEffect(() => {
+    fetchStaff();
+  }, [showInactive]);
+
   const departmentOptions = departments.map((dept) => ({
     value: dept.id.toString(),
     label: dept.name,
@@ -161,15 +235,52 @@ export default function StaffPage() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-2">Staff List</h2>
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-semibold">Staff List</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowInactive(!showInactive)}
+          >
+            {showInactive ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
+            {showInactive ? "Hide Inactive" : "Show Inactive"}
+          </Button>
+        </div>
         {loadingStaff ? (
           <p className="text-center text-gray-500">Loading staff members...</p>
         ) : staff.length > 0 ? (
           <div className="space-y-2">
             {staff.map((person) => (
-              <div key={person.id} className="p-3 border rounded bg-white shadow-sm">
-                <div className="font-medium">{person.name}</div>
-                <div className="text-sm text-gray-600">{person.department_name}</div>
+              <div key={person.id} className={`p-3 border rounded shadow-sm ${person.active === false ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="font-medium">
+                      {person.name}
+                      {person.active === false && <span className="ml-2 text-xs text-gray-500">(Inactive)</span>}
+                    </div>
+                    <div className="text-sm text-gray-600">{person.department_name}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(person)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleActive(person)}
+                    >
+                      {person.active === false ? (
+                        <Eye className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -177,6 +288,38 @@ export default function StaffPage() {
           <p className="text-center text-gray-500">No staff members found</p>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingStaff} onOpenChange={(open) => !open && setEditingStaff(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Staff Member</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Staff Name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+            />
+            
+            <Select value={editDepartmentId} onValueChange={setEditDepartmentId} required>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Department" />
+              </SelectTrigger>
+              <SelectContent items={departmentOptions} />
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingStaff(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate}>
+              Update
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <Navigation />
     </div>
