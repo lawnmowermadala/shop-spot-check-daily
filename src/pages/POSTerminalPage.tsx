@@ -29,6 +29,7 @@ interface Product {
   code: string;
   price: number;
   category: string;
+  show_on_pos?: boolean;
 }
 
 const POSTerminalPage = () => {
@@ -43,25 +44,25 @@ const POSTerminalPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Fetch products that are enabled for POS
+  // Fetch all products (for search/barcode), but display only enabled ones
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('show_on_pos', true)
         .order('name');
       if (error) throw error;
       return data as Product[];
     },
   });
 
-  // Get unique categories
-  const categories = [...new Set(products.map(product => product.category))].filter(Boolean);
+  // Get unique categories from enabled products only
+  const enabledProducts = products.filter(p => p.show_on_pos);
+  const categories = [...new Set(enabledProducts.map(product => product.category))].filter(Boolean);
 
-  // Filter products by search term and category
-  const filteredProducts = products.filter(product =>
+  // Filter products by search term and category - only show enabled products in grid
+  const filteredProducts = enabledProducts.filter(product =>
     (product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.code.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (activeCategory === '' || product.category === activeCategory)
