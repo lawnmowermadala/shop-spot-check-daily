@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, Eye, EyeOff } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/sonner';
@@ -88,19 +88,19 @@ const ProductsPage = () => {
     }
   });
 
-  // Enable all products for POS
-  const enableAllForPOS = useMutation({
-    mutationFn: async () => {
+  // Toggle product POS visibility
+  const togglePOSVisibility = useMutation({
+    mutationFn: async ({ productId, currentStatus }: { productId: string; currentStatus: boolean }) => {
       const { error } = await supabase
         .from('products')
-        .update({ show_on_pos: true })
-        .eq('show_on_pos', false);
+        .update({ show_on_pos: !currentStatus })
+        .eq('id', productId);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success("All products enabled for POS!");
+      toast.success("Product POS visibility updated!");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -269,16 +269,7 @@ const ProductsPage = () => {
       {/* Products List */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Products List ({products.length} products)</CardTitle>
-            <Button 
-              onClick={() => enableAllForPOS.mutate()}
-              disabled={enableAllForPOS.isPending}
-              variant="outline"
-            >
-              Enable All for POS
-            </Button>
-          </div>
+          <CardTitle>Products List ({products.length} products)</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -289,6 +280,7 @@ const ProductsPage = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Code</TableHead>
+                  <TableHead>Show on POS</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -297,6 +289,23 @@ const ProductsPage = () => {
                   <TableRow key={product.id}>
                     <TableCell>{product.name}</TableCell>
                     <TableCell>{product.code}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => togglePOSVisibility.mutate({ 
+                          productId: product.id, 
+                          currentStatus: product.show_on_pos || false 
+                        })}
+                        disabled={togglePOSVisibility.isPending}
+                      >
+                        {product.show_on_pos ? (
+                          <Eye className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <EyeOff className="h-4 w-4 text-gray-400" />
+                        )}
+                      </Button>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button 
