@@ -22,6 +22,8 @@ interface ExpiredItem {
   batch_date: string;
   removal_date: string;
   created_at?: string;
+  cost_per_unit?: number;
+  selling_price?: number;
 }
 
 interface DispatchRecord {
@@ -514,6 +516,8 @@ const ExpiredStockDispatchPage = () => {
               ) : (
                 filteredRecords.map((record) => {
                   const item = expiredItems.find(i => i.id === record.expired_item_id);
+                  const unitValue = item?.cost_per_unit || item?.selling_price || 0;
+                  const totalValue = unitValue * record.quantity_dispatched;
                   return (
                     <div key={record.id} className="p-3 border rounded-lg">
                       <div className="flex justify-between items-start">
@@ -521,6 +525,7 @@ const ExpiredStockDispatchPage = () => {
                           <p className="font-medium">{item?.product_name || 'Unknown Item'}</p>
                           <p className="text-sm text-gray-600">To: {destinations.find(d => d.value === record.dispatch_destination)?.label || record.dispatch_destination}</p>
                           <p className="text-sm text-gray-600">Quantity: {record.quantity_dispatched}</p>
+                          <p className="text-sm text-gray-600">Value: R{totalValue.toFixed(2)}</p>
                           <p className="text-sm text-gray-600">By: {record.dispatched_by}</p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -550,9 +555,13 @@ const ExpiredStockDispatchPage = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {destinations.map((dest) => {
-          const totalDispatched = filteredRecords
-            .filter(record => record.dispatch_destination === dest.value)
-            .reduce((sum, record) => sum + record.quantity_dispatched, 0);
+          const destRecords = filteredRecords.filter(record => record.dispatch_destination === dest.value);
+          const totalDispatched = destRecords.reduce((sum, record) => sum + record.quantity_dispatched, 0);
+          const totalValue = destRecords.reduce((sum, record) => {
+            const item = expiredItems.find(i => i.id === record.expired_item_id);
+            const unitValue = item?.cost_per_unit || item?.selling_price || 0;
+            return sum + (unitValue * record.quantity_dispatched);
+          }, 0);
           
           return (
             <Card key={dest.value}>
@@ -560,7 +569,9 @@ const ExpiredStockDispatchPage = () => {
                 <div className="text-center">
                   <h3 className="font-medium">{dest.label}</h3>
                   <p className="text-2xl font-bold text-blue-600">{totalDispatched}</p>
-                  <p className="text-sm text-gray-600">Total Dispatched</p>
+                  <p className="text-sm text-muted-foreground">Total Dispatched</p>
+                  <p className="text-xl font-semibold text-green-600 mt-2">R{totalValue.toFixed(2)}</p>
+                  <p className="text-sm text-muted-foreground">Total Value</p>
                 </div>
               </CardContent>
             </Card>
