@@ -30,6 +30,7 @@ interface ExpiredItem {
   removal_date: string;
   total_cost_loss: number;
   selling_price: number;
+  cost_per_unit: number;
 }
 
 const ExpiredStockDispatchReport = () => {
@@ -41,7 +42,8 @@ const ExpiredStockDispatchReport = () => {
     { label: "Pig Feed", value: "pig_feed" },
     { label: "Dog Food Production", value: "dog_feed" }, 
     { label: "Ginger Biscuit Production", value: "ginger_biscuit" },
-    { label: "Banana Bread", value: "banana_bread" }
+    { label: "Banana Bread", value: "banana_bread" },
+    { label: "Kitchen Used (Cooking/Baking)", value: "kitchen_used" }
   ];
 
   const getDestinationLabel = (value: string) => {
@@ -63,7 +65,8 @@ const ExpiredStockDispatchReport = () => {
             batch_date,
             removal_date,
             total_cost_loss,
-            selling_price
+            selling_price,
+            cost_per_unit
           )
         `)
         .order('dispatch_date', { ascending: false });
@@ -118,7 +121,7 @@ const ExpiredStockDispatchReport = () => {
   // Calculate summary statistics
   const totalDispatched = filteredRecords.reduce((sum, record) => sum + record.quantity_dispatched, 0);
   const totalValueDispatched = filteredRecords.reduce((sum, record) => {
-    const unitPrice = record.expired_item?.selling_price || 0;
+    const unitPrice = record.expired_item?.cost_per_unit || record.expired_item?.selling_price || 0;
     return sum + (record.quantity_dispatched * unitPrice);
   }, 0);
 
@@ -134,8 +137,9 @@ const ExpiredStockDispatchReport = () => {
         records: []
       };
     }
+    const unitPrice = record.expired_item?.cost_per_unit || record.expired_item?.selling_price || 0;
     acc[dest].totalQuantity += record.quantity_dispatched;
-    acc[dest].totalValue += record.quantity_dispatched * (record.expired_item?.selling_price || 0);
+    acc[dest].totalValue += record.quantity_dispatched * unitPrice;
     acc[dest].recordCount += 1;
     acc[dest].records.push(record);
     return acc;
@@ -152,8 +156,9 @@ const ExpiredStockDispatchReport = () => {
         recordCount: 0
       };
     }
+    const unitPrice = record.expired_item?.cost_per_unit || record.expired_item?.selling_price || 0;
     acc[dispatcher].totalQuantity += record.quantity_dispatched;
-    acc[dispatcher].totalValue += record.quantity_dispatched * (record.expired_item?.selling_price || 0);
+    acc[dispatcher].totalValue += record.quantity_dispatched * unitPrice;
     acc[dispatcher].recordCount += 1;
     return acc;
   }, {} as Record<string, any>);
@@ -276,17 +281,19 @@ const ExpiredStockDispatchReport = () => {
                 </tr>
               </thead>
               <tbody>
-                ${filteredRecords.map(record => `
+                ${filteredRecords.map(record => {
+                  const unitPrice = record.expired_item?.cost_per_unit || record.expired_item?.selling_price || 0;
+                  return `
                   <tr style="border-bottom: 1px solid #ddd;">
                     <td>${format(parseISO(record.dispatch_date), 'MMM d, yyyy')}</td>
                     <td style="font-weight: bold; background-color: #f0f8ff;">${record.expired_item?.product_name || 'Unknown Product'}</td>
                     <td style="font-weight: bold; background-color: #fafafa; text-align: center;">${record.quantity_dispatched} units</td>
                     <td style="font-weight: bold; background-color: #f0f8f0;">${getDestinationLabel(record.dispatch_destination)}</td>
                     <td>${record.dispatched_by}</td>
-                    <td class="text-green" style="font-weight: bold;">R${(record.quantity_dispatched * (record.expired_item?.selling_price || 0)).toFixed(2)}</td>
+                    <td class="text-green" style="font-weight: bold;">R${(record.quantity_dispatched * unitPrice).toFixed(2)}</td>
                     <td style="font-size: 11px;">${record.notes || 'No additional notes'}</td>
                   </tr>
-                `).join('')}
+                `}).join('')}
               </tbody>
             </table>
           </div>
