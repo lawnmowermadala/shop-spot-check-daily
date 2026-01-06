@@ -376,10 +376,29 @@ const ExpiredStockPage = () => {
     });
 
     const totalDispatched = filteredDispatches.reduce((sum, dispatch) => sum + (dispatch.quantity_dispatched || 0), 0);
+    
+    // Calculate dispatch summary with both quantity and value per destination
     const dispatchDestinations = filteredDispatches.reduce((acc, dispatch) => {
-      acc[dispatch.dispatch_destination] = (acc[dispatch.dispatch_destination] || 0) + dispatch.quantity_dispatched;
+      const dest = dispatch.dispatch_destination;
+      if (!acc[dest]) {
+        acc[dest] = { quantity: 0, value: 0 };
+      }
+      const expiredItem = expiredItems.find(item => item.id === dispatch.expired_item_id);
+      const unitValue = expiredItem?.selling_price || 0;
+      acc[dest].quantity += dispatch.quantity_dispatched || 0;
+      acc[dest].value += (dispatch.quantity_dispatched || 0) * unitValue;
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as Record<string, { quantity: number; value: number }>);
+
+    const destinationLabels: Record<string, string> = {
+      'pig_feed': 'Pig Feed',
+      'dog_feed': 'Dog Food Production',
+      'ginger_biscuit': 'Ginger Biscuit Production',
+      'banana_bread': 'Banana Bread',
+      'kitchen_used': 'Kitchen Used (Cooking/Baking)'
+    };
+
+    const totalDispatchValue = Object.values(dispatchDestinations).reduce((sum: number, dest: { quantity: number; value: number }) => sum + dest.value, 0);
 
     const printContent = `
       <html>
@@ -437,15 +456,22 @@ const ExpiredStockPage = () => {
                 <tr>
                   <th>Destination</th>
                   <th>Total Quantity Dispatched</th>
+                  <th>Total Value (ZAR)</th>
                 </tr>
               </thead>
               <tbody>
-                ${Object.entries(dispatchDestinations).map(([destination, quantity]) => `
+                ${Object.entries(dispatchDestinations).map(([destination, data]: [string, { quantity: number; value: number }]) => `
                   <tr>
-                    <td>${destination}</td>
-                    <td class="text-green">${quantity}</td>
+                    <td>${destinationLabels[destination] || destination}</td>
+                    <td class="text-green">${data.quantity.toFixed(2)}</td>
+                    <td class="text-green text-bold">R${data.value.toFixed(2)}</td>
                   </tr>
                 `).join('')}
+                <tr style="font-weight: bold; background-color: #e8f5e9;">
+                  <td>TOTAL</td>
+                  <td class="text-green">${Number(totalDispatched).toFixed(2)}</td>
+                  <td class="text-green">R${Number(totalDispatchValue).toFixed(2)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
