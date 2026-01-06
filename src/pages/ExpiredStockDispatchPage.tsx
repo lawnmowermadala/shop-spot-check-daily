@@ -282,7 +282,106 @@ const ExpiredStockDispatchPage = () => {
   };
 
   const handlePrint = () => {
-    window.print();
+    // Calculate destination summaries for print
+    const destinationSummaries = destinations.map(dest => {
+      const destRecords = filteredRecords.filter(record => record.dispatch_destination === dest.value);
+      const totalDispatched = destRecords.reduce((sum, record) => sum + record.quantity_dispatched, 0);
+      const totalValue = destRecords.reduce((sum, record) => {
+        const item = expiredItems.find(i => i.id === record.expired_item_id);
+        const unitValue = item?.cost_per_unit || item?.selling_price || 0;
+        return sum + (unitValue * record.quantity_dispatched);
+      }, 0);
+      return { label: dest.label, totalDispatched, totalValue };
+    });
+
+    const printContent = `
+      <html>
+        <head>
+          <title>Expired Stock Dispatch Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.4; }
+            h1, h2, h3 { color: #333; margin-bottom: 10px; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+            .summary-item { border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
+            .summary-value { font-size: 1.5rem; font-weight: bold; margin-top: 5px; color: #2563eb; }
+            .summary-label { font-size: 0.9rem; color: #666; }
+            .value-text { font-size: 1.2rem; font-weight: bold; color: #16a34a; margin-top: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background-color: #f2f2f2; font-weight: bold; }
+            .text-green { color: #16a34a; }
+            .section { margin-top: 30px; }
+            @media print {
+              body { margin: 0; font-size: 11px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Expired Stock Dispatch Report</h1>
+            <h3>${format(new Date(), 'PPPP')}</h3>
+            <h2>${getPeriodLabel()}</h2>
+          </div>
+          
+          <h2>Dispatch Summary by Destination</h2>
+          <div class="summary">
+            ${destinationSummaries.map(dest => `
+              <div class="summary-item">
+                <div style="font-weight: bold; margin-bottom: 10px;">${dest.label}</div>
+                <div class="summary-value">${dest.totalDispatched.toFixed(2)}</div>
+                <div class="summary-label">Total Dispatched</div>
+                <div class="value-text">R${dest.totalValue.toFixed(2)}</div>
+                <div class="summary-label">Total Value</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section">
+            <h2>Detailed Dispatch Records</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Product</th>
+                  <th>Quantity</th>
+                  <th>Value (ZAR)</th>
+                  <th>Destination</th>
+                  <th>Dispatched By</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredRecords.map(record => {
+                  const item = expiredItems.find(i => i.id === record.expired_item_id);
+                  const unitValue = item?.cost_per_unit || item?.selling_price || 0;
+                  const totalValue = unitValue * record.quantity_dispatched;
+                  return `
+                    <tr>
+                      <td>${record.dispatch_date}</td>
+                      <td>${item?.product_name || 'Unknown'}</td>
+                      <td>${record.quantity_dispatched}</td>
+                      <td class="text-green">R${totalValue.toFixed(2)}</td>
+                      <td>${destinations.find(d => d.value === record.dispatch_destination)?.label || record.dispatch_destination}</td>
+                      <td>${record.dispatched_by}</td>
+                      <td>${record.notes || '-'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow?.document.write(printContent);
+    printWindow?.document.close();
+    printWindow?.focus();
+    setTimeout(() => {
+      printWindow?.print();
+    }, 500);
   };
 
   const getPeriodLabel = () => {
