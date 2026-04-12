@@ -275,10 +275,10 @@ const ExpiredStockDispatchForm = () => {
 
             {/* Summary of selected items */}
             {selectedItems.length > 0 && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="font-semibold text-blue-900">Selected: {selectedItems.length} item(s)</p>
-                <p className="text-blue-800">Total Quantity: <strong>{totalSelectedQuantity.toFixed(2)}</strong></p>
-                <p className="text-blue-800">Total Value: <strong>R{totalSelectedValue.toFixed(2)}</strong></p>
+              <div className="p-3 bg-accent/50 border border-accent rounded-lg">
+                <p className="font-semibold text-foreground">Selected: {selectedItems.length} item(s)</p>
+                <p className="text-foreground">Total Quantity: <strong>{totalSelectedQuantity.toFixed(2)}</strong></p>
+                <p className="text-foreground">Total Value: <strong>R{totalSelectedValue.toFixed(2)}</strong></p>
               </div>
             )}
 
