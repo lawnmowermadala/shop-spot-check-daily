@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,9 +36,8 @@ interface DispatchRecord {
 
 const ExpiredStockDispatchForm = () => {
   const [expiredItems, setExpiredItems] = useState<ExpiredItem[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState<string>("");
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [destination, setDestination] = useState<string>("");
-  const [quantityToDispatch, setQuantityToDispatch] = useState<string>("");
   const [dispatchedBy, setDispatchedBy] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,9 +45,10 @@ const ExpiredStockDispatchForm = () => {
 
   const destinations = [
     { label: "Pig Feed", value: "pig_feed" },
-    { label: "Dog Food Production", value: "dog_feed" }, 
+    { label: "Dog Food Production", value: "dog_feed" },
     { label: "Ginger Biscuit Production", value: "ginger_biscuit" },
-    { label: "Banana Bread", value: "banana_bread" }
+    { label: "Banana Bread", value: "banana_bread" },
+    { label: "Kitchen Used (Cooking/Baking)", value: "kitchen_used" }
   ];
 
   useEffect(() => {
@@ -63,14 +64,13 @@ const ExpiredStockDispatchForm = () => {
         .gt('remaining_quantity', 0);
 
       if (error) throw error;
-      
-      // Type assertion to match our interface
+
       const typedData = (data || []).map(item => ({
         ...item,
         remaining_quantity: item.remaining_quantity || 0,
         dispatch_status: item.dispatch_status || 'available'
       })) as ExpiredItem[];
-      
+
       setExpiredItems(typedData);
     } catch (error) {
       console.error('Error fetching expired items:', error);
@@ -82,26 +82,40 @@ const ExpiredStockDispatchForm = () => {
     }
   };
 
+  const toggleItem = (id: string) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectedItems = useMemo(
+    () => expiredItems.filter(item => selectedItemIds.has(item.id)),
+    [expiredItems, selectedItemIds]
+  );
+
+  const totalSelectedQuantity = useMemo(
+    () => selectedItems.reduce((sum, item) => sum + item.remaining_quantity, 0),
+    [selectedItems]
+  );
+
+  const totalSelectedValue = useMemo(
+    () => selectedItems.reduce((sum, item) => sum + item.remaining_quantity * (item.selling_price || 0), 0),
+    [selectedItems]
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!selectedItemId || !destination || !quantityToDispatch || !dispatchedBy) {
+
+    if (selectedItemIds.size === 0 || !destination || !dispatchedBy) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const selectedItem = expiredItems.find(item => item.id === selectedItemId);
-    if (!selectedItem) return;
-
-    const dispatchQuantity = parseFloat(quantityToDispatch);
-    if (dispatchQuantity > selectedItem.remaining_quantity) {
-      toast({
-        title: "Error",
-        description: "Dispatch quantity cannot exceed remaining quantity",
+        description: "Please select items, destination, and enter your name",
         variant: "destructive",
       });
       return;
@@ -110,51 +124,48 @@ const ExpiredStockDispatchForm = () => {
     setIsSubmitting(true);
 
     try {
-      // Insert dispatch record using type assertion
-      const dispatchData: DispatchRecord = {
-        expired_item_id: selectedItemId,
-        dispatch_destination: destination,
-        quantity_dispatched: dispatchQuantity,
-        dispatched_by: dispatchedBy,
-        notes: notes || undefined,
-        dispatch_date: new Date().toISOString().split('T')[0]
-      };
+      const dispatchDate = new Date().toISOString().split('T')[0];
 
-      const { error: dispatchError } = await (supabase as any)
-        .from('expired_stock_dispatches')
-        .insert(dispatchData);
+      // Insert a dispatch record for each selected item (dispatch full remaining qty)
+      for (const item of selectedItems) {
+        const dispatchData: DispatchRecord = {
+          expired_item_id: item.id,
+          dispatch_destination: destination,
+          quantity_dispatched: item.remaining_quantity,
+          dispatched_by: dispatchedBy,
+          notes: notes || undefined,
+          dispatch_date: dispatchDate
+        };
 
-      if (dispatchError) throw dispatchError;
+        const { error: dispatchError } = await (supabase as any)
+          .from('expired_stock_dispatches')
+          .insert(dispatchData);
 
-      // Update remaining quantity
-      const newRemainingQuantity = selectedItem.remaining_quantity - dispatchQuantity;
-      const newDispatchStatus = newRemainingQuantity <= 0 ? 'fully_dispatched' : 'available';
+        if (dispatchError) throw dispatchError;
 
-      const { error: updateError } = await supabase
-        .from('expired_items')
-        .update({ 
-          remaining_quantity: newRemainingQuantity,
-          dispatch_status: newDispatchStatus
-        } as any)
-        .eq('id', selectedItemId);
+        const { error: updateError } = await supabase
+          .from('expired_items')
+          .update({
+            remaining_quantity: 0,
+            dispatch_status: 'fully_dispatched'
+          } as any)
+          .eq('id', item.id);
 
-      if (updateError) throw updateError;
+        if (updateError) throw updateError;
+      }
 
       toast({
         title: "Success",
-        description: "Expired stock dispatched successfully",
+        description: `${selectedItems.length} item(s) dispatched successfully`,
       });
 
       // Reset form
-      setSelectedItemId("");
+      setSelectedItemIds(new Set());
       setDestination("");
-      setQuantityToDispatch("");
       setDispatchedBy("");
       setNotes("");
-      
-      // Refresh items
-      fetchExpiredItems();
 
+      fetchExpiredItems();
     } catch (error) {
       console.error('Error dispatching stock:', error);
       toast({
@@ -167,7 +178,31 @@ const ExpiredStockDispatchForm = () => {
     }
   };
 
-  const selectedItem = expiredItems.find(item => item.id === selectedItemId);
+  // Group items by product name for easier selection
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, ExpiredItem[]> = {};
+    expiredItems.forEach(item => {
+      if (!groups[item.product_name]) {
+        groups[item.product_name] = [];
+      }
+      groups[item.product_name].push(item);
+    });
+    return groups;
+  }, [expiredItems]);
+
+  const selectAllOfProduct = (productName: string) => {
+    const items = groupedItems[productName] || [];
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      const allSelected = items.every(item => next.has(item.id));
+      if (allSelected) {
+        items.forEach(item => next.delete(item.id));
+      } else {
+        items.forEach(item => next.add(item.id));
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -177,28 +212,73 @@ const ExpiredStockDispatchForm = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Items selection with checkboxes */}
             <div>
-              <Label htmlFor="item">Select Expired Item</Label>
-              <Select value={selectedItemId} onValueChange={setSelectedItemId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose an expired item to dispatch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expiredItems.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.product_name} - Available: {item.remaining_quantity} (Batch: {item.batch_date})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-base font-semibold">Select Expired Items to Dispatch</Label>
+              <div className="mt-2 border rounded-lg max-h-80 overflow-y-auto">
+                {Object.entries(groupedItems).length === 0 && (
+                  <p className="p-4 text-muted-foreground text-sm">No expired items available for dispatch.</p>
+                )}
+                {Object.entries(groupedItems).map(([productName, items]) => {
+                  const allSelected = items.every(item => selectedItemIds.has(item.id));
+                  const someSelected = items.some(item => selectedItemIds.has(item.id));
+                  return (
+                    <div key={productName} className="border-b last:border-b-0">
+                      {/* Product group header */}
+                      <div
+                        className="flex items-center gap-3 p-3 bg-muted/50 cursor-pointer hover:bg-muted"
+                        onClick={() => selectAllOfProduct(productName)}
+                      >
+                        <Checkbox
+                          checked={allSelected}
+                          className={someSelected && !allSelected ? "opacity-50" : ""}
+                          onCheckedChange={() => selectAllOfProduct(productName)}
+                        />
+                        <span className="font-medium">{productName}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({items.length} batch{items.length > 1 ? 'es' : ''})
+                        </span>
+                      </div>
+                      {/* Individual batches */}
+                      {items.map(item => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-3 px-6 py-2 cursor-pointer hover:bg-accent/50 ${
+                            selectedItemIds.has(item.id) ? 'bg-accent/30' : ''
+                          }`}
+                          onClick={() => toggleItem(item.id)}
+                        >
+                          <Checkbox
+                            checked={selectedItemIds.has(item.id)}
+                            onCheckedChange={() => toggleItem(item.id)}
+                          />
+                          <div className="flex-1 text-sm">
+                            <span>Qty: <strong>{item.remaining_quantity}</strong></span>
+                            <span className="mx-2">|</span>
+                            <span>Batch: {item.batch_date}</span>
+                            <span className="mx-2">|</span>
+                            <span>Removed: {item.removal_date}</span>
+                            {item.selling_price ? (
+                              <>
+                                <span className="mx-2">|</span>
+                                <span>Value: R{(item.remaining_quantity * item.selling_price).toFixed(2)}</span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {selectedItem && (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p><strong>Product:</strong> {selectedItem.product_name}</p>
-                <p><strong>Available Quantity:</strong> {selectedItem.remaining_quantity}</p>
-                <p><strong>Batch Date:</strong> {selectedItem.batch_date}</p>
-                <p><strong>Removal Date:</strong> {selectedItem.removal_date}</p>
+            {/* Summary of selected items */}
+            {selectedItems.length > 0 && (
+              <div className="p-3 bg-accent/50 border border-accent rounded-lg">
+                <p className="font-semibold text-foreground">Selected: {selectedItems.length} item(s)</p>
+                <p className="text-foreground">Total Quantity: <strong>{totalSelectedQuantity.toFixed(2)}</strong></p>
+                <p className="text-foreground">Total Value: <strong>R{totalSelectedValue.toFixed(2)}</strong></p>
               </div>
             )}
 
@@ -216,19 +296,6 @@ const ExpiredStockDispatchForm = () => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="quantity">Quantity to Dispatch</Label>
-              <Input
-                id="quantity"
-                type="number"
-                step="0.01"
-                value={quantityToDispatch}
-                onChange={(e) => setQuantityToDispatch(e.target.value)}
-                max={selectedItem?.remaining_quantity || 0}
-                placeholder="Enter quantity to dispatch"
-              />
             </div>
 
             <div>
@@ -252,12 +319,12 @@ const ExpiredStockDispatchForm = () => {
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isSubmitting || !selectedItemId || !destination || !quantityToDispatch || !dispatchedBy}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting || selectedItemIds.size === 0 || !destination || !dispatchedBy}
             >
-              {isSubmitting ? "Dispatching..." : "Dispatch Stock"}
+              {isSubmitting ? "Dispatching..." : `Dispatch ${selectedItems.length} Item(s)`}
             </Button>
           </form>
         </CardContent>
