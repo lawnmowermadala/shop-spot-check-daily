@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +36,14 @@ interface DispatchRecord {
   dispatch_date: string;
 }
 
+const destinations = [
+  { label: "Pig Feed", value: "pig_feed" },
+  { label: "Dog Food Production", value: "dog_feed" },
+  { label: "Ginger Biscuit Production", value: "ginger_biscuit" },
+  { label: "Banana Bread", value: "banana_bread" },
+  { label: "Kitchen Used (Cooking/Baking)", value: "kitchen_used" }
+];
+
 const ExpiredStockDispatchPage = () => {
   const [expiredItems, setExpiredItems] = useState<ExpiredItem[]>([]);
   const [dispatchRecords, setDispatchRecords] = useState<DispatchRecord[]>([]);
@@ -46,26 +53,16 @@ const ExpiredStockDispatchPage = () => {
   const [dispatchedBy, setDispatchedBy] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Filter states
+
   const [filterPeriod, setFilterPeriod] = useState<string>("all");
   const [fromDate, setFromDate] = useState<Date>();
   const [toDate, setToDate] = useState<Date>();
   const [showFilters, setShowFilters] = useState(false);
-  
-  // Edit states
+
   const [editingRecord, setEditingRecord] = useState<DispatchRecord | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  
-  const { toast } = useToast();
 
-  const destinations = [
-    { label: "Pig Feed", value: "pig_feed" },
-    { label: "Dog Food Production", value: "dog_feed" }, 
-    { label: "Ginger Biscuit Production", value: "ginger_biscuit" },
-    { label: "Banana Bread", value: "banana_bread" },
-    { label: "Kitchen Used (Cooking/Baking)", value: "kitchen_used" }
-  ];
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchExpiredItems();
@@ -78,12 +75,12 @@ const ExpiredStockDispatchPage = () => {
 
   const applyFilters = () => {
     let filtered = [...dispatchRecords];
-    
+
     if (filterPeriod !== "all") {
       const now = new Date();
       let startDate: Date;
       let endDate: Date;
-      
+
       switch (filterPeriod) {
         case "today":
           startDate = startOfDay(now);
@@ -110,13 +107,13 @@ const ExpiredStockDispatchPage = () => {
           setFilteredRecords(filtered);
           return;
       }
-      
+
       filtered = filtered.filter(record => {
         const recordDate = new Date(record.dispatch_date);
         return recordDate >= startDate && recordDate <= endDate;
       });
     }
-    
+
     setFilteredRecords(filtered);
   };
 
@@ -131,11 +128,7 @@ const ExpiredStockDispatchPage = () => {
       setExpiredItems(data || []);
     } catch (error) {
       console.error('Error fetching expired items:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load expired items",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to load expired items", variant: "destructive" });
     }
   };
 
@@ -153,27 +146,21 @@ const ExpiredStockDispatchPage = () => {
     }
   };
 
-  const calculateRemainingQuantity = (itemId: string, originalQuantity: string) => {
-    const totalDispatched = dispatchRecords
-      .filter(record => record.expired_item_id === itemId)
-      .reduce((sum, record) => sum + record.quantity_dispatched, 0);
-    
-    return parseFloat(originalQuantity) - totalDispatched;
-  };
+  // Memoize remaining quantities map to avoid recalculating repeatedly
+  const remainingQuantityMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const item of expiredItems) {
+      const totalDispatched = dispatchRecords
+        .filter(r => r.expired_item_id === item.id)
+        .reduce((sum, r) => sum + r.quantity_dispatched, 0);
+      map[item.id] = parseFloat(item.quantity) - totalDispatched;
+    }
+    return map;
+  }, [expiredItems, dispatchRecords]);
 
-  const toggleItem = (id: string) => {
-    setSelectedItemIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  // Group available items by product name
-  const availableItems = useMemo(() => 
-    expiredItems.filter(item => calculateRemainingQuantity(item.id, item.quantity) > 0),
-    [expiredItems, dispatchRecords]
+  const availableItems = useMemo(
+    () => expiredItems.filter(item => (remainingQuantityMap[item.id] ?? 0) > 0),
+    [expiredItems, remainingQuantityMap]
   );
 
   const groupedItems = useMemo(() => {
@@ -185,7 +172,19 @@ const ExpiredStockDispatchPage = () => {
     return groups;
   }, [availableItems]);
 
-  const selectAllOfProduct = (productName: string) => {
+  // FIX: use useCallback and stop event propagation to avoid double-firing
+  const toggleItem = useCallback((id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAllOfProduct = useCallback((productName: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const items = groupedItems[productName] || [];
     setSelectedItemIds(prev => {
       const next = new Set(prev);
@@ -194,7 +193,7 @@ const ExpiredStockDispatchPage = () => {
       else items.forEach(item => next.add(item.id));
       return next;
     });
-  };
+  }, [groupedItems]);
 
   const selectedItems = useMemo(
     () => availableItems.filter(item => selectedItemIds.has(item.id)),
@@ -202,27 +201,23 @@ const ExpiredStockDispatchPage = () => {
   );
 
   const totalSelectedQuantity = useMemo(
-    () => selectedItems.reduce((sum, item) => sum + calculateRemainingQuantity(item.id, item.quantity), 0),
-    [selectedItems, dispatchRecords]
+    () => selectedItems.reduce((sum, item) => sum + (remainingQuantityMap[item.id] ?? 0), 0),
+    [selectedItems, remainingQuantityMap]
   );
 
   const totalSelectedValue = useMemo(
     () => selectedItems.reduce((sum, item) => {
-      const remaining = calculateRemainingQuantity(item.id, item.quantity);
+      const remaining = remainingQuantityMap[item.id] ?? 0;
       return sum + remaining * (item.selling_price || item.cost_per_unit || 0);
     }, 0),
-    [selectedItems, dispatchRecords]
+    [selectedItems, remainingQuantityMap]
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (selectedItemIds.size === 0 || !destination || !dispatchedBy) {
-      toast({
-        title: "Error",
-        description: "Please select items, destination, and enter your name",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Please select items, destination, and enter your name", variant: "destructive" });
       return;
     }
 
@@ -230,7 +225,7 @@ const ExpiredStockDispatchPage = () => {
 
     try {
       for (const item of selectedItems) {
-        const remaining = calculateRemainingQuantity(item.id, item.quantity);
+        const remaining = remainingQuantityMap[item.id] ?? 0;
         const { error } = await supabase
           .from('expired_stock_dispatches')
           .insert({
@@ -243,11 +238,7 @@ const ExpiredStockDispatchPage = () => {
         if (error) throw error;
       }
 
-      toast({
-        title: "Success",
-        description: `${selectedItems.length} item(s) dispatched successfully`,
-      });
-
+      toast({ title: "Success", description: `${selectedItems.length} item(s) dispatched successfully` });
       setSelectedItemIds(new Set());
       setDestination("");
       setDispatchedBy("");
@@ -256,11 +247,7 @@ const ExpiredStockDispatchPage = () => {
       fetchExpiredItems();
     } catch (error: any) {
       console.error('Error dispatching stock:', error);
-      toast({
-        title: "Error",
-        description: `Failed to dispatch: ${error.message}`,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: `Failed to dispatch: ${error.message}`, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -285,33 +272,34 @@ const ExpiredStockDispatchPage = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Dispatch record updated successfully",
-      });
-
+      toast({ title: "Success", description: "Dispatch record updated successfully" });
       setShowEditDialog(false);
       setEditingRecord(null);
       fetchDispatchRecords();
     } catch (error) {
       console.error('Error updating dispatch:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update dispatch record",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to update dispatch record", variant: "destructive" });
+    }
+  };
+
+  const getPeriodLabel = () => {
+    switch (filterPeriod) {
+      case "today": return "Today's Dispatches";
+      case "week": return "This Week's Dispatches";
+      case "month": return "This Month's Dispatches";
+      case "custom": return `Dispatches (${fromDate ? format(fromDate, "MMM dd") : ""} - ${toDate ? format(toDate, "MMM dd, yyyy") : ""})`;
+      default: return "All Dispatches";
     }
   };
 
   const handlePrint = () => {
-    // Calculate destination summaries for print
     const destinationSummaries = destinations.map(dest => {
-      const destRecords = filteredRecords.filter(record => record.dispatch_destination === dest.value);
-      const totalDispatched = destRecords.reduce((sum, record) => sum + record.quantity_dispatched, 0);
-      const totalValue = destRecords.reduce((sum, record) => {
-        const item = expiredItems.find(i => i.id === record.expired_item_id);
+      const destRecords = filteredRecords.filter(r => r.dispatch_destination === dest.value);
+      const totalDispatched = destRecords.reduce((sum, r) => sum + r.quantity_dispatched, 0);
+      const totalValue = destRecords.reduce((sum, r) => {
+        const item = expiredItems.find(i => i.id === r.expired_item_id);
         const unitValue = item?.cost_per_unit || item?.selling_price || 0;
-        return sum + (unitValue * record.quantity_dispatched);
+        return sum + unitValue * r.quantity_dispatched;
       }, 0);
       return { label: dest.label, totalDispatched, totalValue };
     });
@@ -334,9 +322,7 @@ const ExpiredStockDispatchPage = () => {
             th { background-color: #f2f2f2; font-weight: bold; }
             .text-green { color: #16a34a; }
             .section { margin-top: 30px; }
-            @media print {
-              body { margin: 0; font-size: 11px; }
-            }
+            @media print { body { margin: 0; font-size: 11px; } }
           </style>
         </head>
         <body>
@@ -345,7 +331,6 @@ const ExpiredStockDispatchPage = () => {
             <h3>${format(new Date(), 'PPPP')}</h3>
             <h2>${getPeriodLabel()}</h2>
           </div>
-          
           <h2>Dispatch Summary by Destination</h2>
           <div class="summary">
             ${destinationSummaries.map(dest => `
@@ -358,19 +343,13 @@ const ExpiredStockDispatchPage = () => {
               </div>
             `).join('')}
           </div>
-
           <div class="section">
             <h2>Detailed Dispatch Records</h2>
             <table>
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Product</th>
-                  <th>Quantity</th>
-                  <th>Value (ZAR)</th>
-                  <th>Destination</th>
-                  <th>Dispatched By</th>
-                  <th>Notes</th>
+                  <th>Date</th><th>Product</th><th>Quantity</th><th>Value (ZAR)</th>
+                  <th>Destination</th><th>Dispatched By</th><th>Notes</th>
                 </tr>
               </thead>
               <tbody>
@@ -401,46 +380,25 @@ const ExpiredStockDispatchPage = () => {
     printWindow?.document.write(printContent);
     printWindow?.document.close();
     printWindow?.focus();
-    setTimeout(() => {
-      printWindow?.print();
-    }, 500);
-  };
-
-  const getPeriodLabel = () => {
-    switch (filterPeriod) {
-      case "today": return "Today's Dispatches";
-      case "week": return "This Week's Dispatches";
-      case "month": return "This Month's Dispatches";
-      case "custom": return `Dispatches (${fromDate ? format(fromDate, "MMM dd") : ""} - ${toDate ? format(toDate, "MMM dd, yyyy") : ""})`;
-      default: return "All Dispatches";
-    }
+    setTimeout(() => printWindow?.print(), 500);
   };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center print:justify-center">
         <h1 className="text-3xl font-bold">Expired Stock Dispatch</h1>
-        <Button 
-          onClick={handlePrint}
-          variant="outline"
-          size="sm"
-          className="print:hidden"
-        >
+        <Button onClick={handlePrint} variant="outline" size="sm" className="print:hidden">
           <Printer className="h-4 w-4 mr-2" />
           Print Report
         </Button>
       </div>
-      
+
       {/* Filter Controls */}
       <Card className="print:hidden">
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Filter Dispatch Records</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
               <Filter className="h-4 w-4 mr-2" />
               {showFilters ? "Hide" : "Show"} Filters
             </Button>
@@ -452,9 +410,7 @@ const ExpiredStockDispatchPage = () => {
               <div>
                 <Label>Time Period</Label>
                 <Select value={filterPeriod} onValueChange={setFilterPeriod}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Time</SelectItem>
                     <SelectItem value="today">Today</SelectItem>
@@ -464,53 +420,34 @@ const ExpiredStockDispatchPage = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {filterPeriod === "custom" && (
                 <>
                   <div>
                     <Label>From Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn("w-full justify-start text-left font-normal", !fromDate && "text-muted-foreground")}
-                        >
+                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !fromDate && "text-muted-foreground")}>
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {fromDate ? format(fromDate, "PPP") : "Pick start date"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={fromDate}
-                          onSelect={setFromDate}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
+                        <Calendar mode="single" selected={fromDate} onSelect={setFromDate} initialFocus className={cn("p-3 pointer-events-auto")} />
                       </PopoverContent>
                     </Popover>
                   </div>
-                  
                   <div>
                     <Label>To Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}
-                        >
+                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}>
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {toDate ? format(toDate, "PPP") : "Pick end date"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={toDate}
-                          onSelect={setToDate}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
+                        <Calendar mode="single" selected={toDate} onSelect={setToDate} initialFocus className={cn("p-3 pointer-events-auto")} />
                       </PopoverContent>
                     </Popover>
                   </div>
@@ -520,16 +457,13 @@ const ExpiredStockDispatchPage = () => {
           </CardContent>
         )}
       </Card>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Dispatch Form */}
         <Card className="print:hidden">
-          <CardHeader>
-            <CardTitle>Dispatch Expired Stock</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Dispatch Expired Stock</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Checkbox list of items grouped by product */}
               <div>
                 <Label className="text-base font-semibold">Select Expired Items to Dispatch</Label>
                 <div className="mt-2 border rounded-lg max-h-80 overflow-y-auto">
@@ -541,14 +475,15 @@ const ExpiredStockDispatchPage = () => {
                     const someSelected = items.some(item => selectedItemIds.has(item.id));
                     return (
                       <div key={productName} className="border-b last:border-b-0">
+                        {/* FIX: only use onClick on the div, not onCheckedChange on Checkbox */}
                         <div
                           className="flex items-center gap-3 p-3 bg-muted/50 cursor-pointer hover:bg-muted"
-                          onClick={() => selectAllOfProduct(productName)}
+                          onClick={(e) => selectAllOfProduct(productName, e)}
                         >
                           <Checkbox
                             checked={allSelected}
                             className={someSelected && !allSelected ? "opacity-50" : ""}
-                            onCheckedChange={() => selectAllOfProduct(productName)}
+                            // FIX: removed onCheckedChange to prevent double-firing
                           />
                           <span className="font-medium">{productName}</span>
                           <span className="text-xs text-muted-foreground">
@@ -556,19 +491,15 @@ const ExpiredStockDispatchPage = () => {
                           </span>
                         </div>
                         {items.map(item => {
-                          const remaining = calculateRemainingQuantity(item.id, item.quantity);
+                          const remaining = remainingQuantityMap[item.id] ?? 0;
                           return (
                             <div
                               key={item.id}
-                              className={`flex items-center gap-3 px-6 py-2 cursor-pointer hover:bg-accent/50 ${
-                                selectedItemIds.has(item.id) ? 'bg-accent/30' : ''
-                              }`}
-                              onClick={() => toggleItem(item.id)}
+                              className={`flex items-center gap-3 px-6 py-2 cursor-pointer hover:bg-accent/50 ${selectedItemIds.has(item.id) ? 'bg-accent/30' : ''}`}
+                              onClick={(e) => toggleItem(item.id, e)}
                             >
-                              <Checkbox
-                                checked={selectedItemIds.has(item.id)}
-                                onCheckedChange={() => toggleItem(item.id)}
-                              />
+                              {/* FIX: removed onCheckedChange to prevent double-firing */}
+                              <Checkbox checked={selectedItemIds.has(item.id)} />
                               <div className="flex-1 text-sm">
                                 <span>Qty: <strong>{remaining.toFixed(2)}</strong></span>
                                 <span className="mx-2">|</span>
@@ -585,7 +516,6 @@ const ExpiredStockDispatchPage = () => {
                 </div>
               </div>
 
-              {/* Summary of selected */}
               {selectedItems.length > 0 && (
                 <div className="p-3 bg-accent/50 border border-accent rounded-lg">
                   <p className="font-semibold text-foreground">Selected: {selectedItems.length} item(s)</p>
@@ -597,45 +527,26 @@ const ExpiredStockDispatchPage = () => {
               <div>
                 <Label htmlFor="destination">Dispatch Destination</Label>
                 <Select value={destination} onValueChange={setDestination}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select destination" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select destination" /></SelectTrigger>
                   <SelectContent>
-                     {destinations.map((dest) => (
-                       <SelectItem key={dest.value} value={dest.value}>
-                         {dest.label}
-                       </SelectItem>
-                     ))}
+                    {destinations.map(dest => (
+                      <SelectItem key={dest.value} value={dest.value}>{dest.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
                 <Label htmlFor="dispatched-by">Dispatched By</Label>
-                <Input
-                  id="dispatched-by"
-                  value={dispatchedBy}
-                  onChange={(e) => setDispatchedBy(e.target.value)}
-                  placeholder="Enter your name"
-                />
+                <Input id="dispatched-by" value={dispatchedBy} onChange={e => setDispatchedBy(e.target.value)} placeholder="Enter your name" />
               </div>
 
               <div>
                 <Label htmlFor="notes">Notes (Optional)</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add any additional notes about this dispatch"
-                  rows={3}
-                />
+                <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add any additional notes about this dispatch" rows={3} />
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isSubmitting || selectedItemIds.size === 0 || !destination || !dispatchedBy}
-              >
+              <Button type="submit" className="w-full" disabled={isSubmitting || selectedItemIds.size === 0 || !destination || !dispatchedBy}>
                 {isSubmitting ? "Dispatching..." : `Dispatch ${selectedItems.length} Item(s)`}
               </Button>
             </form>
@@ -646,16 +557,14 @@ const ExpiredStockDispatchPage = () => {
         <Card className="print:col-span-2">
           <CardHeader>
             <CardTitle>{getPeriodLabel()}</CardTitle>
-            <p className="text-sm text-gray-600">
-              Showing {filteredRecords.length} of {dispatchRecords.length} total dispatches
-            </p>
+            <p className="text-sm text-gray-600">Showing {filteredRecords.length} of {dispatchRecords.length} total dispatches</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto print:max-h-none print:overflow-visible">
               {filteredRecords.length === 0 ? (
                 <p className="text-gray-500">No dispatches found for the selected period</p>
               ) : (
-                filteredRecords.map((record) => {
+                filteredRecords.map(record => {
                   const item = expiredItems.find(i => i.id === record.expired_item_id);
                   const unitValue = item?.cost_per_unit || item?.selling_price || 0;
                   const totalValue = unitValue * record.quantity_dispatched;
@@ -671,19 +580,10 @@ const ExpiredStockDispatchPage = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-500">{record.dispatch_date}</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(record)}
-                            className="print:hidden"
-                          >
-                            Edit
-                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(record)} className="print:hidden">Edit</Button>
                         </div>
                       </div>
-                      {record.notes && (
-                        <p className="text-sm text-gray-600 mt-2">Notes: {record.notes}</p>
-                      )}
+                      {record.notes && <p className="text-sm text-gray-600 mt-2">Notes: {record.notes}</p>}
                     </div>
                   );
                 })
@@ -695,15 +595,14 @@ const ExpiredStockDispatchPage = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {destinations.map((dest) => {
-          const destRecords = filteredRecords.filter(record => record.dispatch_destination === dest.value);
-          const totalDispatched = destRecords.reduce((sum, record) => sum + record.quantity_dispatched, 0);
-          const totalValue = destRecords.reduce((sum, record) => {
-            const item = expiredItems.find(i => i.id === record.expired_item_id);
+        {destinations.map(dest => {
+          const destRecords = filteredRecords.filter(r => r.dispatch_destination === dest.value);
+          const totalDispatched = destRecords.reduce((sum, r) => sum + r.quantity_dispatched, 0);
+          const totalValue = destRecords.reduce((sum, r) => {
+            const item = expiredItems.find(i => i.id === r.expired_item_id);
             const unitValue = item?.cost_per_unit || item?.selling_price || 0;
-            return sum + (unitValue * record.quantity_dispatched);
+            return sum + unitValue * r.quantity_dispatched;
           }, 0);
-          
           return (
             <Card key={dest.value}>
               <CardContent className="pt-6">
@@ -720,14 +619,11 @@ const ExpiredStockDispatchPage = () => {
         })}
       </div>
 
-      {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Dispatch Record</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Edit Dispatch Record</DialogTitle></DialogHeader>
           {editingRecord && (
-            <EditDispatchForm 
+            <EditDispatchForm
               record={editingRecord}
               destinations={destinations}
               onSave={handleUpdateDispatch}
@@ -740,12 +636,11 @@ const ExpiredStockDispatchPage = () => {
   );
 };
 
-// Edit form component
-const EditDispatchForm = ({ 
-  record, 
-  destinations, 
-  onSave, 
-  onCancel 
+const EditDispatchForm = ({
+  record,
+  destinations,
+  onSave,
+  onCancel
 }: {
   record: DispatchRecord;
   destinations: { label: string; value: string }[];
@@ -759,13 +654,7 @@ const EditDispatchForm = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...record,
-      dispatch_destination: destination,
-      quantity_dispatched: parseFloat(quantity),
-      dispatched_by: dispatchedBy,
-      notes: notes || undefined
-    });
+    onSave({ ...record, dispatch_destination: destination, quantity_dispatched: parseFloat(quantity), dispatched_by: dispatchedBy, notes: notes || undefined });
   };
 
   return (
@@ -773,55 +662,27 @@ const EditDispatchForm = ({
       <div>
         <Label>Destination</Label>
         <Select value={destination} onValueChange={setDestination}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            {destinations.map((dest) => (
-              <SelectItem key={dest.value} value={dest.value}>
-                {dest.label}
-              </SelectItem>
-            ))}
+            {destinations.map(dest => <SelectItem key={dest.value} value={dest.value}>{dest.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
-
       <div>
         <Label>Quantity</Label>
-        <Input
-          type="number"
-          step="0.01"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          required
-        />
+        <Input type="number" step="0.01" value={quantity} onChange={e => setQuantity(e.target.value)} required />
       </div>
-
       <div>
         <Label>Dispatched By</Label>
-        <Input
-          value={dispatchedBy}
-          onChange={(e) => setDispatchedBy(e.target.value)}
-          required
-        />
+        <Input value={dispatchedBy} onChange={e => setDispatchedBy(e.target.value)} required />
       </div>
-
       <div>
         <Label>Notes</Label>
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-        />
+        <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
       </div>
-
       <div className="flex gap-2 pt-4">
-        <Button type="submit" className="flex-1">
-          Save Changes
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-          Cancel
-        </Button>
+        <Button type="submit" className="flex-1">Save Changes</Button>
+        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">Cancel</Button>
       </div>
     </form>
   );
