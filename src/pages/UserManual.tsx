@@ -3,7 +3,7 @@ import Navigation from '@/components/Navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clipboard, Star, Home, BarChart, Building, Users, AlertTriangle, Clock, Image, Printer } from 'lucide-react';
+import { Check, Clipboard, Star, Home, BarChart, Building, Users, AlertTriangle, Clock, Image, Printer, ShoppingCart, DollarSign, Truck, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const UserManual = () => {
