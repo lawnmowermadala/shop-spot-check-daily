@@ -89,11 +89,34 @@ const UserManual = () => {
               <Clipboard className="h-4 w-4 mr-2" />
               Promotions
             </Link>
-            <Link to="/expired-stock" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+            <Link to="/expired" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
               <AlertTriangle className="h-4 w-4 mr-2" />
               Expired Stock
             </Link>
-          </div>
+            <Link to="/expired-dispatch" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <Truck className="h-4 w-4 mr-2" />
+              Expired Stock Dispatch
+            </Link>
+            <Link to="/expired-dispatch-report" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <BarChart className="h-4 w-4 mr-2" />
+              Dispatch Report
+            </Link>
+            <Link to="/pos" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              POS Terminal
+            </Link>
+            <Link to="/sales-reports" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Sales Reports
+            </Link>
+            <Link to="/cash-register" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Cash Register
+            </Link>
+            <Link to="/user-management" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <Shield className="h-4 w-4 mr-2" />
+              User Management
+            </Link>
           
           <div className="mt-6 p-4 bg-blue-50 rounded-lg text-sm">
             <p className="font-medium text-blue-700">Need help?</p>
