@@ -3,7 +3,7 @@ import Navigation from '@/components/Navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Clipboard, Star, Home, BarChart, Building, Users, AlertTriangle, Clock, Image, Printer } from 'lucide-react';
+import { Check, Clipboard, Star, Home, BarChart, Building, Users, AlertTriangle, Clock, Image, Printer, ShoppingCart, DollarSign, Truck, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const UserManual = () => {
@@ -89,9 +89,33 @@ const UserManual = () => {
               <Clipboard className="h-4 w-4 mr-2" />
               Promotions
             </Link>
-            <Link to="/expired-stock" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+            <Link to="/expired" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
               <AlertTriangle className="h-4 w-4 mr-2" />
               Expired Stock
+            </Link>
+            <Link to="/expired-dispatch" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <Truck className="h-4 w-4 mr-2" />
+              Expired Stock Dispatch
+            </Link>
+            <Link to="/expired-dispatch-report" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <BarChart className="h-4 w-4 mr-2" />
+              Dispatch Report
+            </Link>
+            <Link to="/pos" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              POS Terminal
+            </Link>
+            <Link to="/sales-reports" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Sales Reports
+            </Link>
+            <Link to="/cash-register" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Cash Register
+            </Link>
+            <Link to="/user-management" className="inline-flex items-center px-3 py-2 rounded bg-blue-100 text-blue-700 no-underline">
+              <Shield className="h-4 w-4 mr-2" />
+              User Management
             </Link>
           </div>
           
@@ -961,6 +985,281 @@ const UserManual = () => {
                   <li>Staff training on proper storage and handling</li>
                   <li>Optimize ordering to reduce over-stocking</li>
                 </ul>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="expired-dispatch" className="bg-white rounded-lg border shadow-sm">
+          <AccordionTrigger className="px-4">
+            <div className="flex items-center">
+              <Truck className="h-4 w-4 mr-2" />
+              Expired Stock Dispatch
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Dispatching Expired Stock</h3>
+                <p className="text-sm text-gray-600">
+                  Dispatch expired items to designated destinations instead of simply discarding them.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Multi-Select Dispatch</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Select multiple expired items using checkboxes</li>
+                    <li>Items are grouped by product name for easy selection</li>
+                    <li>Use "Select All" per product group to tick all batches</li>
+                    <li>View total quantity and value of selected items in real-time</li>
+                  </ul>
+                </div>
+                
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Dispatch Destinations</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li><strong>Pig Feed</strong> — expired items sent for animal feed</li>
+                    <li><strong>Dog Food Production</strong> — repurposed for pet food</li>
+                    <li><strong>Ginger Biscuit Production</strong> — used in baking</li>
+                    <li><strong>Banana Bread</strong> — repurposed for baking</li>
+                    <li><strong>Kitchen Used (Cooking/Baking)</strong> — used in kitchen</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="p-3 bg-blue-50 rounded">
+                <h4 className="font-medium text-blue-700">How to Dispatch</h4>
+                <ol className="mt-2 space-y-1 text-sm text-blue-600 list-decimal pl-5">
+                  <li>Tick the expired items you want to dispatch (multiple items allowed)</li>
+                  <li>Review the summary showing total quantity and value</li>
+                  <li>Select the dispatch destination</li>
+                  <li>Enter your name as the person dispatching</li>
+                  <li>Add optional notes and click Dispatch</li>
+                </ol>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="expired-dispatch-report" className="bg-white rounded-lg border shadow-sm">
+          <AccordionTrigger className="px-4">
+            <div className="flex items-center">
+              <BarChart className="h-4 w-4 mr-2" />
+              Expired Stock Dispatch Report
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Dispatch Reporting</h3>
+                <p className="text-sm text-gray-600">
+                  View summary and detailed reports of all expired stock dispatches.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Summary by Destination</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>View total quantity dispatched per destination</li>
+                    <li>See total value (ZAR) per destination</li>
+                    <li>Summary cards for Pig Feed, Dog Food, Ginger Biscuit, Banana Bread, Kitchen Used</li>
+                    <li>Filter by date range for specific periods</li>
+                  </ul>
+                </div>
+                
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Detailed Records</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Full dispatch history with dates and quantities</li>
+                    <li>Product names and destination details</li>
+                    <li>Dispatched by (staff name) and notes</li>
+                    <li>Printable report with all values included</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="pos" className="bg-white rounded-lg border shadow-sm">
+          <AccordionTrigger className="px-4">
+            <div className="flex items-center">
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              POS Terminal
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Point of Sale System</h3>
+                <p className="text-sm text-gray-600">
+                  Process sales transactions, manage payments, and track daily sales activity.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Sales Processing</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Scan or search for products to add to cart</li>
+                    <li>Adjust quantities and apply discounts</li>
+                    <li>Process multiple payment methods</li>
+                    <li>Generate transaction receipts</li>
+                  </ul>
+                </div>
+                
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Payment Options</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Cash payments with change calculation</li>
+                    <li>Card payments with reference numbers</li>
+                    <li>Split payments across methods</li>
+                    <li>Track all payment transactions</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="p-3 bg-green-50 rounded">
+                <h4 className="font-medium text-green-700">POS Tips</h4>
+                <p className="text-sm text-green-600 mt-1">
+                  Only products marked as "Show on POS" in the Products page will appear in the terminal.
+                  Ensure product prices are set correctly before processing sales.
+                </p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="sales-reports" className="bg-white rounded-lg border shadow-sm">
+          <AccordionTrigger className="px-4">
+            <div className="flex items-center">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Sales Reports
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Sales Analytics & Reporting</h3>
+                <p className="text-sm text-gray-600">
+                  View detailed sales reports, track revenue, and analyse sales performance.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Report Features</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Daily, weekly, and monthly sales summaries</li>
+                    <li>Transaction history with full details</li>
+                    <li>Revenue breakdowns by product</li>
+                    <li>Payment method analysis</li>
+                  </ul>
+                </div>
+                
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Data Export</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Print sales reports for record-keeping</li>
+                    <li>Filter reports by date range</li>
+                    <li>View individual transaction details</li>
+                    <li>Track cashier performance</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="cash-register" className="bg-white rounded-lg border shadow-sm">
+          <AccordionTrigger className="px-4">
+            <div className="flex items-center">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Cash Register
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Cash Management</h3>
+                <p className="text-sm text-gray-600">
+                  Track cash register balances, reconcile daily takings, and manage float amounts.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Cash Operations</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Set opening float amount</li>
+                    <li>Track cash sales throughout the day</li>
+                    <li>Record cash pickups and drops</li>
+                    <li>End-of-day cash reconciliation</li>
+                  </ul>
+                </div>
+                
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Reconciliation</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Compare expected vs actual cash in register</li>
+                    <li>Identify variances and discrepancies</li>
+                    <li>Maintain audit trail for accountability</li>
+                    <li>Generate daily cash reports</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="user-management" className="bg-white rounded-lg border shadow-sm">
+          <AccordionTrigger className="px-4">
+            <div className="flex items-center">
+              <Shield className="h-4 w-4 mr-2" />
+              User Management
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">POS User Accounts</h3>
+                <p className="text-sm text-gray-600">
+                  Manage user accounts for the POS terminal, including roles and access permissions.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">User Setup</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Create POS user accounts with usernames</li>
+                    <li>Set passwords for secure access</li>
+                    <li>Assign roles (admin, cashier, etc.)</li>
+                    <li>Generate QR codes for quick login</li>
+                  </ul>
+                </div>
+                
+                <div className="p-3 border rounded">
+                  <h4 className="font-medium">Access Control</h4>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li>Activate or deactivate user accounts</li>
+                    <li>Role-based access to features</li>
+                    <li>Track which user processed each sale</li>
+                    <li>Manage permissions per role</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                <h4 className="font-medium text-yellow-800 flex items-center">
+                  <AlertTriangle className="h-4 w-4 mr-1" />
+                  Security Reminder
+                </h4>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Ensure all POS users have strong passwords. Deactivate accounts for staff who no longer need access.
+                </p>
               </div>
             </div>
           </AccordionContent>
