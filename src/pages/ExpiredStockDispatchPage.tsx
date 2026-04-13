@@ -1,6 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -160,28 +166,66 @@ const ExpiredStockDispatchPage = () => {
     return parseFloat(originalQuantity) - totalDispatched;
   };
 
+  const toggleItem = (id: string) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Group available items by product name
+  const availableItems = useMemo(() => 
+    expiredItems.filter(item => calculateRemainingQuantity(item.id, item.quantity) > 0),
+    [expiredItems, dispatchRecords]
+  );
+
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, typeof availableItems> = {};
+    availableItems.forEach(item => {
+      if (!groups[item.product_name]) groups[item.product_name] = [];
+      groups[item.product_name].push(item);
+    });
+    return groups;
+  }, [availableItems]);
+
+  const selectAllOfProduct = (productName: string) => {
+    const items = groupedItems[productName] || [];
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      const allSelected = items.every(item => next.has(item.id));
+      if (allSelected) items.forEach(item => next.delete(item.id));
+      else items.forEach(item => next.add(item.id));
+      return next;
+    });
+  };
+
+  const selectedItems = useMemo(
+    () => availableItems.filter(item => selectedItemIds.has(item.id)),
+    [availableItems, selectedItemIds]
+  );
+
+  const totalSelectedQuantity = useMemo(
+    () => selectedItems.reduce((sum, item) => sum + calculateRemainingQuantity(item.id, item.quantity), 0),
+    [selectedItems, dispatchRecords]
+  );
+
+  const totalSelectedValue = useMemo(
+    () => selectedItems.reduce((sum, item) => {
+      const remaining = calculateRemainingQuantity(item.id, item.quantity);
+      return sum + remaining * (item.selling_price || item.cost_per_unit || 0);
+    }, 0),
+    [selectedItems, dispatchRecords]
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedItemId || !destination || !quantityToDispatch || !dispatchedBy) {
+    if (selectedItemIds.size === 0 || !destination || !dispatchedBy) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const selectedItem = expiredItems.find(item => item.id === selectedItemId);
-    if (!selectedItem) return;
-
-    const dispatchQuantity = parseFloat(quantityToDispatch);
-    const remainingQuantity = calculateRemainingQuantity(selectedItemId, selectedItem.quantity);
-
-    if (dispatchQuantity > remainingQuantity) {
-      toast({
-        title: "Error",
-        description: `Dispatch quantity cannot exceed remaining quantity (${remainingQuantity})`,
+        description: "Please select items, destination, and enter your name",
         variant: "destructive",
       });
       return;
@@ -190,52 +234,36 @@ const ExpiredStockDispatchPage = () => {
     setIsSubmitting(true);
 
     try {
-      console.log('Submitting dispatch with data:', {
-        expired_item_id: selectedItemId,
-        dispatch_destination: destination,
-        quantity_dispatched: dispatchQuantity,
-        dispatched_by: dispatchedBy,
-        notes: notes || null
-      });
-
-      const { data, error } = await supabase
-        .from('expired_stock_dispatches')
-        .insert({
-          expired_item_id: selectedItemId,
-          dispatch_destination: destination,
-          quantity_dispatched: dispatchQuantity,
-          dispatched_by: dispatchedBy,
-          notes: notes || null
-        })
-        .select();
-
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      for (const item of selectedItems) {
+        const remaining = calculateRemainingQuantity(item.id, item.quantity);
+        const { error } = await supabase
+          .from('expired_stock_dispatches')
+          .insert({
+            expired_item_id: item.id,
+            dispatch_destination: destination,
+            quantity_dispatched: remaining,
+            dispatched_by: dispatchedBy,
+            notes: notes || null
+          });
+        if (error) throw error;
       }
-
-      console.log('Dispatch successful:', data);
 
       toast({
         title: "Success",
-        description: "Expired stock dispatched successfully",
+        description: `${selectedItems.length} item(s) dispatched successfully`,
       });
 
-      // Reset form
-      setSelectedItemId("");
+      setSelectedItemIds(new Set());
       setDestination("");
-      setQuantityToDispatch("");
       setDispatchedBy("");
       setNotes("");
-      
-      // Refresh dispatch records
       fetchDispatchRecords();
-
-    } catch (error) {
+      fetchExpiredItems();
+    } catch (error: any) {
       console.error('Error dispatching stock:', error);
       toast({
         title: "Error",
-        description: `Failed to dispatch expired stock: ${error.message}`,
+        description: `Failed to dispatch: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -393,9 +421,6 @@ const ExpiredStockDispatchPage = () => {
     }
   };
 
-  const selectedItem = expiredItems.find(item => item.id === selectedItemId);
-  const remainingQuantity = selectedItem ? calculateRemainingQuantity(selectedItemId, selectedItem.quantity) : 0;
-
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center print:justify-center">
@@ -509,32 +534,68 @@ const ExpiredStockDispatchPage = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Checkbox list of items grouped by product */}
               <div>
-                <Label htmlFor="item">Select Expired Item</Label>
-                <Select value={selectedItemId} onValueChange={setSelectedItemId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose an expired item to dispatch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {expiredItems.map((item) => {
-                      const remaining = calculateRemainingQuantity(item.id, item.quantity);
-                      return (
-                        <SelectItem key={item.id} value={item.id} disabled={remaining <= 0}>
-                          {item.product_name} - Available: {remaining} (Batch: {item.batch_date})
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                <Label className="text-base font-semibold">Select Expired Items to Dispatch</Label>
+                <div className="mt-2 border rounded-lg max-h-80 overflow-y-auto">
+                  {Object.entries(groupedItems).length === 0 && (
+                    <p className="p-4 text-muted-foreground text-sm">No expired items available for dispatch.</p>
+                  )}
+                  {Object.entries(groupedItems).map(([productName, items]) => {
+                    const allSelected = items.every(item => selectedItemIds.has(item.id));
+                    const someSelected = items.some(item => selectedItemIds.has(item.id));
+                    return (
+                      <div key={productName} className="border-b last:border-b-0">
+                        <div
+                          className="flex items-center gap-3 p-3 bg-muted/50 cursor-pointer hover:bg-muted"
+                          onClick={() => selectAllOfProduct(productName)}
+                        >
+                          <Checkbox
+                            checked={allSelected}
+                            className={someSelected && !allSelected ? "opacity-50" : ""}
+                            onCheckedChange={() => selectAllOfProduct(productName)}
+                          />
+                          <span className="font-medium">{productName}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({items.length} batch{items.length > 1 ? 'es' : ''})
+                          </span>
+                        </div>
+                        {items.map(item => {
+                          const remaining = calculateRemainingQuantity(item.id, item.quantity);
+                          return (
+                            <div
+                              key={item.id}
+                              className={`flex items-center gap-3 px-6 py-2 cursor-pointer hover:bg-accent/50 ${
+                                selectedItemIds.has(item.id) ? 'bg-accent/30' : ''
+                              }`}
+                              onClick={() => toggleItem(item.id)}
+                            >
+                              <Checkbox
+                                checked={selectedItemIds.has(item.id)}
+                                onCheckedChange={() => toggleItem(item.id)}
+                              />
+                              <div className="flex-1 text-sm">
+                                <span>Qty: <strong>{remaining.toFixed(2)}</strong></span>
+                                <span className="mx-2">|</span>
+                                <span>Batch: {item.batch_date}</span>
+                                <span className="mx-2">|</span>
+                                <span>Removed: {item.removal_date}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {selectedItem && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p><strong>Product:</strong> {selectedItem.product_name}</p>
-                  <p><strong>Original Quantity:</strong> {selectedItem.quantity}</p>
-                  <p><strong>Available Quantity:</strong> {remainingQuantity}</p>
-                  <p><strong>Batch Date:</strong> {selectedItem.batch_date}</p>
-                  <p><strong>Removal Date:</strong> {selectedItem.removal_date}</p>
+              {/* Summary of selected */}
+              {selectedItems.length > 0 && (
+                <div className="p-3 bg-accent/50 border border-accent rounded-lg">
+                  <p className="font-semibold text-foreground">Selected: {selectedItems.length} item(s)</p>
+                  <p className="text-foreground">Total Quantity: <strong>{totalSelectedQuantity.toFixed(2)}</strong></p>
+                  <p className="text-foreground">Total Value: <strong>R{totalSelectedValue.toFixed(2)}</strong></p>
                 </div>
               )}
 
@@ -552,19 +613,6 @@ const ExpiredStockDispatchPage = () => {
                      ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="quantity">Quantity to Dispatch</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  step="0.01"
-                  value={quantityToDispatch}
-                  onChange={(e) => setQuantityToDispatch(e.target.value)}
-                  max={remainingQuantity}
-                  placeholder="Enter quantity to dispatch"
-                />
               </div>
 
               <div>
@@ -591,9 +639,9 @@ const ExpiredStockDispatchPage = () => {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isSubmitting || !selectedItemId || !destination || !quantityToDispatch || !dispatchedBy}
+                disabled={isSubmitting || selectedItemIds.size === 0 || !destination || !dispatchedBy}
               >
-                {isSubmitting ? "Dispatching..." : "Dispatch Stock"}
+                {isSubmitting ? "Dispatching..." : `Dispatch ${selectedItems.length} Item(s)`}
               </Button>
             </form>
           </CardContent>
