@@ -117,6 +117,7 @@ const UserManual = () => {
               <Shield className="h-4 w-4 mr-2" />
               User Management
             </Link>
+          </div>
           
           <div className="mt-6 p-4 bg-blue-50 rounded-lg text-sm">
             <p className="font-medium text-blue-700">Need help?</p>
