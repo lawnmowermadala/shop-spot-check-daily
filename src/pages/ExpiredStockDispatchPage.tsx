@@ -40,9 +40,8 @@ const ExpiredStockDispatchPage = () => {
   const [expiredItems, setExpiredItems] = useState<ExpiredItem[]>([]);
   const [dispatchRecords, setDispatchRecords] = useState<DispatchRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<DispatchRecord[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState<string>("");
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [destination, setDestination] = useState<string>("");
-  const [quantityToDispatch, setQuantityToDispatch] = useState<string>("");
   const [dispatchedBy, setDispatchedBy] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
